@@ -1,0 +1,671 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+BEGIN_CRASH_DUMP	src/elf/config/win32.h	124;"	d
+BEGIN_C_DECLS	src/elf/config.h	40;"	d
+BEGIN_C_DECLS	src/elf/config.h	44;"	d
+BUCKET_MAP	src/elf/timer.cpp	88;"	d	file:
+CATCH_CRASH_DUMP	src/elf/config/win32.h	125;"	d
+CHUNK_DEFAULT_SIZE	src/elf/net/net.cpp	/^static const int CHUNK_DEFAULT_SIZE = 1024;$/;"	m	namespace:elf	file:
+COLOR_DEBUG	src/elf/log.h	102;"	d
+COLOR_DEBUG	src/elf/log.h	112;"	d
+COLOR_ERROR	src/elf/log.h	105;"	d
+COLOR_ERROR	src/elf/log.h	115;"	d
+COLOR_FATAL	src/elf/log.h	106;"	d
+COLOR_FATAL	src/elf/log.h	116;"	d
+COLOR_INFO	src/elf/log.h	103;"	d
+COLOR_INFO	src/elf/log.h	113;"	d
+COLOR_NORMAL	src/elf/log.h	107;"	d
+COLOR_NORMAL	src/elf/log.h	117;"	d
+COLOR_TRACE	src/elf/log.h	101;"	d
+COLOR_TRACE	src/elf/log.h	111;"	d
+COLOR_WARN	src/elf/log.h	104;"	d
+COLOR_WARN	src/elf/log.h	114;"	d
+CONFIG_COMMENT_CHAR	src/elf/cp.cpp	/^static const char CONFIG_COMMENT_CHAR = '#';$/;"	m	namespace:elf	file:
+CONFIG_FILE_NAME	src/elf/log.cpp	/^static const char *CONFIG_FILE_NAME = "CONFIG\/log.conf";$/;"	v	file:
+CSV_DELIM_CHAR	src/elf/cp.cpp	/^static const char CSV_DELIM_CHAR = ',';$/;"	m	namespace:elf	file:
+CURRENT_WHEEL_CURSOR	src/elf/timer.cpp	81;"	d	file:
+ELF_API	src/elf/config.h	56;"	d
+ELF_API	src/elf/config.h	59;"	d
+ELF_API	src/elf/config.h	63;"	d
+ELF_ASSERT	src/elf/config.h	70;"	d
+ELF_BUILD_VERSION	src/elf/version.h	23;"	d
+ELF_CONFIG_H	src/elf/config.h	11;"	d
+ELF_CONFIG_LINUX_H	src/elf/config/linux.h	8;"	d
+ELF_CONFIG_MACOSX_H	src/elf/config/macosx.h	8;"	d
+ELF_CONFIG_WIN32_H	src/elf/config/win32.h	8;"	d
+ELF_CP_H	src/elf/cp.h	18;"	d
+ELF_DATA	src/elf/config.h	57;"	d
+ELF_DATA	src/elf/config.h	60;"	d
+ELF_DATA	src/elf/config.h	64;"	d
+ELF_DB_H	src/elf/db.h	20;"	d
+ELF_DEBUG	src/elf/config.h	33;"	d
+ELF_DLLMAIN_HINSTANCE	src/elf/config/win32.h	100;"	d
+ELF_DLLMAIN_HINSTANCE	src/elf/config/win32.h	97;"	d
+ELF_ELF_H	src/elf/elf.h	12;"	d
+ELF_ENTRY	src/elf/config.h	68;"	d
+ELF_EVENT_H	src/elf/event.h	19;"	d
+ELF_FINI	src/elf/elf.h	43;"	d
+ELF_HAVE_C99_VARIADIC_MACROS	src/elf/config/linux.h	33;"	d
+ELF_HAVE_C99_VARIADIC_MACROS	src/elf/config/macosx.h	33;"	d
+ELF_HAVE_C99_VARIADIC_MACROS	src/elf/config/win32.h	116;"	d
+ELF_HAVE_C99_VARIADIC_MACROS	src/elf/config/win32.h	90;"	d
+ELF_HAVE_ERRNO_H	src/elf/config/linux.h	24;"	d
+ELF_HAVE_ERRNO_H	src/elf/config/macosx.h	24;"	d
+ELF_HAVE_ERRNO_H	src/elf/config/win32.h	58;"	d
+ELF_HAVE_FCNTL_H	src/elf/config/linux.h	18;"	d
+ELF_HAVE_FCNTL_H	src/elf/config/macosx.h	18;"	d
+ELF_HAVE_FCNTL_H	src/elf/config/win32.h	50;"	d
+ELF_HAVE_FTIME	src/elf/config/win32.h	32;"	d
+ELF_HAVE_FUNCSIG_MACRO	src/elf/config/win32.h	89;"	d
+ELF_HAVE_FUNCTION_MACRO	src/elf/config/linux.h	31;"	d
+ELF_HAVE_FUNCTION_MACRO	src/elf/config/macosx.h	31;"	d
+ELF_HAVE_FUNCTION_MACRO	src/elf/config/win32.h	114;"	d
+ELF_HAVE_FUNCTION_MACRO	src/elf/config/win32.h	88;"	d
+ELF_HAVE_GMTIME_S	src/elf/config/win32.h	36;"	d
+ELF_HAVE_GNU_VARIADIC_MACROS	src/elf/config/linux.h	32;"	d
+ELF_HAVE_GNU_VARIADIC_MACROS	src/elf/config/macosx.h	32;"	d
+ELF_HAVE_GNU_VARIADIC_MACROS	src/elf/config/win32.h	115;"	d
+ELF_HAVE_INTRIN_H	src/elf/config/win32.h	24;"	d
+ELF_HAVE_IO_H	src/elf/config/linux.h	19;"	d
+ELF_HAVE_IO_H	src/elf/config/macosx.h	19;"	d
+ELF_HAVE_IO_H	src/elf/config/win32.h	51;"	d
+ELF_HAVE_NT_EVENT_LOG	src/elf/config/win32.h	101;"	d
+ELF_HAVE_NT_EVENT_LOG	src/elf/config/win32.h	98;"	d
+ELF_HAVE_OUTPUTDEBUGSTRING	src/elf/config/win32.h	43;"	d
+ELF_HAVE_PRAGMA_ONCE	src/elf/config.h	27;"	d
+ELF_HAVE_PRAGMA_ONCE	src/elf/config.h	28;"	d
+ELF_HAVE_PRETTY_FUNCTION_MACRO	src/elf/config/linux.h	35;"	d
+ELF_HAVE_PRETTY_FUNCTION_MACRO	src/elf/config/macosx.h	35;"	d
+ELF_HAVE_PRETTY_FUNCTION_MACRO	src/elf/config/win32.h	118;"	d
+ELF_HAVE_STDARG_H	src/elf/config/linux.h	22;"	d
+ELF_HAVE_STDARG_H	src/elf/config/macosx.h	22;"	d
+ELF_HAVE_STDARG_H	src/elf/config/win32.h	54;"	d
+ELF_HAVE_STDIO_H	src/elf/config/linux.h	20;"	d
+ELF_HAVE_STDIO_H	src/elf/config/macosx.h	20;"	d
+ELF_HAVE_STDIO_H	src/elf/config/win32.h	52;"	d
+ELF_HAVE_STDLIB_H	src/elf/config/linux.h	23;"	d
+ELF_HAVE_STDLIB_H	src/elf/config/linux.h	27;"	d
+ELF_HAVE_STDLIB_H	src/elf/config/macosx.h	23;"	d
+ELF_HAVE_STDLIB_H	src/elf/config/macosx.h	27;"	d
+ELF_HAVE_STDLIB_H	src/elf/config/win32.h	55;"	d
+ELF_HAVE_STDLIB_H	src/elf/config/win32.h	62;"	d
+ELF_HAVE_SYS_LOCKING_H	src/elf/config/linux.h	17;"	d
+ELF_HAVE_SYS_LOCKING_H	src/elf/config/macosx.h	17;"	d
+ELF_HAVE_SYS_LOCKING_H	src/elf/config/win32.h	49;"	d
+ELF_HAVE_SYS_STAT_H	src/elf/config/linux.h	25;"	d
+ELF_HAVE_SYS_STAT_H	src/elf/config/macosx.h	25;"	d
+ELF_HAVE_SYS_STAT_H	src/elf/config/win32.h	59;"	d
+ELF_HAVE_SYS_TIMEB_H	src/elf/config/win32.h	31;"	d
+ELF_HAVE_SYS_TYPES_H	src/elf/config/linux.h	16;"	d
+ELF_HAVE_SYS_TYPES_H	src/elf/config/macosx.h	16;"	d
+ELF_HAVE_SYS_TYPES_H	src/elf/config/win32.h	48;"	d
+ELF_HAVE_TIME_H	src/elf/config/linux.h	26;"	d
+ELF_HAVE_TIME_H	src/elf/config/macosx.h	26;"	d
+ELF_HAVE_TIME_H	src/elf/config/win32.h	28;"	d
+ELF_HAVE_TIME_H	src/elf/config/win32.h	61;"	d
+ELF_HAVE_VFPRINTF_S	src/elf/config/win32.h	74;"	d
+ELF_HAVE_VFWPRINTF_S	src/elf/config/win32.h	75;"	d
+ELF_HAVE_VSNPRINTF	src/elf/config/win32.h	65;"	d
+ELF_HAVE_VSNPRINTF_S	src/elf/config/win32.h	78;"	d
+ELF_HAVE_VSPRINTF_S	src/elf/config/win32.h	70;"	d
+ELF_HAVE_VSWPRINTF_S	src/elf/config/win32.h	71;"	d
+ELF_HAVE_WCHAR_H	src/elf/config/linux.h	21;"	d
+ELF_HAVE_WCHAR_H	src/elf/config/macosx.h	21;"	d
+ELF_HAVE_WCHAR_H	src/elf/config/win32.h	53;"	d
+ELF_HAVE_WIN32_CONSOLE	src/elf/config/win32.h	46;"	d
+ELF_HAVE__VSNPRINTF	src/elf/config/win32.h	66;"	d
+ELF_HAVE__VSNPRINTF_S	src/elf/config/win32.h	79;"	d
+ELF_HAVE__VSNWPRINTF_S	src/elf/config/win32.h	80;"	d
+ELF_INIT	src/elf/elf.h	38;"	d
+ELF_INL	src/elf/config.h	69;"	d
+ELF_INLINES_ARE_EXPORTED	src/elf/config/linux.h	30;"	d
+ELF_INLINES_ARE_EXPORTED	src/elf/config/macosx.h	30;"	d
+ELF_INLINES_ARE_EXPORTED	src/elf/config/win32.h	113;"	d
+ELF_INLINES_ARE_EXPORTED	src/elf/config/win32.h	82;"	d
+ELF_LOG_H	src/elf/log.h	20;"	d
+ELF_MAJOR_VERSION	src/elf/version.h	20;"	d
+ELF_MAX_LINE	src/elf/config.h	79;"	d
+ELF_MEMORY_H	src/elf/memory.h	14;"	d
+ELF_MINOR_VERSION	src/elf/version.h	21;"	d
+ELF_MUTEX_H	src/elf/mutex.h	17;"	d
+ELF_NET_MESSAGE_H	src/elf/net/message.h	18;"	d
+ELF_NET_NET_H	src/elf/net/net.h	18;"	d
+ELF_OID_H	src/elf/oid.h	18;"	d
+ELF_PATCH_VERSION	src/elf/version.h	22;"	d
+ELF_PB_H	src/elf/pb.h	18;"	d
+ELF_PC_H	src/elf/pc.h	18;"	d
+ELF_PLATFORM_LINUX	src/elf/config/linux.h	13;"	d
+ELF_PLATFORM_MACOSX	src/elf/config/macosx.h	13;"	d
+ELF_PLATFORM_WIN32	src/elf/config/win32.h	17;"	d
+ELF_POOR_MANS_SHAREDMUTEX	src/elf/config/win32.h	109;"	d
+ELF_RAND_H	src/elf/rand.h	18;"	d
+ELF_RC_DB_COMMAND_NOT_FOUND	src/elf/db.h	/^    ELF_RC_DB_COMMAND_NOT_FOUND,$/;"	e	enum:db_rc
+ELF_RC_DB_COMPILE_FAILED	src/elf/db.h	/^    ELF_RC_DB_COMPILE_FAILED,$/;"	e	enum:db_rc
+ELF_RC_DB_EXECUTE_FAILED	src/elf/db.h	/^    ELF_RC_DB_EXECUTE_FAILED,$/;"	e	enum:db_rc
+ELF_RC_DB_INIT_FAILED	src/elf/db.h	/^    ELF_RC_DB_INIT_FAILED,$/;"	e	enum:db_rc
+ELF_RC_DB_OK	src/elf/db.h	/^    ELF_RC_DB_OK,$/;"	e	enum:db_rc
+ELF_RC_DB_SYNTAX_ERROR	src/elf/db.h	/^    ELF_RC_DB_SYNTAX_ERROR,$/;"	e	enum:db_rc
+ELF_RC_DB_TABLE_NOT_FOUND	src/elf/db.h	/^    ELF_RC_DB_TABLE_NOT_FOUND,$/;"	e	enum:db_rc
+ELF_RELEASE	src/elf/config.h	35;"	d
+ELF_SCRIPT_SCRIPT_H	src/elf/script/script.h	16;"	d
+ELF_SINGLETON_H	src/elf/singleton.h	21;"	d
+ELF_THREAD_ATOMIC_H	src/elf/thread/atomic.h	18;"	d
+ELF_THREAD_H	src/elf/thread.h	19;"	d
+ELF_THREAD_SEMPHORE_H	src/elf/thread/semaphore.h	13;"	d
+ELF_THREAD_SIGNAL_H	src/elf/thread/signal.h	11;"	d
+ELF_TIMER_H	src/elf/timer.h	21;"	d
+ELF_TIME_H	src/elf/time.h	19;"	d
+ELF_UNUSED_ARG	src/elf/config.h	71;"	d
+ELF_USE_CP	src/elf/elf.h	14;"	d
+ELF_USE_DB	src/elf/elf.h	15;"	d
+ELF_USE_EVENT	src/elf/elf.h	23;"	d
+ELF_USE_HTTP	src/elf/elf.h	24;"	d
+ELF_USE_INPUT	src/elf/elf.h	25;"	d
+ELF_USE_LOG	src/elf/elf.h	16;"	d
+ELF_USE_LOG4CPLUS	src/elf/log.h	24;"	d
+ELF_USE_MEMORY	src/elf/elf.h	17;"	d
+ELF_USE_NET	src/elf/elf.h	26;"	d
+ELF_USE_OID	src/elf/elf.h	18;"	d
+ELF_USE_PB	src/elf/elf.h	19;"	d
+ELF_USE_PC	src/elf/elf.h	27;"	d
+ELF_USE_RAND	src/elf/elf.h	28;"	d
+ELF_USE_SCRIPT	src/elf/elf.h	29;"	d
+ELF_USE_SINGLETON	src/elf/elf.h	20;"	d
+ELF_USE_SINGLETON	src/elf/elf.h	30;"	d
+ELF_USE_THREAD	src/elf/elf.h	31;"	d
+ELF_USE_TIME	src/elf/elf.h	32;"	d
+ELF_USE_TIMER	src/elf/elf.h	33;"	d
+ELF_USE_UTILS	src/elf/elf.h	34;"	d
+ELF_USE_VERSION	src/elf/elf.h	35;"	d
+ELF_USE_WIN32_THREADS	src/elf/config/win32.h	105;"	d
+ELF_USE_WINSOCK	src/elf/config/win32.h	40;"	d
+ELF_UTILS_VERSION_H	src/elf/utils/version.h	18;"	d
+ELF_VERSION_H	src/elf/version.h	11;"	d
+ELF_VERSION_STR	src/elf/version.h	24;"	d
+ELF_WORKING_LOCALE	src/elf/config/win32.h	86;"	d
+ELF_XQUEUE_H	src/elf/thread/xqueue.h	18;"	d
+END_C_DECLS	src/elf/config.h	41;"	d
+END_C_DECLS	src/elf/config.h	45;"	d
+EPOCHFILETIME	src/elf/time.cpp	9;"	d	file:
+E_ALLOC	src/elf/memory.h	25;"	d
+E_DELETE	src/elf/memory.h	29;"	d
+E_FREE	src/elf/memory.h	28;"	d
+E_NEW	src/elf/memory.h	27;"	d
+E_REALLOC	src/elf/memory.h	26;"	d
+FRAME_BINGO	src/elf/timer.cpp	92;"	d	file:
+FRAME_CALC	src/elf/timer.cpp	77;"	d	file:
+FRAME_DIFFER	src/elf/timer.cpp	22;"	d	file:
+Find	src/elf/object.h	/^    static Type *Find(oid_t id) {$/;"	f	class:elf::Object
+FindPB	src/elf/object.h	/^    static Type *FindPB(oid_t id) {$/;"	f	class:elf::Object
+GetID	src/elf/object.h	/^    inline oid_t GetID(void) const { return m_id; }$/;"	f	class:elf::Object
+GetName	src/elf/object.h	/^    inline const std::string &GetName(void) const { return m_name; }$/;"	f	class:elf::Object
+GetPB	src/elf/object.h	/^    inline Type *GetPB(void) {$/;"	f	class:elf::Object
+GetPB	src/elf/object.h	/^    inline const Type &GetPB(void) const {$/;"	f	class:elf::Object
+L	src/elf/script/script.cpp	/^static lua_State *L;$/;"	m	namespace:elf	file:
+LOG	src/elf/log.cpp	10;"	d	file:
+LOGE	src/elf/log.cpp	11;"	d	file:
+LOG_DEBUG	src/elf/log.h	124;"	d
+LOG_DEBUG	src/elf/log.h	152;"	d
+LOG_ERROR	src/elf/log.h	133;"	d
+LOG_ERROR	src/elf/log.h	161;"	d
+LOG_FATAL	src/elf/log.h	136;"	d
+LOG_FATAL	src/elf/log.h	164;"	d
+LOG_FMT_COLOR	src/elf/log.h	82;"	d
+LOG_FMT_COLOR	src/elf/log.h	93;"	d
+LOG_INFO	src/elf/log.h	127;"	d
+LOG_INFO	src/elf/log.h	155;"	d
+LOG_NOIMPL	src/elf/log.h	141;"	d
+LOG_NOIMPL	src/elf/log.h	144;"	d
+LOG_NOIMPL	src/elf/log.h	169;"	d
+LOG_NOIMPL	src/elf/log.h	172;"	d
+LOG_RAW	src/elf/log.h	69;"	d
+LOG_RAW	src/elf/log.h	72;"	d
+LOG_RAW	src/elf/log.h	76;"	d
+LOG_TEST	src/elf/log.h	140;"	d
+LOG_TEST	src/elf/log.h	143;"	d
+LOG_TEST	src/elf/log.h	168;"	d
+LOG_TEST	src/elf/log.h	171;"	d
+LOG_TRACE	src/elf/log.h	121;"	d
+LOG_TRACE	src/elf/log.h	149;"	d
+LOG_WARN	src/elf/log.h	130;"	d
+LOG_WARN	src/elf/log.h	158;"	d
+MAGIC_INDEX	src/elf/oid.cpp	/^int MAGIC_INDEX = 0;$/;"	m	namespace:elf	file:
+MAX_CURSOR	src/elf/timer.cpp	20;"	d	file:
+MAX_FUNCTION_NAME_LENGTH	src/elf/script/script.cpp	14;"	d	file:
+MAX_INDEX	src/elf/oid.cpp	/^const int MAX_INDEX = 1 << 20;$/;"	m	namespace:elf	file:
+MAX_LIFE	src/elf/timer.cpp	21;"	d	file:
+MAX_MODULE_LAYERS	src/elf/script/script.cpp	12;"	d	file:
+MAX_MODULE_NAME_LENGTH	src/elf/script/script.cpp	13;"	d	file:
+MAX_PATH	src/elf/config/linux.h	49;"	d
+MAX_PATH	src/elf/config/macosx.h	49;"	d
+MAX_SCRIPT_TOKEN_LENGTH	src/elf/script/script.h	26;"	d
+MAX_TIME	src/elf/oid.cpp	/^const oid_t MAX_TIME = 1ll << 42;$/;"	m	namespace:elf	file:
+MAX_WHEEL_SET_SIZE	src/elf/timer.cpp	19;"	d	file:
+MODULE_IMPORT_SWITCH	src/elf/config.h	73;"	d
+OID_NIL	src/elf/oid.h	/^const oid_t OID_NIL = 0;$/;"	m	namespace:elf
+Object	src/elf/object.cpp	/^Object::Object()$/;"	f	class:elf::Object
+Object	src/elf/object.cpp	/^Object::Object(oid_t id)$/;"	f	class:elf::Object
+Object	src/elf/object.h	/^class Object {$/;"	c	namespace:elf
+OnInit	src/elf/object.cpp	/^void Object::OnInit(void)$/;"	f	class:elf::Object
+SCRIPT_RC_ERROR	src/elf/script/script.h	/^    SCRIPT_RC_ERROR,$/;"	e	enum:elf::script_rc
+SCRIPT_RC_OK	src/elf/script/script.h	/^    SCRIPT_RC_OK,$/;"	e	enum:elf::script_rc
+SIZE_INT	src/elf/net/net.cpp	/^const int SIZE_INT = sizeof(int(0));$/;"	m	namespace:elf	file:
+SIZE_INTX2	src/elf/net/net.cpp	/^const int SIZE_INTX2 = sizeof(int(0)) * 2;$/;"	m	namespace:elf	file:
+S_DELETE	src/elf/memory.h	23;"	d
+S_FREE	src/elf/memory.h	22;"	d
+TIMER_FRAME_INTERVAL_DEFAULT	src/elf/timer.cpp	/^static const time64_t TIMER_FRAME_INTERVAL_DEFAULT = 50; \/\/ (ms)$/;"	m	namespace:elf	file:
+TIMER_FRAME_INTERVAL_MAX	src/elf/timer.cpp	/^static const time64_t TIMER_FRAME_INTERVAL_MAX = 1000; \/\/ (frame)$/;"	m	namespace:elf	file:
+TIMER_FRAME_INTERVAL_MIN	src/elf/timer.cpp	/^static const time64_t TIMER_FRAME_INTERVAL_MIN = 1; \/\/ (frame)$/;"	m	namespace:elf	file:
+WHEEL_CMP	src/elf/timer.cpp	84;"	d	file:
+WHEEL_SET_BIT	src/elf/timer.cpp	16;"	d	file:
+WHEEL_SET_BIT0	src/elf/timer.cpp	14;"	d	file:
+WHEEL_SET_BITS	src/elf/timer.cpp	15;"	d	file:
+WHEEL_SET_SIZE	src/elf/timer.cpp	18;"	d	file:
+WHEEL_SET_SIZE0	src/elf/timer.cpp	17;"	d	file:
+WRITE_RAW	src/elf/log.h	53;"	d
+WRITE_RAW	src/elf/log.h	61;"	d
+_cond	src/elf/pc.h	/^    pthread_cond_t _cond;$/;"	m	class:elf::xqueue
+_mutex	src/elf/pc.h	/^    pthread_mutex_t _mutex;$/;"	m	class:elf::xqueue
+_nready	src/elf/pc.h	/^    int _nready;$/;"	m	class:elf::xqueue
+_queue	src/elf/pc.h	/^    std::deque<type> _queue;$/;"	m	class:elf::xqueue
+_ready	src/elf/pc.h	/^    pthread_mutex_t _ready;$/;"	m	class:elf::xqueue
+a	src/elf/timer.cpp	/^    int a;$/;"	m	union:elf::cursor_t	file:
+args	src/elf/timer.cpp	/^    void *args; \/\/ callback arguments$/;"	m	struct:elf::timer_t	file:
+atomic_add	src/elf/thread/atomic.cpp	/^int atomic_add(volatile int *n, int val)$/;"	f
+atomic_dec	src/elf/thread/atomic.cpp	/^int atomic_dec(volatile int *n)$/;"	f
+atomic_inc	src/elf/thread/atomic.cpp	/^int atomic_inc(volatile int *n)$/;"	f
+atomic_ptr_cas	src/elf/thread/atomic.cpp	/^void * atomic_ptr_cas(void **dst, void *src, void *cmp)$/;"	f
+atomic_ptr_xchg	src/elf/thread/atomic.cpp	/^void * atomic_ptr_xchg(void **dst, void *src)$/;"	f
+atomic_sub	src/elf/thread/atomic.cpp	/^int atomic_sub(volatile int *n, int val)$/;"	f
+atomic_xchg	src/elf/thread/atomic.cpp	/^int atomic_xchg(volatile int *dst, volatile int src)$/;"	f
+bingo	src/elf/timer.cpp	/^static void bingo(void)$/;"	f	namespace:elf
+blob_fini	src/elf/net/net.cpp	/^static void blob_fini(blob_t *blob)$/;"	f	namespace:elf
+blob_init	src/elf/net/net.cpp	/^static void blob_init(blob_t *blob)$/;"	f	namespace:elf
+blob_t	src/elf/net/net.cpp	/^struct blob_t {$/;"	s	namespace:elf	file:
+body	src/elf/net/net.h	/^    std::string body;$/;"	m	struct:elf::recv_message_t
+bool	src/elf/config.h	/^typedef enum { false, true } bool;$/;"	t	typeref:enum:__anon1
+build	src/elf/utils/version.h	/^    int build;$/;"	m	struct:elf::version_t
+callback	src/elf/oid.h	/^typedef void (*callback)(void *args);$/;"	t	namespace:elf
+callback_t	src/elf/oid.h	/^struct callback_t {$/;"	s	namespace:elf
+cb	src/elf/timer.cpp	/^    cb_t cb; \/\/ callback function$/;"	m	struct:elf::timer_t	file:
+cb_t	src/elf/timer.cpp	/^    union cb_t {$/;"	u	struct:elf::timer_t	file:
+chunk_clone	src/elf/net/net.cpp	/^static chunk_t *chunk_clone(const chunk_t &src)$/;"	f	namespace:elf
+chunk_fini	src/elf/net/net.cpp	/^static void chunk_fini(chunk_t *c)$/;"	f	namespace:elf
+chunk_init	src/elf/net/net.cpp	/^static chunk_t *chunk_init(void)$/;"	f	namespace:elf
+chunk_num	src/elf/thread/xqueue.cpp	/^    size_t chunk_num;$/;"	m	struct:xqueue_s	file:
+chunk_queue	src/elf/net/net.cpp	/^typedef std::list<chunk_t *> chunk_queue;$/;"	t	namespace:elf	file:
+chunk_t	src/elf/net/net.cpp	/^struct chunk_t {$/;"	s	namespace:elf	file:
+chunk_xqueue	src/elf/net/net.cpp	/^typedef xqueue<chunk_t *> chunk_xqueue;$/;"	t	namespace:elf	file:
+chunks	src/elf/net/net.cpp	/^    chunk_queue chunks;$/;"	m	struct:elf::blob_t	file:
+cmd	src/elf/db.cpp	/^    std::string cmd; \/\/ sql command$/;"	m	struct:elf::db_req_t	file:
+config_load	src/elf/cp.cpp	/^bool config_load(const std::string &path, oid_t sid)$/;"	f	namespace:elf
+config_load	src/elf/cp.cpp	/^pb_t *config_load(const std::string &name, const std::string &path)$/;"	f	namespace:elf
+context_find	src/elf/net/net.cpp	/^static context_t *context_find(oid_t peer)$/;"	f	namespace:elf
+context_fini	src/elf/net/net.cpp	/^static void context_fini(elf::oid_t peer)$/;"	f	namespace:elf
+context_init	src/elf/net/net.cpp	/^static context_t *context_init(oid_t peer, int fd,$/;"	f	namespace:elf
+context_list	src/elf/net/net.cpp	/^typedef std::map<oid_t, context_t *> context_list;$/;"	t	namespace:elf	file:
+context_t	src/elf/net/net.cpp	/^struct context_t {$/;"	s	namespace:elf	file:
+creator	src/elf/singleton.h	/^        creator(void) { singleton_mt<T>::inst(); }$/;"	f	class:elf::utils::singleton_mt::creator
+creator	src/elf/singleton.h	/^    class creator$/;"	c	class:elf::utils::singleton_mt
+creator	src/elf/singleton.h	/^    static creator creator;$/;"	m	class:elf::utils::singleton_mt
+creator	src/elf/singleton.h	/^typename singleton_mt<T>::creator singleton_mt<T>::creator;$/;"	m	class:elf::utils::singleton_mt
+cur_time	src/elf/timer.cpp	/^    time64_t cur_time; \/\/ current frame time$/;"	m	struct:elf::mgr_t	file:
+cursor	src/elf/timer.cpp	/^    cursor_t cursor; \/\/ current cursor (number of escaped frames)$/;"	m	struct:elf::mgr_t	file:
+cursor	src/elf/timer.cpp	/^    cursor_t cursor; \/\/ expired frame$/;"	m	struct:elf::timer_t	file:
+cursor_t	src/elf/timer.cpp	/^union cursor_t {$/;"	u	namespace:elf	file:
+data	src/elf/db.cpp	/^    MYSQL_RES *data; \/\/ query result$/;"	m	struct:elf::db_res_t	file:
+data	src/elf/net/net.cpp	/^    char data[CHUNK_DEFAULT_SIZE];$/;"	m	struct:elf::chunk_t	file:
+db_callback	src/elf/db.h	/^typedef void (*db_callback)(oid_t, pb_t *);$/;"	t	namespace:elf
+db_connect	src/elf/db.cpp	/^int db_connect(const std::string &host, const std::string &user,$/;"	f	namespace:elf
+db_fini	src/elf/db.cpp	/^int db_fini(void)$/;"	f	namespace:elf
+db_init	src/elf/db.cpp	/^int db_init(void)$/;"	f	namespace:elf
+db_proc	src/elf/db.cpp	/^int db_proc(void)$/;"	f	namespace:elf
+db_query	src/elf/db.cpp	/^db_rc db_query(const char *cmd)$/;"	f	namespace:elf
+db_query	src/elf/db.cpp	/^db_rc db_query(const char *cmd, pb_t *out)$/;"	f	namespace:elf
+db_query	src/elf/db.cpp	/^db_rc db_query(const char *cmd, pb_t *out, const std::string &field)$/;"	f	namespace:elf
+db_rc	src/elf/db.h	/^enum db_rc {$/;"	g
+db_req	src/elf/db.cpp	/^void db_req(const char *cmd, oid_t oid, pb_t *out,$/;"	f	namespace:elf
+db_req_t	src/elf/db.cpp	/^struct db_req_t {$/;"	s	namespace:elf	file:
+db_res	src/elf/db.cpp	/^void db_res(MYSQL_RES *res, pb_t *out, const std::string &field)$/;"	f	namespace:elf
+db_res_t	src/elf/db.cpp	/^struct db_res_t {$/;"	s	namespace:elf	file:
+destroy	src/elf/timer.cpp	/^static void destroy(timer_t *t)$/;"	f	namespace:elf
+donothing	src/elf/singleton.h	/^        inline void donothing(void) const {}$/;"	f	class:elf::utils::singleton_mt::creator
+elf	src/elf/cp.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/cp.h	/^namespace elf {$/;"	n
+elf	src/elf/db.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/db.h	/^namespace elf {$/;"	n
+elf	src/elf/event.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/event.h	/^namespace elf {$/;"	n
+elf	src/elf/log.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/log.h	/^namespace elf {$/;"	n
+elf	src/elf/mutex.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/mutex.h	/^namespace elf {$/;"	n
+elf	src/elf/net/message.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/net/message.h	/^namespace elf {$/;"	n
+elf	src/elf/net/net.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/net/net.h	/^namespace elf {$/;"	n
+elf	src/elf/object.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/object.h	/^namespace elf {$/;"	n
+elf	src/elf/oid.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/oid.h	/^namespace elf {$/;"	n
+elf	src/elf/pb.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/pb.h	/^namespace elf {$/;"	n
+elf	src/elf/pc.h	/^namespace elf {$/;"	n
+elf	src/elf/rand.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/rand.h	/^namespace elf {$/;"	n
+elf	src/elf/script/script.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/script/script.h	/^namespace elf {$/;"	n
+elf	src/elf/singleton.h	/^namespace elf {$/;"	n
+elf	src/elf/thread.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/thread.h	/^namespace elf {$/;"	n
+elf	src/elf/thread/atomic.h	/^namespace elf {$/;"	n
+elf	src/elf/thread/xqueue.h	/^namespace elf {$/;"	n
+elf	src/elf/time.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/time.h	/^namespace elf {$/;"	n
+elf	src/elf/timer.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/timer.h	/^namespace elf {$/;"	n
+elf	src/elf/utils/version.cpp	/^namespace elf {$/;"	n	file:
+elf	src/elf/utils/version.h	/^namespace elf {$/;"	n
+elf	src/pb.cpp	/^namespace elf {$/;"	n	file:
+end_time	src/elf/timer.cpp	/^    time64_t end_time; \/\/ end time$/;"	m	struct:elf::mgr_t	file:
+error_times	src/elf/net/net.cpp	/^    int error_times;$/;"	m	struct:elf::context_t	file:
+event_emit	src/elf/event.cpp	/^void event_emit(int evt, int arg, oid_t oid)$/;"	f	namespace:elf
+event_fini	src/elf/event.cpp	/^int event_fini(void)$/;"	f	namespace:elf
+event_init	src/elf/event.cpp	/^int event_init(void)$/;"	f	namespace:elf
+event_init	src/elf/net/net.cpp	/^static void event_init(context_t *ctx)$/;"	f	namespace:elf
+event_regist	src/elf/event.cpp	/^void event_regist(int evt, callback_t *cb)$/;"	f	namespace:elf
+event_unregist	src/elf/event.cpp	/^void event_unregist(oid_t lid, int evt)$/;"	f	namespace:elf
+evt	src/elf/net/net.cpp	/^    epoll_event evt;$/;"	m	struct:elf::context_t	file:
+expire	src/elf/timer.cpp	/^static void expire(timer_t *t)$/;"	f	namespace:elf
+false	src/elf/config.h	/^typedef enum { false, true } bool;$/;"	e	enum:__anon1
+field	src/elf/db.cpp	/^    std::string field; \/\/ pb field$/;"	m	struct:elf::session_t	file:
+frand	src/elf/rand.cpp	/^float frand(float min, float max)$/;"	f	namespace:elf
+func	src/elf/oid.h	/^    callback func; \/\/ callback function$/;"	m	struct:elf::callback_t
+func	src/elf/timer.cpp	/^        callback func; \/\/ callback function$/;"	m	union:elf::timer_t::cb_t	file:
+get	src/elf/timer.cpp	/^static timer_t *get(const oid_t &tid, int *bucket)$/;"	f	namespace:elf
+get_ext	src/elf/cp.cpp	/^static void get_ext(std::string &str)$/;"	f	namespace:elf
+get_inst	src/elf/singleton.h	25;"	d
+get_inst_mt	src/elf/singleton.h	28;"	d
+gettimeofday	src/elf/time.cpp	/^static int gettimeofday(struct timeval *tp, void *tzp)$/;"	f	namespace:elf
+handle	src/elf/db.cpp	/^static void *handle(void *args)$/;"	f	namespace:elf
+handler_list	src/elf/timer.cpp	/^typedef std::list<callback> handler_list;$/;"	t	namespace:elf	file:
+hash	src/elf/timer.cpp	/^static void hash(int bucket)$/;"	f	namespace:elf
+head	src/elf/thread/xqueue.cpp	/^    xchunk_t *head;$/;"	m	struct:xqueue_s	file:
+head_pos	src/elf/thread/xqueue.cpp	/^    size_t head_pos;$/;"	m	struct:xqueue_s	file:
+id	src/elf/db.cpp	/^    oid_t id; \/\/ session id$/;"	m	struct:elf::session_t	file:
+id	src/elf/net/net.cpp	/^    oid_t id;$/;"	m	struct:elf::peer_t	file:
+id	src/elf/timer.cpp	/^    oid_t id; \/\/ identification$/;"	m	struct:elf::timer_t	file:
+id_set	src/elf/oid.h	/^typedef std::set<oid_t> id_set;$/;"	t	namespace:elf
+init	src/elf/net/message.cpp	/^    pb_new init;$/;"	m	struct:elf::message_handler_t	file:
+inst	src/elf/singleton.h	/^    static T& inst()$/;"	f	class:elf::utils::singleton
+inst	src/elf/singleton.h	/^    static T& inst()$/;"	f	class:elf::utils::singleton_mt
+interval	src/elf/timer.cpp	/^    time64_t interval; \/\/ frame interval time$/;"	m	struct:elf::mgr_t	file:
+ip	src/elf/net/net.cpp	/^    std::string ip;$/;"	m	struct:elf::peer_t	file:
+is_period	src/elf/cp.cpp	/^static int is_period(char ch)$/;"	f	namespace:elf
+is_space	src/elf/cp.cpp	/^static int is_space(char ch)$/;"	f	namespace:elf
+larg	src/elf/oid.h	/^    int larg; \/\/ listener argument$/;"	m	struct:elf::callback_t
+last_cursor	src/elf/timer.cpp	/^    int last_cursor; \/\/ last pause cursor$/;"	m	struct:elf::mgr_t	file:
+last_time	src/elf/net/net.cpp	/^    int last_time;$/;"	m	struct:elf::context_t	file:
+last_time	src/elf/timer.cpp	/^    time64_t last_time; \/\/ last pause time$/;"	m	struct:elf::mgr_t	file:
+lid	src/elf/oid.h	/^    oid_t lid; \/\/ listener id$/;"	m	struct:elf::callback_t
+life	src/elf/timer.cpp	/^    time64_t life; \/\/ life from now$/;"	m	struct:elf::timer_t	file:
+listener_list	src/elf/event.cpp	/^typedef std::map<oid_t, callback_t *> listener_list;$/;"	t	namespace:elf	file:
+listener_map	src/elf/event.cpp	/^typedef std::map<int, listener_list *> listener_map;$/;"	t	namespace:elf	file:
+load_cfg	src/elf/cp.cpp	/^bool load_cfg(const std::string &path, pb_t *cfg)$/;"	f	namespace:elf
+load_csv	src/elf/cp.cpp	/^static bool load_csv(const std::string &path, pb_t *cfg)$/;"	f	namespace:elf
+load_tbl	src/elf/cp.cpp	/^static bool load_tbl(const std::string &tbl_name, oid_t sid)$/;"	f	namespace:elf
+load_tbl	src/elf/cp.cpp	/^static bool load_tbl(const std::string &tbl_name, pb_t *cfg)$/;"	f	namespace:elf
+lock	src/elf/net/net.cpp	/^    mutex_t lock;$/;"	m	struct:elf::context_t	file:
+log_fini	src/elf/log.cpp	/^int log_fini(void)$/;"	f	namespace:elf
+log_init	src/elf/log.cpp	/^int log_init(void)$/;"	f	namespace:elf
+ltype	src/elf/oid.h	/^    int ltype; \/\/ listner type$/;"	m	struct:elf::callback_t
+m_id	src/elf/object.h	/^    oid_t m_id;$/;"	m	class:elf::Object
+m_name	src/elf/object.h	/^    std::string m_name;$/;"	m	class:elf::Object
+m_pb	src/elf/object.h	/^    pb_t *m_pb;$/;"	m	class:elf::Object
+major	src/elf/utils/version.h	/^    int major;$/;"	m	struct:elf::version_t
+max	src/elf/config/linux.h	54;"	d
+max	src/elf/config/macosx.h	54;"	d
+message_get	src/elf/net/net.cpp	/^static void message_get(chunk_queue &chunks, std::string &buf, int size)$/;"	f	namespace:elf
+message_get	src/elf/net/net.cpp	/^static void message_get(chunk_queue &chunks, void *buf, int size)$/;"	f	namespace:elf
+message_handle	src/elf/net/message.cpp	/^void message_handle(recv_message_t *msg)$/;"	f	namespace:elf
+message_handler_t	src/elf/net/message.cpp	/^struct message_handler_t {$/;"	s	namespace:elf	file:
+message_regist	src/elf/net/message.cpp	/^void message_regist(const std::string &name, pb_new init, msg_proc proc)$/;"	f	namespace:elf
+message_set	src/elf/net/net.cpp	/^static void message_set(chunk_queue &chunks, const void *buf, int size)$/;"	f	namespace:elf
+message_splice	src/elf/net/net.cpp	/^static bool message_splice(context_t *ctx)$/;"	f	namespace:elf
+message_unregist_all	src/elf/net/message.cpp	/^void message_unregist_all(void)$/;"	f	namespace:elf
+mgr_t	src/elf/timer.cpp	/^struct mgr_t {$/;"	s	namespace:elf	file:
+min	src/elf/config/linux.h	58;"	d
+min	src/elf/config/macosx.h	58;"	d
+minor	src/elf/utils/version.h	/^    int minor;$/;"	m	struct:elf::version_t
+msg_proc	src/elf/net/message.h	/^typedef void (*msg_proc)(const recv_message_t &msg);$/;"	t	namespace:elf
+msg_size	src/elf/net/net.cpp	/^    int msg_size;$/;"	m	struct:elf::blob_t	file:
+mutex_fini	src/elf/mutex.cpp	/^void mutex_fini(mutex_t *m)$/;"	f	namespace:elf
+mutex_init	src/elf/mutex.cpp	/^void mutex_init(mutex_t *m)$/;"	f	namespace:elf
+mutex_lock	src/elf/mutex.cpp	/^void mutex_lock(mutex_t *m)$/;"	f	namespace:elf
+mutex_t	src/elf/mutex.h	/^typedef CRITICAL_SECTION mutex_t;$/;"	t	namespace:elf
+mutex_unlock	src/elf/mutex.cpp	/^void mutex_unlock(mutex_t *m)$/;"	f	namespace:elf
+name	src/elf/net/net.h	/^    std::string name;$/;"	m	struct:elf::recv_message_t
+net_close	src/elf/net/net.cpp	/^void net_close(oid_t peer)$/;"	f	namespace:elf
+net_connect	src/elf/net/net.cpp	/^int net_connect(oid_t peer, const std::string &name,$/;"	f	namespace:elf
+net_decode	src/elf/net/net.cpp	/^bool net_decode(recv_message_t *msg)$/;"	f	namespace:elf
+net_encode	src/elf/net/net.cpp	/^blob_t *net_encode(const pb_t &pb)$/;"	f	namespace:elf
+net_error	src/elf/net/net.cpp	/^int net_error(oid_t peer)$/;"	f	namespace:elf
+net_fini	src/elf/net/net.cpp	/^int net_fini(void)$/;"	f	namespace:elf
+net_init	src/elf/net/net.cpp	/^int net_init(void)$/;"	f	namespace:elf
+net_listen	src/elf/net/net.cpp	/^int net_listen(oid_t peer, const std::string &name,$/;"	f	namespace:elf
+net_peer_info	src/elf/net/net.cpp	/^void net_peer_info(oid_t peer, char *str)$/;"	f	namespace:elf
+net_proc	src/elf/net/net.cpp	/^int net_proc(void)$/;"	f	namespace:elf
+net_send	src/elf/net/net.cpp	/^int net_send(oid_t peer, blob_t *msg)$/;"	f	namespace:elf
+net_send	src/elf/net/net.cpp	/^void net_send(const obj_map_id &peers, const pb_t &pb)$/;"	f	namespace:elf
+net_send	src/elf/net/net.cpp	/^void net_send(oid_t peer, const pb_t &pb)$/;"	f	namespace:elf
+net_stat	src/elf/net/net.cpp	/^void net_stat(void)$/;"	f	namespace:elf
+net_thread	src/elf/net/net.cpp	/^static void *net_thread(void *args)$/;"	f	namespace:elf
+net_update	src/elf/net/net.cpp	/^int net_update(void)$/;"	f	namespace:elf
+next	src/elf/thread/xqueue.cpp	/^    struct xchunk_s *next;$/;"	m	struct:xchunk_s	typeref:struct:xchunk_s::xchunk_s	file:
+next	src/elf/timer.cpp	/^    timer_t *next; \/\/ the next node of the tail node is NULL$/;"	m	struct:elf::timer_t	file:
+obj_map_id	src/elf/object.h	/^typedef std::map<oid_t, Object *> obj_map_id;$/;"	t	namespace:elf
+obj_map_int	src/elf/object.h	/^typedef std::map<int, Object *> obj_map_int;$/;"	t	namespace:elf
+obj_map_str	src/elf/object.h	/^typedef std::map<std::string, Object *> obj_map_str;$/;"	t	namespace:elf
+offset	src/elf/net/net.cpp	/^    int offset;$/;"	m	struct:elf::chunk_t	file:
+oid	src/elf/db.cpp	/^    oid_t oid; \/\/ associated object id$/;"	m	struct:elf::session_t	file:
+oid	src/elf/oid.h	/^    oid_t oid; \/\/ object id$/;"	m	struct:elf::callback_t
+oid_gen	src/elf/oid.cpp	/^oid_t oid_gen(void)$/;"	f	namespace:elf
+oid_t	src/elf/oid.h	/^typedef uint64_t oid_t;$/;"	t	namespace:elf
+on_accept	src/elf/net/net.cpp	/^static void on_accept(const epoll_event &evt)$/;"	f	namespace:elf
+on_error	src/elf/net/net.cpp	/^static void on_error(const epoll_event &evt)$/;"	f	namespace:elf
+on_read	src/elf/net/net.cpp	/^static void on_read(const epoll_event &evt)$/;"	f	namespace:elf
+on_write	src/elf/net/net.cpp	/^static void on_write(const epoll_event &evt)$/;"	f	namespace:elf
+out	src/elf/db.cpp	/^    pb_t *out; \/\/ store query data$/;"	m	struct:elf::session_t	file:
+patch	src/elf/utils/version.h	/^    int patch;$/;"	m	struct:elf::version_t
+pause	src/elf/timer.cpp	/^    bool pause; \/\/ suspend all timers$/;"	m	struct:elf::mgr_t	file:
+pb	src/elf/net/net.h	/^    pb_t *pb;$/;"	m	struct:elf::recv_message_t
+pb_create	src/elf/pb.cpp	/^pb_t *pb_create(const std::string &name)$/;"	f	namespace:elf
+pb_create	src/pb.cpp	/^pb_t *pb_create(const std::string &name)$/;"	f	namespace:elf
+pb_destroy	src/elf/pb.cpp	/^void pb_destroy(pb_t *pb)$/;"	f	namespace:elf
+pb_destroy	src/pb.cpp	/^void pb_destroy(pb_t *pb)$/;"	f	namespace:elf
+pb_get_field	src/elf/pb.cpp	/^pb_t *pb_get_field(pb_t *pb, const std::string &key)$/;"	f	namespace:elf
+pb_get_field	src/pb.cpp	/^pb_t *pb_get_field(pb_t *pb, const std::string &key)$/;"	f	namespace:elf
+pb_get_int	src/elf/pb.cpp	/^int pb_get_int(const pb_t &pb, int num)$/;"	f	namespace:elf
+pb_get_int	src/pb.cpp	/^int pb_get_int(const pb_t &pb, int num)$/;"	f	namespace:elf
+pb_map_id	src/elf/pb.h	/^typedef std::map<oid_t, pb_t *> pb_map_id;$/;"	t	namespace:elf
+pb_map_int	src/elf/pb.h	/^typedef std::map<int, pb_t *> pb_map_int;$/;"	t	namespace:elf
+pb_map_str	src/elf/pb.h	/^typedef std::map<std::string, pb_t *> pb_map_str;$/;"	t	namespace:elf
+pb_new	src/elf/pb.h	/^typedef pb_t *(*pb_new)(void);$/;"	t	namespace:elf
+pb_regist	src/elf/pb.cpp	/^void pb_regist(const std::string &name, pb_new init)$/;"	f	namespace:elf
+pb_regist	src/pb.cpp	/^void pb_regist(const std::string &name, pb_new init)$/;"	f	namespace:elf
+pb_set_field	src/elf/pb.cpp	/^void pb_set_field(pb_t *pb, const FieldDescriptor *fd,$/;"	f	namespace:elf
+pb_set_field	src/elf/pb.cpp	/^void pb_set_field(pb_t *pb, const std::string &key,$/;"	f	namespace:elf
+pb_set_field	src/pb.cpp	/^void pb_set_field(pb_t *pb, const FieldDescriptor *fd,$/;"	f	namespace:elf
+pb_set_field	src/pb.cpp	/^void pb_set_field(pb_t *pb, const std::string &key,$/;"	f	namespace:elf
+pb_t	src/elf/pb.h	/^typedef ::google::protobuf::Message pb_t;$/;"	t	namespace:elf
+peer	src/elf/net/net.cpp	/^    peer_t peer;$/;"	m	struct:elf::context_t	file:
+peer	src/elf/net/net.h	/^    oid_t peer;$/;"	m	struct:elf::recv_message_t
+peer_t	src/elf/net/net.cpp	/^struct peer_t {$/;"	s	namespace:elf	file:
+pending_size	src/elf/net/net.cpp	/^    int pending_size;$/;"	m	struct:elf::blob_t	file:
+pop	src/elf/pc.h	/^    int pop(type &d) {$/;"	f	class:elf::xqueue
+pop_send	src/elf/net/net.cpp	/^static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)$/;"	f	namespace:elf
+port	src/elf/net/net.cpp	/^    int port;$/;"	m	struct:elf::peer_t	file:
+prev	src/elf/thread/xqueue.cpp	/^    struct xchunk_s *prev;$/;"	m	struct:xchunk_s	typeref:struct:xchunk_s::xchunk_s	file:
+prev	src/elf/timer.cpp	/^    timer_t *prev; \/\/ the previous node of the head node is the tail$/;"	m	struct:elf::timer_t	file:
+proc	src/elf/db.cpp	/^    db_callback proc; \/\/ callback function$/;"	m	struct:elf::session_t	file:
+proc	src/elf/net/message.cpp	/^    msg_proc proc;$/;"	m	struct:elf::message_handler_t	file:
+push	src/elf/pc.h	/^    int push(type &d) {$/;"	f	class:elf::xqueue
+push	src/elf/timer.cpp	/^static void push(timer_t *t, int bucket)$/;"	f	namespace:elf
+push_recv	src/elf/net/net.cpp	/^static void push_recv(context_t *ctx, chunk_t *c)$/;"	f	namespace:elf
+push_send	src/elf/net/net.cpp	/^static void push_send(context_t *ctx, blob_t *msg)$/;"	f	namespace:elf
+push_send	src/elf/net/net.cpp	/^static void push_send(context_t *ctx, chunk_queue &chunks)$/;"	f	namespace:elf
+query	src/elf/db.cpp	/^static void query(db_req_t *req)$/;"	f	namespace:elf
+rand	src/elf/rand.cpp	/^int rand(int min, int max)$/;"	f	namespace:elf
+rand	src/elf/rand.cpp	/^void rand(int min, int max, roll_set &res, int times)$/;"	f	namespace:elf
+rd	src/elf/thread/xqueue.cpp	/^    void *rd; \/* point to the first item to be read *\/$/;"	m	struct:xqueue_s	file:
+read	src/elf/db.cpp	/^    bool read; \/\/ need restore query result$/;"	m	struct:elf::db_req_t	file:
+recv_data	src/elf/net/net.cpp	/^    blob_t recv_data;$/;"	m	struct:elf::context_t	file:
+recv_message_fini	src/elf/net/net.cpp	/^static void recv_message_fini(recv_message_t *msg)$/;"	f	namespace:elf
+recv_message_init	src/elf/net/net.cpp	/^static recv_message_t *recv_message_init(void)$/;"	f	namespace:elf
+recv_message_queue	src/elf/net/net.cpp	/^typedef std::deque<recv_message_t *> recv_message_queue;$/;"	t	namespace:elf	file:
+recv_message_t	src/elf/net/net.h	/^struct recv_message_t {$/;"	s	namespace:elf
+recv_message_xqueue	src/elf/net/net.cpp	/^typedef xqueue<recv_message_t *> recv_message_xqueue;$/;"	t	namespace:elf	file:
+ref	src/elf/oid.h	/^    int ref; \/\/ reference$/;"	m	struct:elf::callback_t
+reg_map	src/elf/net/message.cpp	/^typedef std::map<std::string, message_handler_t *> reg_map;$/;"	t	namespace:elf	file:
+reg_map	src/elf/pb.cpp	/^typedef std::map<std::string, pb_new> reg_map;$/;"	t	namespace:elf	file:
+reg_map	src/pb.cpp	/^typedef std::map<std::string, pb_new> reg_map;$/;"	t	namespace:elf	file:
+reset	src/elf/timer.cpp	/^static void reset(void)$/;"	f	namespace:elf
+retrieve	src/elf/db.cpp	/^static void retrieve(MYSQL_RES *res, pb_t *out)$/;"	f	namespace:elf
+retrieve	src/elf/db.cpp	/^static void retrieve(MYSQL_RES *res, pb_t *out, const std::string &field)$/;"	f	namespace:elf
+roll	src/elf/rand.cpp	/^void roll(const roll_req &req, roll_res &res, int times)$/;"	f	namespace:elf
+roll_req	src/elf/rand.h	/^typedef std::map<int, int> roll_req;$/;"	t	namespace:elf
+roll_res	src/elf/rand.h	/^typedef std::map<int, int> roll_res;$/;"	t	namespace:elf
+roll_set	src/elf/rand.h	/^typedef std::set<int> roll_set;$/;"	t	namespace:elf
+round	src/elf/timer.cpp	/^    int round; \/\/ current round$/;"	m	struct:elf::mgr_t	file:
+s_context_lock	src/elf/net/net.cpp	/^static mutex_t s_context_lock;$/;"	m	namespace:elf	file:
+s_contexts	src/elf/net/net.cpp	/^static context_list s_contexts;$/;"	m	namespace:elf	file:
+s_epoll	src/elf/net/net.cpp	/^static int s_epoll;$/;"	m	namespace:elf	file:
+s_handlers	src/elf/timer.cpp	/^static handler_list s_handlers;$/;"	m	namespace:elf	file:
+s_listeners	src/elf/event.cpp	/^static listener_map s_listeners;$/;"	m	namespace:elf	file:
+s_mgr	src/elf/timer.cpp	/^static mgr_t s_mgr;$/;"	m	namespace:elf	file:
+s_mysql	src/elf/db.cpp	/^static MYSQL *s_mysql = NULL;$/;"	m	namespace:elf	file:
+s_objs	src/elf/object.cpp	/^obj_map_id Object::s_objs;$/;"	m	class:elf::Object	file:
+s_objs	src/elf/object.h	/^    static obj_map_id s_objs;$/;"	m	class:elf::Object
+s_queue_req	src/elf/db.cpp	/^static xqueue<db_req_t *> s_queue_req;$/;"	m	namespace:elf	file:
+s_queue_res	src/elf/db.cpp	/^static xqueue<db_res_t *> s_queue_res;$/;"	m	namespace:elf	file:
+s_recv_msgs	src/elf/net/net.cpp	/^static recv_message_xqueue s_recv_msgs;$/;"	m	namespace:elf	file:
+s_regs	src/elf/net/message.cpp	/^static reg_map s_regs;$/;"	m	namespace:elf	file:
+s_regs	src/elf/pb.cpp	/^static reg_map s_regs;$/;"	m	namespace:elf	file:
+s_regs	src/pb.cpp	/^static reg_map s_regs;$/;"	m	namespace:elf	file:
+s_sessions	src/elf/db.cpp	/^static session_list s_sessions;$/;"	m	namespace:elf	file:
+s_sock	src/elf/net/net.cpp	/^static int s_sock;$/;"	m	namespace:elf	file:
+s_tid	src/elf/net/net.cpp	/^static thread_t s_tid;$/;"	m	namespace:elf	file:
+s_tid_req	src/elf/db.cpp	/^static thread_t s_tid_req = 0;$/;"	m	namespace:elf	file:
+schedule	src/elf/timer.cpp	/^static int schedule(timer_t *t)$/;"	f	namespace:elf
+script	src/elf/timer.cpp	/^        char script[1024]; \/\/ script function name$/;"	m	union:elf::timer_t::cb_t	file:
+script	src/elf/timer.cpp	/^    bool script;$/;"	m	struct:elf::timer_t	file:
+script_error	src/elf/script/script.cpp	/^static int script_error(lua_State *L)$/;"	f	namespace:elf
+script_file_exec	src/elf/script/script.cpp	/^int script_file_exec(const char *file)$/;"	f	namespace:elf
+script_fini	src/elf/script/script.cpp	/^int script_fini(void)$/;"	f	namespace:elf
+script_foo	src/elf/script/script.cpp	/^void script_foo(void)$/;"	f	namespace:elf
+script_func_exec	src/elf/script/script.cpp	/^int script_func_exec(const char *func, const char *sig, ...)$/;"	f	namespace:elf
+script_get_state	src/elf/script/script.cpp	/^lua_State *script_get_state(void)$/;"	f	namespace:elf
+script_init	src/elf/script/script.cpp	/^int script_init(void)$/;"	f	namespace:elf
+script_rc	src/elf/script/script.h	/^enum script_rc {$/;"	g	namespace:elf
+script_str_exec	src/elf/script/script.cpp	/^int script_str_exec(const char *cmd)$/;"	f	namespace:elf
+script_traceback	src/elf/script/script.cpp	/^static int script_traceback(lua_State *L)$/;"	f	namespace:elf
+sem_fini	src/elf/thread/semaphore.cpp	/^sem_fini(sem_t *s)$/;"	f
+sem_init	src/elf/thread/semaphore.cpp	/^int sem_init(sem_t *s)$/;"	f
+sem_post	src/elf/thread/semaphore.cpp	/^sem_post(sem_t *s)$/;"	f
+sem_t	src/elf/thread/semaphore.h	/^typedef HANDLE sem_t;$/;"	t
+sem_wait	src/elf/thread/semaphore.cpp	/^sem_wait(sem_t *s)$/;"	f
+send_data	src/elf/net/net.cpp	/^    blob_t send_data;$/;"	m	struct:elf::context_t	file:
+session_list	src/elf/db.cpp	/^typedef std::map<oid_t, session_t *> session_list;$/;"	t	namespace:elf	file:
+session_t	src/elf/db.cpp	/^struct session_t {$/;"	s	namespace:elf	file:
+set_noblock	src/elf/net/net.cpp	/^static void set_noblock(int sock)$/;"	f	namespace:elf
+sid	src/elf/db.cpp	/^    oid_t sid; \/\/ session id$/;"	m	struct:elf::db_req_t	file:
+sid	src/elf/db.cpp	/^    oid_t sid; \/\/ session id$/;"	m	struct:elf::db_res_t	file:
+sigfunc	src/elf/thread/signal.h	/^typedef void sigfunc(int);$/;"	t
+singleton	src/elf/singleton.h	/^    singleton(void) {}$/;"	f	class:elf::utils::singleton
+singleton	src/elf/singleton.h	/^class singleton$/;"	c	namespace:elf::utils
+singleton_mt	src/elf/singleton.h	/^    singleton_mt(void) {}$/;"	f	class:elf::utils::singleton_mt
+singleton_mt	src/elf/singleton.h	/^class singleton_mt$/;"	c	namespace:elf::utils
+size	src/elf/net/net.cpp	/^    int size;$/;"	m	struct:elf::blob_t	file:
+size	src/elf/net/net.cpp	/^    int size;$/;"	m	struct:elf::chunk_t	file:
+snprintf	src/elf/config/win32.h	122;"	d
+sock	src/elf/net/net.cpp	/^    int sock;$/;"	m	struct:elf::peer_t	file:
+spare	src/elf/thread/xqueue.cpp	/^    xchunk_t *spare; \/* spare chunk *\/$/;"	m	struct:xqueue_s	file:
+start_time	src/elf/net/net.cpp	/^    int start_time;$/;"	m	struct:elf::context_t	file:
+start_time	src/elf/timer.cpp	/^    time64_t start_time; \/\/ start time$/;"	m	struct:elf::mgr_t	file:
+status	src/elf/db.cpp	/^    int status; \/\/ status$/;"	m	struct:elf::db_res_t	file:
+swap	src/elf/pc.h	/^    int swap(std::deque<type> &clone) {$/;"	f	class:elf::xqueue
+tail	src/elf/thread/xqueue.cpp	/^    xchunk_t *tail;$/;"	m	struct:xqueue_s	file:
+tail_pos	src/elf/thread/xqueue.cpp	/^    size_t tail_pos;$/;"	m	struct:xqueue_s	file:
+targ	src/elf/oid.h	/^    int targ; \/\/ trigger argument$/;"	m	struct:elf::callback_t
+thread	src/elf/thread/atomic.h	/^namespace thread {$/;"	n	namespace:elf
+thread_fini	src/elf/thread.cpp	/^void thread_fini(thread_t tid)$/;"	f	namespace:elf
+thread_func	src/elf/thread.h	/^typedef unsigned int (__stdcall *thread_func)(void *);$/;"	t	namespace:elf
+thread_init	src/elf/thread.cpp	/^thread_t thread_init(thread_func func, void *args)$/;"	f	namespace:elf
+thread_t	src/elf/thread.h	/^typedef HANDLE thread_t;$/;"	t	namespace:elf
+tid	src/elf/oid.h	/^    oid_t tid; \/\/ trigger id$/;"	m	struct:elf::callback_t
+time64_t	src/elf/time.h	/^typedef uint64_t time64_t;$/;"	t	namespace:elf
+time_diff	src/elf/time.cpp	/^time64_t time_diff(time64_t end, time64_t start)$/;"	f	namespace:elf
+time_ms	src/elf/time.cpp	/^time64_t time_ms(void)$/;"	f	namespace:elf
+time_s	src/elf/time.cpp	/^time_t time_s(void)$/;"	f	namespace:elf
+timer_add	src/elf/timer.cpp	/^const oid_t &timer_add(time64_t life, callback func, void *args)$/;"	f	namespace:elf
+timer_add	src/elf/timer.cpp	/^const oid_t &timer_add(time64_t life, const char *func)$/;"	f	namespace:elf
+timer_bucket	src/elf/timer.cpp	/^void timer_bucket(unsigned char no, int l)$/;"	f	namespace:elf
+timer_cancelled	src/elf/timer.cpp	/^    int timer_cancelled; \/\/ total number of cancelled timers$/;"	m	struct:elf::mgr_t	file:
+timer_cycle	src/elf/timer.cpp	/^void timer_cycle(callback func)$/;"	f	namespace:elf
+timer_fini	src/elf/timer.cpp	/^int timer_fini(void)$/;"	f	namespace:elf
+timer_init	src/elf/timer.cpp	/^int timer_init(void)$/;"	f	namespace:elf
+timer_interval	src/elf/timer.cpp	/^void timer_interval(time64_t t)$/;"	f	namespace:elf
+timer_min	src/elf/timer.cpp	/^static void timer_min(void *args)$/;"	f	namespace:elf
+timer_passed	src/elf/timer.cpp	/^    int timer_passed; \/\/ total number of passed timers$/;"	m	struct:elf::mgr_t	file:
+timer_pause	src/elf/timer.cpp	/^void timer_pause(const oid_t &tid)$/;"	f	namespace:elf
+timer_pause	src/elf/timer.cpp	/^void timer_pause(void)$/;"	f	namespace:elf
+timer_remain	src/elf/timer.cpp	/^    int timer_remain; \/\/ remain timers$/;"	m	struct:elf::mgr_t	file:
+timer_remove	src/elf/timer.cpp	/^void timer_remove(const oid_t &tid)$/;"	f	namespace:elf
+timer_resume	src/elf/timer.cpp	/^void timer_resume(const oid_t &tid)$/;"	f	namespace:elf
+timer_resume	src/elf/timer.cpp	/^void timer_resume(void)$/;"	f	namespace:elf
+timer_run	src/elf/timer.cpp	/^void timer_run(void)$/;"	f	namespace:elf
+timer_size	src/elf/timer.cpp	/^int timer_size(void)$/;"	f	namespace:elf
+timer_stat	src/elf/timer.cpp	/^void timer_stat(void)$/;"	f	namespace:elf
+timer_t	src/elf/timer.cpp	/^struct timer_t {$/;"	s	namespace:elf	file:
+timer_total	src/elf/timer.cpp	/^    int timer_total; \/\/ total number of timers$/;"	m	struct:elf::mgr_t	file:
+timers	src/elf/timer.cpp	/^    timer_t *timers[MAX_WHEEL_SET_SIZE];$/;"	m	struct:elf::mgr_t	file:
+timeval	src/elf/time.h	/^struct timeval$/;"	s	namespace:elf
+total_size	src/elf/net/net.cpp	/^    int total_size;$/;"	m	struct:elf::blob_t	file:
+trim_leading_ws	src/elf/cp.cpp	/^static void trim_leading_ws(std::string &str)$/;"	f	namespace:elf
+trim_trailing_ws	src/elf/cp.cpp	/^static void trim_trailing_ws(std::string &str)$/;"	f	namespace:elf
+trim_ws	src/elf/cp.cpp	/^static void trim_ws(std::string &str)$/;"	f	namespace:elf
+true	src/elf/config.h	/^typedef enum { false, true } bool;$/;"	e	enum:__anon1
+ttype	src/elf/oid.h	/^    int ttype; \/\/ trigger type$/;"	m	struct:elf::callback_t
+tv_sec	src/elf/time.h	/^    long tv_sec;$/;"	m	struct:elf::timeval
+tv_usec	src/elf/time.h	/^    long tv_usec;$/;"	m	struct:elf::timeval
+utils	src/elf/singleton.h	/^namespace utils {$/;"	n	namespace:elf
+values	src/elf/thread/xqueue.cpp	/^    void **values;$/;"	m	struct:xchunk_s	file:
+version_compare	src/elf/utils/version.cpp	/^int version_compare(const std::string &left, const std::string &right)$/;"	f	namespace:elf
+version_compare	src/elf/utils/version.cpp	/^int version_compare(const version_t &left, const version_t &right)$/;"	f	namespace:elf
+version_parse	src/elf/utils/version.cpp	/^int version_parse(version_t *ver, const std::string &str)$/;"	f	namespace:elf
+version_t	src/elf/utils/version.h	/^struct version_t {$/;"	s	namespace:elf
+w	src/elf/timer.cpp	/^    wheel_t w;$/;"	m	union:elf::cursor_t	file:
+w0	src/elf/timer.cpp	/^        unsigned char w0;$/;"	m	struct:elf::cursor_t::wheel_t	file:
+w1	src/elf/timer.cpp	/^        unsigned char w1;$/;"	m	struct:elf::cursor_t::wheel_t	file:
+w2	src/elf/timer.cpp	/^        unsigned char w2;$/;"	m	struct:elf::cursor_t::wheel_t	file:
+w3	src/elf/timer.cpp	/^        unsigned char w3;$/;"	m	struct:elf::cursor_t::wheel_t	file:
+wheel_t	src/elf/timer.cpp	/^    struct wheel_t {$/;"	s	union:elf::cursor_t	file:
+wr	src/elf/thread/xqueue.cpp	/^    void *wr; \/* point to the first item to be writen *\/$/;"	m	struct:xqueue_s	file:
+xchunk_s	src/elf/thread/xqueue.cpp	/^typedef struct xchunk_s {$/;"	s	file:
+xchunk_t	src/elf/thread/xqueue.cpp	/^} xchunk_t;$/;"	t	typeref:struct:xchunk_s	file:
+xqueue	src/elf/pc.h	/^    xqueue(): _nready(0) {$/;"	f	class:elf::xqueue
+xqueue	src/elf/pc.h	/^class xqueue {$/;"	c	namespace:elf
+xqueue_check_pop	src/elf/thread/xqueue.cpp	/^static bool xqueue_check_pop(xqueue_t *q)$/;"	f	file:
+xqueue_create	src/elf/thread/xqueue.cpp	/^xqueue_t *xqueue_create(size_t chunk_num)$/;"	f
+xqueue_destroy	src/elf/thread/xqueue.cpp	/^void xqueue_destroy(xqueue_t *q)$/;"	f
+xqueue_pop	src/elf/thread/xqueue.cpp	/^int xqueue_pop(xqueue_t *q, void **val)$/;"	f
+xqueue_push	src/elf/thread/xqueue.cpp	/^int xqueue_push(xqueue_t *q, void *val)$/;"	f
+xqueue_s	src/elf/thread/xqueue.cpp	/^struct xqueue_s {$/;"	s	file:
+xqueue_t	src/elf/thread/xqueue.h	/^typedef struct xqueue_s xqueue_t;$/;"	t	namespace:elf	typeref:struct:elf::xqueue_s
+~Object	src/elf/object.cpp	/^Object::~Object(void)$/;"	f	class:elf::Object
+~singleton	src/elf/singleton.h	/^    ~singleton(void) {}$/;"	f	class:elf::utils::singleton
+~singleton_mt	src/elf/singleton.h	/^    ~singleton_mt(void) {}$/;"	f	class:elf::utils::singleton_mt

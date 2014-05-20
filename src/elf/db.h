@@ -1,0 +1,124 @@
+/*
+ * Copyright (C) 2012-2014 Yule Fox. All rights reserved.
+ * http://www.yulefox.com/
+ */
+
+/**
+ * @file db.h
+ * @author Fox (yulefox at gmail.com)
+ * @date 2012-12-05
+ * @brief Database operations: CRUD.
+ *
+ * Use MySQL.
+ */
+
+#if defined(ELF_HAVE_PRAGMA_ONCE)
+#   pragma once
+#endif
+
+#ifndef ELF_DB_H
+#define ELF_DB_H
+
+#include <elf/config.h>
+#include <elf/object.h>
+#include <elf/oid.h>
+#include <elf/pb.h>
+#include <mysql/mysql.h>
+#include <string>
+#include <deque>
+
+enum db_rc {
+    ELF_RC_DB_OK,
+    ELF_RC_DB_INIT_FAILED,
+    ELF_RC_DB_SYNTAX_ERROR,
+    ELF_RC_DB_COMPILE_FAILED,
+    ELF_RC_DB_EXECUTE_FAILED,
+    ELF_RC_DB_TABLE_NOT_FOUND,
+    ELF_RC_DB_COMMAND_NOT_FOUND,
+};
+
+namespace elf {
+// DB query session callback function
+typedef void (*db_callback)(oid_t, pb_t *);
+
+/**
+ * Initialize the DB module.
+ * @return ELF_RC_DB_OK(0).
+ */
+int db_init(void);
+
+/**
+ * Release the DB module.
+ * @return ELF_RC_DB_OK(0).
+ */
+int db_fini(void);
+
+/**
+ * Process all query session.
+ * @return (0).
+ */
+int db_proc(void);
+
+/**
+ * Initialize the DB module.
+ * @return ELF_RC_DB_OK(0).
+ */
+int db_connect(const std::string &host, const std::string &user,
+        const std::string &passwd, const std::string &db, unsigned int port);
+
+/**
+ * Check connection, reconnect if dropped.
+ * @return ELF_RC_DB_OK(0).
+ */
+int db_ping(void);
+
+///
+/// DB request(asynchronous).
+/// @param[in] cmd SQL command.
+/// @param[in] oid Object id for checking.
+/// @param[out] out Store query data.
+/// @param[in] field pb field.
+/// @param[in] proc Callback function.
+/// @warning: only one query statement is supported if `out` is NOT NULL.
+///
+void db_req(const char *cmd, oid_t oid = OID_NIL, pb_t *out = NULL,
+        const std::string &field = "", db_callback proc = NULL);
+
+///
+/// DB response, fetch query result.
+/// @param[in] res MYSQL_RES result.
+/// @param[out] out Store query data.
+/// @param[in] field Field.
+///
+void db_res(MYSQL_RES *res, pb_t *out, const std::string &field = "");
+
+///
+/// DB request(synchronous).
+/// @param[in] cmd SQL command.
+/// @param[out] out Store query data.
+/// @return ELF_RC_DB_OK(0).
+///
+db_rc db_query(const char *cmd);
+
+///
+/// DB request(synchronous).
+/// @param[in] cmd SQL command.
+/// @param[out] out Store query data.
+/// @return ELF_RC_DB_OK(0).
+/// @warning: only one query statement is supported.
+///
+db_rc db_query(const char *cmd, pb_t *out);
+
+///
+/// DB request(synchronous).
+/// @param[in] cmd SQL command.
+/// @param[out] out Store query data.
+/// @param[in] field Field.
+/// @return ELF_RC_DB_OK(0).
+/// @warning: only one query statement is supported.
+///
+db_rc db_query(const char *cmd, pb_t *out, const std::string &field);
+} // namespace elf
+
+#endif /* !ELF_DB_H */
+
