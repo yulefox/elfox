@@ -21,8 +21,9 @@
 
 #if defined ELF_USE_ALL
 #   define ELF_USE_EVENT
-//#   define ELF_USE_HTTP
+#   define ELF_USE_HTTP
 #   define ELF_USE_INPUT
+#   define ELF_USE_JSON
 #   define ELF_USE_NET
 #   define ELF_USE_PC
 #   define ELF_USE_RAND
@@ -66,6 +67,10 @@
 #if defined(ELF_USE_HTTP)
 #   include <elf/net/http.h>
 #endif /* ELF_USE_HTTP */
+
+#if defined(ELF_USE_JSON)
+#   include <elf/json.h>
+#endif /* ELF_USE_JSON */
 
 #if defined(ELF_USE_LOG)
 #   include <elf/log.h>

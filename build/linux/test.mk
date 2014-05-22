@@ -24,6 +24,7 @@ CPPFLAGS	:= \
 	-DELF_HAVE_PRAGMA_ONCE \
 	-DELF_USE_ALL
 LIBS		:= \
+	-lcurl \
 	-llog4cplus \
 	-llua \
 	-ltolua++ \
@@ -32,22 +33,21 @@ LIBS		:= \
 
 ifeq (YES, $(DEBUG))
 	LIBS	+= \
+	-lcjson_d \
 	-lelfox_d
 else
 	LIBS	+= \
+	-lcjson \
 	-lelfox
 endif
 
 LDFLAGS		:= \
 	-L$(LIBDIR) \
-	-L/usr/local/lib \
-	-L/usr/lib64/mysql \
 	$(LIBS)
 
 SRCDIRS		:= $(ROOTDIR)/src/$(PROJECT)
 SRCS_C_EXCLUDE_FILTER 	:=
-SRCS_CPP_EXCLUDE_FILTER	:= \
-	 -name 'todo' -prune -o
+SRCS_CPP_EXCLUDE_FILTER	:=
 
 include common.mk
 

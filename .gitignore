@@ -2,3 +2,6 @@
 *.log
 .dep
 .obj
+core.*
+tags
+

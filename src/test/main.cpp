@@ -68,11 +68,11 @@ int main(int argc, char **argv)
         ELF_INIT(db);
         ELF_INIT(script);
         ELF_INIT(net);
-        //ELF_INIT(http);
+        ELF_INIT(http);
 
         test(argc, argv);
 
-        //ELF_FINI(http);
+        ELF_FINI(http);
         ELF_FINI(net);
         ELF_FINI(script);
         ELF_FINI(db);

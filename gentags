@@ -1,1 +1,1 @@
-ctags -R --languages=c++ --exclude=.svn
+ctags -R --languages=c,c++ --exclude=.svn
