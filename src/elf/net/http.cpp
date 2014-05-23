@@ -23,6 +23,10 @@ static void *http_post(void *args)
     CURLcode res;
 
     if (curl != NULL) {
+        struct curl_slist *slist = NULL;
+
+        slist = curl_slist_append(slist, "Expect:");
+
         curl_easy_setopt(curl, CURLOPT_URL, post->url);
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
@@ -30,17 +34,19 @@ static void *http_post(void *args)
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post->cb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, post->args);
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
         res = curl_easy_perform(curl);
         if(res != CURLE_OK) {
             if (post->cb) {
                 post->cb(0, 0, 0, post->args);
             }
             LOG_ERROR("http", "curl_easy_perform() failed: %s %s.",
-              curl_easy_strerror(res), post->url);
+                    curl_easy_strerror(res), post->url);
         }
+        curl_slist_free_all(slist);
         curl_easy_cleanup(curl);
     } else {
-        LOG_ERROR("http", "curl_easy_init() failed.");
+        LOG_ERROR("http", "%s", "curl_easy_init() failed.");
     }
     E_DELETE post;
     return NULL;

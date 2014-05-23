@@ -43,6 +43,7 @@ endif
 
 LDFLAGS		:= \
 	-L$(LIBDIR) \
+	-L/usr/lib64/mysql \
 	$(LIBS)
 
 SRCDIRS		:= $(ROOTDIR)/src/$(PROJECT)
