@@ -9,11 +9,6 @@
 #include <curl/curl.h>
 
 namespace elf {
-static char JSON_HEAD[] = 
-    "Accept:application/json;"
-    "Content-Type:application/json;"
-    "charset=UTF-8";
-
 struct http_req_t {
     const char *json;
     const char *url;
@@ -25,21 +20,29 @@ static void *http_post(void *args)
 {
     http_req_t *post = (http_req_t *)args;
     CURL *curl = curl_easy_init();
+    CURLcode res;
 
     if (curl != NULL) {
-        curl_slist *slist = curl_slist_append(NULL, JSON_HEAD);
-
         curl_easy_setopt(curl, CURLOPT_URL, post->url);
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
+        curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+        curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post->cb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, post->args);
-        curl_easy_perform(curl);
+        res = curl_easy_perform(curl);
+        if(res != CURLE_OK) {
+            if (post->cb) {
+                post->cb(0, 0, 0, post->args);
+            }
+            LOG_ERROR("http", "curl_easy_perform() failed: %s %s.",
+              curl_easy_strerror(res), post->url);
+        }
         curl_easy_cleanup(curl);
     } else {
         LOG_ERROR("http", "curl_easy_init() failed.");
     }
+    E_DELETE post;
     return NULL;
 }
 
@@ -69,14 +72,14 @@ int http_fini(void)
 int http_json(const char *url, const char *json,
         http_response func, void *args)
 {
-    http_req_t post;
+    http_req_t *post = E_NEW http_req_t;
 
-    post.url = url;
-    post.json = json;
-    post.cb = func;
-    post.args = args;
+    post->url = url;
+    post->json = json;
+    post->cb = func;
+    post->args = args;
 
-    elf::thread_init(http_post, &post);
+    elf::thread_init(http_post, post);
     return 0;
 }
 } // namespace elf
