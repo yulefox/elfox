@@ -36,7 +36,7 @@ void object::test<1>() {
     while (true) {
         LOG_TEST("%s", "->");
         elf::http_json(URL, JSON, do_response, user);
-        sleep(10);
+        usleep(100);
     }
 }
 }

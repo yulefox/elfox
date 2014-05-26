@@ -40,8 +40,8 @@ static void *http_post(void *args)
             if (post->cb) {
                 post->cb(0, 0, 0, post->args);
             }
-            LOG_ERROR("http", "curl_easy_perform() failed: %s %s.",
-                    curl_easy_strerror(res), post->url);
+            LOG_ERROR("http", "curl_easy_perform() failed: %s %s, %s.",
+                    curl_easy_strerror(res), post->url, post->json);
         }
         curl_slist_free_all(slist);
         curl_easy_cleanup(curl);
