@@ -1,5 +1,6 @@
 *.swp
 *.log
+*.log.*
 .dep
 .obj
 core.*
