@@ -48,7 +48,6 @@ template<>
 void object::test<1>() {
     const char *JSON = "{\"csdkId\":\"8000\",\"sdkId\":\"226\",\"uid\":\"123456\",\"token\":\"07d72e5200cb5c0031d988e618d90d5b\",\"ext\":\"扩展\"}";
     set_test_name("HTTP");
-<<<<<<< HEAD
 
     const char *URL = "http://219.133.55.163/api/user/loginoauth.php";
     req_times = 0;
@@ -86,14 +85,6 @@ void object::test<1>() {
     LOG_TEST("%lld - %lld(%lld) req: %d, err: %d.",
             start_time, end_time, end_time - start_time,
             req_times, err_times);
-=======
-    void *user = malloc(5);
-    while (true) {
-        LOG_TEST("%s", "->");
-        elf::http_json(URL, JSON, do_response, user);
-        usleep(100);
-    }
->>>>>>> 3e4aab970f766c98152bcc6197ed5b8ed3dffaec
 }
 }
 
