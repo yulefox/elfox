@@ -138,7 +138,7 @@ ELF_API int log_fini(void);
 
 #   ifdef ELF_DEBUG
 #       define LOG_TEST(fmt, ...) LOG_INFO("test", fmt, ##__VA_ARGS__)
-#       define LOG_NOIMPL() LOG_WARN("noimpl", __FUNCTION__)
+#       define LOG_NOIMPL() LOG_WARN("noimpl", "%s", __FUNCTION__)
 #   else
 #       define LOG_TEST(fmt, ...) LOG_TRACE("test", fmt, ##__VA_ARGS__)
 #       define LOG_NOIMPL()
@@ -166,7 +166,7 @@ ELF_API int log_fini(void);
 
 #   ifdef ELF_DEBUG
 #       define LOG_TEST(fmt, args...) LOG_INFO("test", fmt, ##args)
-#       define LOG_NOIMPL() LOG_WARN("noimpl", __FUNCTION__)
+#       define LOG_NOIMPL() LOG_WARN("noimpl", "%s", __FUNCTION__)
 #   else
 #       define LOG_TEST(fmt, args...) LOG_TRACE("test", fmt, ##args)
 #       define LOG_NOIMPL()
