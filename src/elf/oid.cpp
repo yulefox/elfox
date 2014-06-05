@@ -8,8 +8,8 @@
 
 namespace elf {
 int MAGIC_INDEX = 0;
-const int MAX_INDEX = 1 << 20;
-const oid_t MAX_TIME = 1ll << 42;
+const int MAX_INDEX = 100000ll;
+const oid_t MAX_TIME = 10000000000000ll;
 
 oid_t oid_gen(void)
 {
@@ -18,7 +18,7 @@ oid_t oid_gen(void)
 
     assert(MAGIC_INDEX < MAX_INDEX && time < MAX_TIME);
 
-    oid_t cid = ((oid_t)MAGIC_INDEX << 42) + time;
+    oid_t cid = ((oid_t)MAGIC_INDEX * MAX_TIME) + time;
 
     if (id >= cid) {
         ++id;

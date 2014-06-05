@@ -626,7 +626,6 @@ blob_t *net_encode(const pb_t &pb)
     message_set(msg->chunks, &name_len, SIZE_INT);
     message_set(msg->chunks, pb.GetTypeName().data(), name_len);
     message_set(msg->chunks, buf.data(), body_len);
-    LOG_TRACE("net", "<< %s", pb.GetTypeName().c_str());
     return msg;
 }
 
@@ -634,7 +633,6 @@ bool net_decode(recv_message_t *msg)
 {
     assert(msg && msg->pb);
     msg->pb->ParseFromString(msg->body);
-    LOG_TRACE("net", ">> %s", msg->name.c_str());
     return true;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012 Yule Fox. All rights reserved.
+ * Copyright (C) 2011-2013 Yule Fox. All rights reserved.
  * http://www.yulefox.com/
  */
 
