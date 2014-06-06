@@ -20,6 +20,7 @@
 #define ELF_USE_SINGLETON
 
 #if defined ELF_USE_ALL
+#   define ELF_USE_DIR
 #   define ELF_USE_EVENT
 #   define ELF_USE_HTTP
 #   define ELF_USE_INPUT
@@ -59,6 +60,10 @@
 #if defined(ELF_USE_DB)
 #   include <elf/db.h>
 #endif /* ELF_USE_DB */
+
+#if defined(ELF_USE_DIR)
+#   include <elf/dir.h>
+#endif /* ELF_USE_DIR */
 
 #if defined(ELF_USE_EVENT)
 #   include <elf/event.h>
