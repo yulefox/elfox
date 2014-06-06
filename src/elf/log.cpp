@@ -4,7 +4,7 @@
  */
 
 #include <elf/log.h>
-#include <elf/dir.h>
+#include <elf/os.h>
 
 static const char *CONFIG_FILE_NAME = "CONFIG/log.conf";
 
@@ -15,7 +15,7 @@ namespace elf {
 int log_init(void)
 {
     MODULE_IMPORT_SWITCH;
-    dir_make("log");
+    os_mkdir("log");
 #if defined(ELF_USE_LOG4CPLUS)
     try {
         log4cplus::ConfigureAndWatchThread th(CONFIG_FILE_NAME);

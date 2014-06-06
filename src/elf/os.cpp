@@ -3,20 +3,42 @@
  * http://www.yulefox.com/
  */
 
-#include <elf/dir.h>
+#include <elf/os.h>
 #if defined(ELF_PLATFORM_LINUX)
 #  include <sys/stat.h>
 #  include <sys/types.h>
+#  include <stdlib.h>
 #endif
 
 namespace elf {
-int dir_make(const char *dir)
+int os_mkdir(const char *dir)
 {
 #if defined(ELF_PLATFORM_WIN32)
     ::CreateDirectory(dir, NULL);
 #elif defined(ELF_PLATFORM_LINUX)
     return mkdir(dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 #endif
+}
+
+int os_putenv(char *val)
+{
+    return putenv(val);
+}
+
+const char *os_getenv(const char *name)
+{
+    return getenv(name);
+}
+
+int os_getenv_int(const char *name)
+{
+    const char *val = os_getenv(name);
+
+    if (val) {
+        return atoi(val);
+    } else {
+        return 0;
+    }
 }
 } // namespace elf
 
