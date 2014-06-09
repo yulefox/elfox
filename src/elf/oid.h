@@ -19,11 +19,13 @@
 
 #include <elf/config.h>
 #include <stdint.h>
+#include <map>
 #include <set>
 
 namespace elf {
 typedef uint64_t oid_t;
 typedef std::set<oid_t> id_set;
+typedef std::map<int, oid_t> id_map;
 typedef void (*callback)(void *args);
 
 const oid_t OID_NIL = 0;
