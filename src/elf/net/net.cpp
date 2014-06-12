@@ -636,11 +636,39 @@ bool net_decode(recv_message_t *msg)
     return true;
 }
 
+int net_send(oid_t peer, blob_t *msg)
+{
+    assert(msg);
+
+    context_t *ctx = context_find(peer);
+    if (ctx == NULL) {
+        LOG_TRACE("net", "Context `%lld' is NOT found to be sent.",
+                peer);
+        return -1;
+    }
+
+    push_send(ctx, msg);
+    return 0;
+}
+
 void net_send(oid_t peer, const pb_t &pb)
 {
     blob_t *msg = net_encode(pb);
 
     net_send(peer, msg);
+    blob_fini(msg);
+}
+
+void net_send(const id_set &peers, const pb_t &pb)
+{
+    if (peers.empty()) return;
+
+    blob_t *msg = net_encode(pb);
+    id_set::const_iterator itr = peers.begin();
+
+    for (; itr != peers.end(); ++itr) {
+        net_send(*itr, msg);
+    }
     blob_fini(msg);
 }
 
@@ -657,19 +685,30 @@ void net_send(const obj_map_id &peers, const pb_t &pb)
     blob_fini(msg);
 }
 
-int net_send(oid_t peer, blob_t *msg)
+void net_send(const id_map &peers, const pb_t &pb)
 {
-    assert(msg);
+    if (peers.empty()) return;
 
-    context_t *ctx = context_find(peer);
-    if (ctx == NULL) {
-        LOG_TRACE("net", "Context `%lld' is NOT found to be sent.",
-                peer);
-        return -1;
+    blob_t *msg = net_encode(pb);
+    id_map::const_iterator itr = peers.begin();
+
+    for (; itr != peers.end(); ++itr) {
+        net_send(itr->first, msg);
     }
+    blob_fini(msg);
+}
 
-    push_send(ctx, msg);
-    return 0;
+void net_send(const id_imap &peers, const pb_t &pb)
+{
+    if (peers.empty()) return;
+
+    blob_t *msg = net_encode(pb);
+    id_imap::const_iterator itr = peers.begin();
+
+    for (; itr != peers.end(); ++itr) {
+        net_send(itr->second, msg);
+    }
+    blob_fini(msg);
 }
 
 static void on_accept(const epoll_event &evt)

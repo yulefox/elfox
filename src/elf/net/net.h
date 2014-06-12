@@ -122,26 +122,54 @@ blob_t *net_encode(const pb_t &pb);
 bool net_decode(recv_message_t *msg);
 
 ///
-/// Uniicast to given peer.
-/// @param[in] peer Peer id.
-/// @param[in] pb Message.
-///
-void net_send(oid_t peer, const pb_t &pb);
-
-///
-/// Uniicast to given peer.
-/// @param[in] peers Object list.
-/// @param[in] pb Message.
-///
-void net_send(const obj_map_id &peers, const pb_t &pb);
-
-///
 /// Send message.
 /// @param peer Peer id.
 /// @param msg Encoded message data.
 /// @return (0).
 ///
 int net_send(oid_t peer, blob_t *msg);
+
+///
+/// Unicast to given peer.
+/// @param[in] peer Peer id.
+/// @param[in] pb Message.
+///
+void net_send(oid_t peer, const pb_t &pb);
+
+///
+/// Multicast to given peers.
+/// @param[in] peers Peers list.
+/// @param[in] pb Message.
+///
+void net_send(const id_set &peers, const pb_t &pb);
+
+///
+/// Multicast to given peers.
+/// @param[in] peers Peers list.
+/// @param[in] pb Message.
+///
+void net_send(const obj_map_id &peers, const pb_t &pb);
+
+///
+/// Multicast to given peers.
+/// @param[in] peers Peers list.
+/// @param[in] pb Message.
+///
+void net_send(const id_map &peers, const pb_t &pb);
+
+///
+/// Multicast to given peers.
+/// @param[in] peers Peers list.
+/// @param[in] pb Message.
+///
+void net_send(const id_imap &peers, const pb_t &pb);
+
+///
+/// Multicast to given peers.
+/// @param[in] peers Peers list.
+/// @param[in] pb Message.
+///
+void net_send(const obj_map_id &peers, const pb_t &pb);
 } // namespace elf
 
 #endif /* !ELF_NET_NET_H */

@@ -25,7 +25,8 @@
 namespace elf {
 typedef uint64_t oid_t;
 typedef std::set<oid_t> id_set;
-typedef std::map<int, oid_t> id_map;
+typedef std::map<oid_t, int> id_map;
+typedef std::map<int, oid_t> id_imap;
 typedef void (*callback)(void *args);
 
 const oid_t OID_NIL = 0;
