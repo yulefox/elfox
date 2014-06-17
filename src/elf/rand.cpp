@@ -57,31 +57,23 @@ void rand(int min, int max, roll_set &res, int times)
 
 void roll(const roll_req &req, roll_res &res, int times)
 {
-    int sum_rate = 0;
     roll_req::const_iterator itr_c = req.begin();
     roll_res::iterator itr_d;
 
-    // calculate sum probability
-    for (; itr_c != req.end(); ++itr_c) {
-        sum_rate += itr_c->second;
-    }
-    if (sum_rate == 0) sum_rate = 100;
-
     // rolling
     for (int i = 0; i < times; ++i) {
-        int rnd = rand(0, sum_rate);
+        int rnd = rand(0, 10000);
 
         for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
-            if (rnd < 0) break;
-            if (rnd < itr_c->second) {
+            if (rnd <= itr_c->second) {
                 itr_d = res.find(itr_c->first);
                 if (itr_d == res.end()) {
                     res[itr_c->first] = 1;
                 } else {
                     ++(itr_d->second);
                 }
+                break;
             }
-            rnd -= itr_c->second;
         }
     }
 }

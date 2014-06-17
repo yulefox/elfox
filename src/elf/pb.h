@@ -25,6 +25,7 @@
 
 namespace elf {
 typedef ::google::protobuf::Message pb_t;
+typedef std::set<pb_t *> pb_set;
 typedef std::map<oid_t, pb_t *> pb_map_id;
 typedef std::map<int, pb_t *> pb_map_int;
 typedef std::map<std::string, pb_t *> pb_map_str;
