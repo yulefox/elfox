@@ -8,6 +8,7 @@
 #include <elf/net/message.h>
 #include <elf/pc.h>
 #include <elf/thread.h>
+#include <elf/time.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -66,6 +67,7 @@ struct context_t {
     int error_times;
 };
 
+typedef std::map<int, id_set *> lasy_peer_map;
 typedef std::map<oid_t, context_t *> context_list;
 const int SIZE_INT = sizeof(int(0));
 const int SIZE_INTX2 = sizeof(int(0)) * 2;
@@ -76,6 +78,7 @@ static int s_epoll;
 static int s_sock;
 static context_list s_contexts;
 static recv_message_xqueue s_recv_msgs;
+static lasy_peer_map s_lasy_peers;
 
 static void on_accept(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
@@ -100,7 +103,7 @@ static void set_noblock(int sock)
     rc = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse,
             sizeof(reuse));
     if (rc != 0) {
-        LOG_ERROR("net", "setsockopt(REUSE) failed: %s", strerror(errno));
+        LOG_ERROR("net", "setsockopt(REUSE) FAILED: %s.", strerror(errno));
         return;
     }
 
@@ -112,7 +115,7 @@ static void set_noblock(int sock)
     rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg,
             sizeof(lg));
     if (rc != 0) {
-        LOG_ERROR("net", "setsockopt(LINGER) failed: %s", strerror(errno));
+        LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
         return;
     }
 
@@ -122,7 +125,7 @@ static void set_noblock(int sock)
     opts = opts | O_NONBLOCK;
     rc = fcntl(sock, F_SETFL, opts);
     if (rc != 0) {
-        LOG_ERROR("net", "fcntl failed: %s", strerror(errno));
+        LOG_ERROR("net", "fcntl FAILED: %s.", strerror(errno));
         return;
     }
 }
@@ -316,6 +319,7 @@ static context_t *context_init(oid_t peer, int fd,
     ctx->peer.sock = fd;
     ctx->peer.ip = inet_ntoa(addr.sin_addr);
     ctx->peer.port = ntohs(addr.sin_port);
+    ctx->last_time = ctx->start_time = time_s();
     blob_init(&(ctx->recv_data));
     blob_init(&(ctx->send_data));
     event_init(ctx);
@@ -397,7 +401,8 @@ static void push_send(context_t *ctx, blob_t *msg)
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock,
                 &(ctx->evt))) {
-        LOG_ERROR("net", "[%s:%d] epoll_ctl failed: %s.",
+        LOG_ERROR("net", "%lld (%s:%d) epoll_ctl FAILED: %s.",
+                ctx->peer.id,
                 ctx->peer.ip.c_str(), ctx->peer.port,
                 strerror(errno));
     }
@@ -417,7 +422,8 @@ static void push_send(context_t *ctx, chunk_queue &chunks)
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock,
                 &(ctx->evt))) {
-        LOG_ERROR("net", "[%s:%d] epoll_ctl failed: %s.",
+        LOG_ERROR("net", "%lld (%s:%d) epoll_ctl FAILED: %s.",
+                ctx->peer.id,
                 ctx->peer.ip.c_str(), ctx->peer.port,
                 strerror(errno));
     }
@@ -440,7 +446,7 @@ int net_init(void)
     MODULE_IMPORT_SWITCH;
     s_epoll = epoll_create(1000);
     if (s_epoll == -1) {
-        LOG_ERROR("net", "epoll_create failed: %s", strerror(errno));
+        LOG_ERROR("net", "epoll_create FAILED: %s.", strerror(errno));
         return -1;
     }
     mutex_init(&s_context_lock);
@@ -468,7 +474,8 @@ int net_listen(oid_t peer, const std::string &name,
     evt.data.fd = s_sock;
     evt.events = EPOLLIN|EPOLLET|EPOLLERR|EPOLLHUP;
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, s_sock, &evt)) {
-        LOG_ERROR("net", "[%s:%d] epoll_ctl failed: %s", ip.c_str(), port,
+        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
                 strerror(errno));
         close(s_sock);
         return -1;
@@ -482,18 +489,21 @@ int net_listen(oid_t peer, const std::string &name,
     addr.sin_port = htons(port);
 
     if (0 != bind(s_sock, (sockaddr *)&addr, sizeof(addr))) {
-        LOG_ERROR("net", "Bind %s:%d FAILED.", ip.c_str(), port);
+        LOG_ERROR("net", "[%s] (%s:%d) bind FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
         close(s_sock);
         return -1;
     }
 
     if (0 != listen(s_sock, 0)) {
-        LOG_ERROR("net", "Listen on [%s]%s:%d FAILED.",
-               name.c_str(), ip.c_str(), port);
+        LOG_ERROR("net", "[%s] (%s:%d) listen FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
         close(s_sock);
         return -1;
     }
-    LOG_INFO("net", "Listen on [%s]%s:%d OK.",
+    LOG_INFO("net", "[%s] (%s:%d) listen OK.",
             name.c_str(), ip.c_str(), port);
 
     // @todo ON_LISTEN
@@ -513,7 +523,7 @@ int net_connect(oid_t peer, const std::string &name,
     addr.sin_port = htons(port);
 
     if (0 != connect(fd, (struct sockaddr *)(&addr), sizeof(addr))) {
-        LOG_ERROR("net", "Connect to [%s]%s:%d FAILED: %s.",
+        LOG_ERROR("net", "[%s] (%s:%d) connect FAILED: %s.",
                 name.c_str(), ip.c_str(), port,
                 strerror(errno));
         close(fd);
@@ -526,13 +536,13 @@ int net_connect(oid_t peer, const std::string &name,
     context_t *ctx = context_init(peer, fd, addr);
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
-        LOG_ERROR("net", "[%s:%d] epoll_ctl failed: %s", ip.c_str(), port,
-                ctx->peer.ip.c_str(), ctx->peer.port,
+        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
                 strerror(errno));
         context_fini(ctx->peer.id);
         return -1;
     } else {
-        LOG_INFO("net", "Connect to [%s]%s:%d OK.",
+        LOG_INFO("net", "[%s] (%s:%d) connect OK.",
                name.c_str(), ip.c_str(), port);
     }
     return 0;
@@ -549,7 +559,8 @@ int net_update(void)
     int num = epoll_wait(s_epoll, evts, sizeof(evts)/sizeof(evts[0]), 5);
 
     if (num < 0 && errno != EINTR) {
-        LOG_ERROR("net", "epoll_wait failed: %s", strerror(errno));
+        LOG_ERROR("net", "epoll_wait FAILED: %s.",
+                strerror(errno));
         return num;
     }
     for (int i = 0; i < num; ++i) {
@@ -591,18 +602,20 @@ void net_peer_info(oid_t peer, char *str)
 {
     context_t *ctx = context_find(peer);
     if (ctx == NULL) {
-        LOG_TRACE("net", "Context `%lld' is NOT found.",
+        LOG_TRACE("net", "%lld is NOT found.",
                 peer);
         return;
     }
-    sprintf(str, "%s:%d", ctx->peer.ip.c_str(), ctx->peer.port);
+    sprintf(str, "%lld (%s:%d)",
+            ctx->peer.id,
+            ctx->peer.ip.c_str(), ctx->peer.port);
 }
 
 int net_error(oid_t peer)
 {
     context_t *ctx = context_find(peer);
     if (ctx == NULL) {
-        LOG_TRACE("net", "Context `%lld' is NOT found.",
+        LOG_TRACE("net", "%lld is NOT found.",
                 peer);
         return -1;
     }
@@ -633,6 +646,14 @@ bool net_decode(recv_message_t *msg)
 {
     assert(msg && msg->pb);
     msg->pb->ParseFromString(msg->body);
+
+    context_t *ctx = context_find(msg->peer);
+    if (ctx == NULL) {
+        LOG_TRACE("net", "%lld is NOT found.",
+                msg->peer);
+        return false;
+    }
+    ctx->last_time = elf::time_s();
     return true;
 }
 
@@ -642,7 +663,7 @@ int net_send(oid_t peer, blob_t *msg)
 
     context_t *ctx = context_find(peer);
     if (ctx == NULL) {
-        LOG_TRACE("net", "Context `%lld' is NOT found to be sent.",
+        LOG_TRACE("net", "%lld is NOT found to be sent.",
                 peer);
         return -1;
     }
@@ -718,7 +739,7 @@ static void on_accept(const epoll_event &evt)
     int fd = 0;
     while ((fd = accept(s_sock, (sockaddr *)&addr, &len)) > 0) {
         if (0 != getpeername(fd, (sockaddr *)&addr, &len)) {
-            LOG_ERROR("net", "Accept failed: %s", strerror(errno));
+            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
             close(fd);
             return;
         }
@@ -729,19 +750,21 @@ static void on_accept(const epoll_event &evt)
         context_t *ctx = context_init(OID_NIL, fd, addr);
 
         if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
-            LOG_ERROR("net", "[%s:%d] epoll_ctl failed: %s",
+            LOG_ERROR("net", "%lld (%s:%d) epoll_ctl FAILED: %s.",
+                    ctx->peer.id,
                     ctx->peer.ip.c_str(), ctx->peer.port,
                     strerror(errno));
             context_fini(ctx->peer.id);
         } else {
-            LOG_INFO("net", "Accept %s:%d.",
+            LOG_INFO("net", "%lld (%s:%d) accepted.",
+                    ctx->peer.id,
                     ctx->peer.ip.c_str(), ctx->peer.port);
         }
         len = sizeof(addr);
     }
     if (fd < 0) {
         if (errno != EINTR && errno != EAGAIN) {
-            LOG_ERROR("net", "Accept failed: %s.", strerror(errno));
+            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
         }
     }
 }
@@ -758,7 +781,8 @@ static void on_read(const epoll_event &evt)
         if (size < 0) {
             chunk_fini(c);
             if (errno != EINTR && errno != EAGAIN) {
-                LOG_ERROR("net", "Recv %s:%d failed: %s.",
+                LOG_ERROR("net", "%lld (%s:%d) recv FAILED: %s.",
+                        ctx->peer.id,
                         ctx->peer.ip.c_str(), ctx->peer.port,
                         strerror(errno));
                 context_fini(ctx->peer.id);
@@ -769,7 +793,8 @@ static void on_read(const epoll_event &evt)
         // client disconnect socket
         if (0 == size) {
             chunk_fini(c);
-            LOG_INFO("net", "Peer %s:%d active closed.",
+            LOG_INFO("net", "%lld (%s:%d) active closed.",
+                    ctx->peer.id,
                     ctx->peer.ip.c_str(), ctx->peer.port);
             context_fini(ctx->peer.id);
             return;
@@ -781,7 +806,8 @@ static void on_read(const epoll_event &evt)
     }
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock,
                 &(ctx->evt))) {
-        LOG_ERROR("net", "[%s:%d] epoll_ctl failed: %s.",
+        LOG_ERROR("net", "%lld (%s:%d) epoll_ctl FAILED: %s.",
+                ctx->peer.id,
                 ctx->peer.ip.c_str(), ctx->peer.port,
                 strerror(errno));
     }
@@ -805,7 +831,8 @@ static void on_write(const epoll_event &evt)
                     c->data + c->offset, rem, 0);
             if (num < 0) {
                 if (errno != EINTR && errno != EAGAIN) {
-                    LOG_ERROR("net", "Send %s:%d failed: %s.",
+                    LOG_ERROR("net", "%lld (%s:%d) send FAILED: %s.",
+                            ctx->peer.id,
                             ctx->peer.ip.c_str(), ctx->peer.port,
                             strerror(errno));
                     context_fini(ctx->peer.id);
@@ -832,7 +859,8 @@ static void on_error(const epoll_event &evt)
 {
     context_t *ctx = (context_t *)(evt.data.ptr);
 
-    LOG_ERROR("net", "Error %s:%d.",
+    LOG_ERROR("net", "%lld (%s:%d), UNKNOWN ERROR.",
+            ctx->peer.id,
             ctx->peer.ip.c_str(), ctx->peer.port);
     ctx->evt.events = EPOLLIN|EPOLLET;
     epoll_ctl(s_epoll, EPOLL_CTL_DEL, ctx->peer.sock, &(ctx->evt));
