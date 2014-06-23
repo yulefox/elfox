@@ -8,6 +8,7 @@
 #include <elf/memory.h>
 #include <elf/pc.h>
 #include <elf/thread.h>
+#include <elf/time.h>
 #include <deque>
 #include <map>
 #include <string>
@@ -19,6 +20,7 @@ struct db_req_t {
     bool read; // need restore query result
     std::string cmd; // sql command
     oid_t sid; // session id
+    elf::time64_t stamp; // request time stamp
 };
 
 struct db_res_t {
@@ -88,6 +90,21 @@ static void query(db_req_t *req)
                     }
                 }
             } while (!mysql_next_result(s_mysql));
+
+            elf::time64_t ct = time_ms();
+            elf::time64_t delta = time_diff(ct, req->stamp);
+            static elf::time64_t leap = 5000; // 5s
+            static elf::time64_t times = 1;
+
+            if (delta > leap * times) {
+                LOG_WARN("db", "DB Server is busying for %d.%03ds.",
+                        delta / 1000,
+                        delta % 1000,
+                        req->cmd.c_str());
+                ++times;
+            } else if (delta < leap) {
+                times = 1;
+            }
         }
         s_queue_res.push(res);
     } catch(...) {
@@ -233,6 +250,7 @@ void db_req(const char *cmd, oid_t oid, pb_t *out,
 
     req->cmd = cmd;
     req->sid = s->id;
+    req->stamp = time_ms();
     req->read = (out != NULL);
     s_queue_req.push(req);
 }
