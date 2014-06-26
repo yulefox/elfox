@@ -95,6 +95,13 @@ public:
         }
         return NULL;
     }
+
+    ///
+    /// Get size of object map.
+    /// @return Size of object map.
+    ///
+    static int Size(void) { return s_objs.size(); }
+
     virtual ~Object(void);
 
 protected:
