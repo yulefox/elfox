@@ -85,6 +85,9 @@ void event_emit(int evt, int arg, oid_t oid)
         return;
     }
 
+    LOG_TRACE("event", "<%lld> emit %d:%d.",
+            oid, evt, arg);
+
     listener_list *lss = itr_l->second;
     listener_list::iterator itr = lss->begin();
     for (; itr != lss->end(); ++itr) {
@@ -92,6 +95,8 @@ void event_emit(int evt, int arg, oid_t oid)
 
         assert(cb);
 
+        // not same owner
+        if (oid != cb->oid) continue;
         cb->tid = oid;
         cb->targ = arg;
         cb->func(cb);
