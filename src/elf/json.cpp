@@ -54,19 +54,22 @@ pb_t *json_pb(const char *pb_type, const char *json_type, const char *data)
     cJSON *ref = cJSON_GetObjectItem(s_json, json_type);
 
     assert(ref);
-    json = json->child;
-    for (; json; json = json->next) {
-        if (json->type != cJSON_String) continue;
-        if (strlen(json->valuestring) <= 0) continue;
+    cJSON *item = json->child;
+    for (; item; item = item->next) {
+        if (item->type != cJSON_String) continue;
+        if (strlen(item->valuestring) <= 0) continue;
 
-        cJSON *ofd = cJSON_GetObjectItem(ref, json->string);
+        cJSON *ofd = cJSON_GetObjectItem(ref, item->string);
 
-        if (!ofd) return NULL;
+        if (!ofd) {
+            cJSON_Delete(json);
+            return NULL;
+        }
 
         const FieldDescriptor *fd = des->FindFieldByName(ofd->valuestring);
 
         if (!fd) continue;
-        pb_set_field(pb, fd, json->valuestring);
+        pb_set_field(pb, fd, item->valuestring);
     }
     cJSON_Delete(json);
     return pb;

@@ -57,7 +57,9 @@ void event_unregist(oid_t lid, int evt)
         listener_list::iterator itr_l = lss->find(lid);
 
         if (itr_l != lss->end()) {
-            E_DELETE(itr_l->second);
+            callback_t *cb = itr_l->second;
+
+            E_DELETE cb;
             lss->erase(itr_l);
         }
     } else {
@@ -70,7 +72,9 @@ void event_unregist(oid_t lid, int evt)
             listener_list::iterator itr_l = lss->find(lid);
 
             if (itr_l != lss->end()) {
-                E_DELETE(itr_l->second);
+                callback_t *cb = itr_l->second;
+
+                E_DELETE cb;
                 lss->erase(itr_l);
             }
         }
