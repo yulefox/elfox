@@ -28,7 +28,16 @@ Object::~Object(void)
 
 void Object::OnInit(void)
 {
-    assert(s_objs.find(m_id) == s_objs.end());
+    obj_map_id::const_iterator itr = s_obj.find(m_id);
+
+    if (itr != s_objs.end()) {
+        Object *obj = itr->second;
+
+        LOG_ERROR("sys", "<%lld>(%s) - (%s)",
+                m_id,
+                obj->GetName.c_str()(),
+                m_name.c_str());
+    }
     s_objs[m_id] = this;
 }
 } // namespace elf
