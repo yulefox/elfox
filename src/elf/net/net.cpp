@@ -786,6 +786,7 @@ static void on_read(const epoll_event &evt)
                         ctx->peer.ip.c_str(), ctx->peer.port,
                         strerror(errno));
                 context_fini(ctx->peer.id);
+                return;
             }
             break;
         }

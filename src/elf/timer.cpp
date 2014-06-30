@@ -266,7 +266,7 @@ void timer_remove(const oid_t &tid)
         if (t == s_mgr.timers[bucket]) {
             s_mgr.timers[bucket] = n;
         }
-        S_DELETE(t->args);
+        S_FREE(t->args);
         destroy(t);
         ++s_mgr.timer_cancelled;
         --s_mgr.timer_remain;
