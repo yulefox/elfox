@@ -3,6 +3,7 @@
  * http://www.yulefox.com/
  */
 
+#include <elf/log.h>
 #include <elf/object.h>
 #include <elf/memory.h>
 
@@ -28,14 +29,14 @@ Object::~Object(void)
 
 void Object::OnInit(void)
 {
-    obj_map_id::const_iterator itr = s_obj.find(m_id);
+    obj_map_id::const_iterator itr = s_objs.find(m_id);
 
     if (itr != s_objs.end()) {
         Object *obj = itr->second;
 
         LOG_ERROR("sys", "<%lld>(%s) - (%s)",
                 m_id,
-                obj->GetName.c_str()(),
+                obj->GetName().c_str(),
                 m_name.c_str());
     }
     s_objs[m_id] = this;

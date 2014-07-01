@@ -59,7 +59,7 @@ void event_unregist(oid_t lid, int evt)
         if (itr_l != lss->end()) {
             callback_t *cb = itr_l->second;
 
-            E_DELETE cb;
+            E_FREE(cb);
             lss->erase(itr_l);
         }
     } else {
