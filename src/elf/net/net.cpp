@@ -598,6 +598,18 @@ void net_stat(void)
     mutex_unlock(&s_context_lock);
 }
 
+void net_peer_addr(oid_t peer, char *str)
+{
+    context_t *ctx = context_find(peer);
+    if (ctx == NULL) {
+        LOG_TRACE("net", "%lld is NOT found.",
+                peer);
+        return;
+    }
+    sprintf(str, "%s:%d",
+            ctx->peer.ip.c_str(), ctx->peer.port);
+}
+
 void net_peer_info(oid_t peer, char *str)
 {
     context_t *ctx = context_find(peer);

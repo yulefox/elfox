@@ -93,6 +93,14 @@ int net_proc(void);
 void net_stat(void);
 
 ///
+/// Get peer address ip:port.
+/// @param[in] peer Peer id.
+/// @param[out] str Peer info.
+/// @return Peer address info.
+///
+void net_peer_addr(oid_t peer, char *str);
+
+///
 /// Get peer address info.
 /// @param[in] peer Peer id.
 /// @param[out] str Peer info.
