@@ -113,7 +113,16 @@ int timer_init(void)
     s_mgr.cursor.a = 0;
     s_mgr.round = 0;
     memset(s_mgr.timers, 0, sizeof(s_mgr.timers[0]) * MAX_WHEEL_SET_SIZE);
-    timer_min(NULL);
+
+    time_t ms = elf::time_ms() % 1000;
+    time_t cur = elf::time_s();
+    elf::time64_t tm_timer;
+    struct tm tm_cur;
+
+    localtime_r(&cur, &tm_cur);
+    tm_timer = (60 - tm_cur.tm_sec) * 1000llu - ms;
+
+    timer_add(tm_timer, timer_min, NULL);
     return 0;
 }
 
