@@ -75,12 +75,6 @@ int net_connect(oid_t peer, const std::string &name,
 void net_close(oid_t peer);
 
 ///
-/// Running.
-/// @return (0).
-///
-int net_update(void);
-
-///
 /// Process all received messages.
 /// @return (0).
 ///

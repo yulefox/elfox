@@ -30,7 +30,9 @@ struct recv_message_t;
 struct context_t;
 
 typedef std::list<chunk_t *> chunk_queue;
-typedef xqueue<chunk_t *> chunk_xqueue;
+
+typedef std::deque<oid_t> context_queue;
+typedef xqueue<oid_t> context_xqueue;
 
 typedef std::deque<recv_message_t *> recv_message_queue;
 typedef xqueue<recv_message_t *> recv_message_xqueue;
@@ -72,14 +74,25 @@ typedef std::map<oid_t, context_t *> context_list;
 const int SIZE_INT = sizeof(int(0));
 const int SIZE_INTX2 = sizeof(int(0)) * 2;
 
-static thread_t s_tid;
+static thread_t s_tid; // io thread
+static thread_t s_cid; // context thread
 static mutex_t s_context_lock;
 static int s_epoll;
 static int s_sock;
 static context_list s_contexts;
 static recv_message_xqueue s_recv_msgs;
+static context_xqueue s_free_contexts;
 static lasy_peer_map s_lasy_peers;
 
+///
+/// Running.
+/// @return (0).
+///
+static int net_update(void);
+
+static context_t *context_init(oid_t peer, int fd,
+        const struct sockaddr_in &addr);
+static void context_fini(elf::oid_t peer);
 static void on_accept(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
 static void on_write(const epoll_event &evt);
@@ -94,7 +107,53 @@ static void *net_thread(void *args)
     return NULL;
 }
 
-static void set_noblock(int sock)
+static void *context_thread(void *args)
+{
+    while (true) {
+        context_queue peers;
+        context_queue::iterator itr;
+
+        s_free_contexts.swap(peers);
+        if (peers.empty()) {
+            usleep(500);
+            continue;
+        }
+        LOG_TRACE("net", "%d contexts closing ...",
+                peers.size());
+        for (itr = peers.begin(); itr != peers.end(); ++itr) {
+            context_fini(*itr);
+        }
+        LOG_TRACE("net", "%d contexts closed.",
+                peers.size());
+    }
+    return NULL;
+}
+
+static int net_update(void)
+{
+    epoll_event evts[100];
+    int num = epoll_wait(s_epoll, evts, sizeof(evts)/sizeof(evts[0]), 5);
+
+    if (num < 0 && errno != EINTR) {
+        LOG_ERROR("net", "epoll_wait FAILED: %s.",
+                strerror(errno));
+        return num;
+    }
+    for (int i = 0; i < num; ++i) {
+        if (evts[i].data.fd == s_sock) {
+            on_accept(evts[i]);
+        } else if (evts[i].events & EPOLLIN) {
+            on_read(evts[i]);
+        } else if (evts[i].events & EPOLLOUT) {
+            on_write(evts[i]);
+        } else {
+            on_error(evts[i]);
+        }
+    }
+    return 0;
+}
+
+static void set_nonblock(int sock)
 {
     // reuser socket address
     int rc = 0;
@@ -111,7 +170,7 @@ static void set_noblock(int sock)
     struct linger lg;
 
     lg.l_onoff = 1;
-    lg.l_linger = 5;
+    lg.l_linger = 10;
     rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg,
             sizeof(lg));
     if (rc != 0) {
@@ -451,6 +510,7 @@ int net_init(void)
     }
     mutex_init(&s_context_lock);
     s_tid = thread_init(net_thread, NULL);
+    s_cid = thread_init(context_thread, NULL);
     return 0;
 }
 
@@ -466,7 +526,7 @@ int net_listen(oid_t peer, const std::string &name,
         const std::string &ip, int port)
 {
     s_sock = socket(AF_INET, SOCK_STREAM, 0);
-    set_noblock(s_sock);
+    set_nonblock(s_sock);
 
     epoll_event evt;
 
@@ -531,7 +591,7 @@ int net_connect(oid_t peer, const std::string &name,
     }
 
     // @todo ON_CONNECT
-    set_noblock(fd);
+    set_nonblock(fd);
     getsockname(fd, (struct sockaddr *)(&addr), &len);
     context_t *ctx = context_init(peer, fd, addr);
 
@@ -550,31 +610,7 @@ int net_connect(oid_t peer, const std::string &name,
 
 void net_close(oid_t peer)
 {
-    context_fini(peer);
-}
-
-int net_update(void)
-{
-    epoll_event evts[100];
-    int num = epoll_wait(s_epoll, evts, sizeof(evts)/sizeof(evts[0]), 5);
-
-    if (num < 0 && errno != EINTR) {
-        LOG_ERROR("net", "epoll_wait FAILED: %s.",
-                strerror(errno));
-        return num;
-    }
-    for (int i = 0; i < num; ++i) {
-        if (evts[i].data.fd == s_sock) {
-            on_accept(evts[i]);
-        } else if (evts[i].events & EPOLLIN) {
-            on_read(evts[i]);
-        } else if (evts[i].events & EPOLLOUT) {
-            on_write(evts[i]);
-        } else {
-            on_error(evts[i]);
-        }
-    }
-    return 0;
+    s_free_contexts.push(peer);
 }
 
 int net_proc(void)
@@ -757,7 +793,7 @@ static void on_accept(const epoll_event &evt)
         }
 
         // @todo ON_ACCEPT
-        set_noblock(fd);
+        set_nonblock(fd);
 
         context_t *ctx = context_init(OID_NIL, fd, addr);
 

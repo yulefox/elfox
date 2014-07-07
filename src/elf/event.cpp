@@ -74,7 +74,7 @@ void event_unregist(oid_t lid, int evt)
             if (itr_l != lss->end()) {
                 callback_t *cb = itr_l->second;
 
-                E_DELETE cb;
+                E_FREE(cb);
                 lss->erase(itr_l);
             }
         }
@@ -96,8 +96,6 @@ void event_emit(int evt, int arg, oid_t oid)
     listener_list::iterator itr = lss->begin();
     for (; itr != lss->end(); ++itr) {
         callback_t *cb = itr->second;
-
-        assert(cb);
 
         // not same owner
         if (oid != cb->oid) continue;
