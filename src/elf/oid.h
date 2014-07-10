@@ -29,7 +29,7 @@ typedef std::list<oid_t> id_list;
 typedef std::set<oid_t> id_set;
 typedef std::map<oid_t, int> id_map;
 typedef std::map<int, oid_t> id_imap;
-typedef void (*callback)(void *args);
+typedef bool (*callback)(void *args);
 
 const oid_t OID_NIL = 0;
 

@@ -10,7 +10,8 @@
 #include <set>
 
 namespace elf {
-typedef std::map<oid_t, callback_t *> listener_list;
+typedef std::list<callback_t *> callback_list;
+typedef std::map<oid_t, callback_list *> listener_list;
 typedef std::map<int, listener_list *> listener_map;
 
 static listener_map s_listeners;
@@ -30,16 +31,25 @@ int event_fini(void)
 void event_regist(int evt, callback_t *cb)
 {
     assert(cb);
-    listener_list *lss = NULL;
+    callback_list *cl = NULL;
+    listener_list *ll = NULL;
     listener_map::iterator itr = s_listeners.find(evt);
 
     if (itr == s_listeners.end()) {
-        lss = E_NEW listener_list;
-        s_listeners[evt] = lss;
+        ll = E_NEW listener_list;
+        s_listeners[evt] = ll;
     } else {
-        lss = itr->second;
+        ll = itr->second;
     }
-    (*lss)[cb->lid] = cb;
+
+    listener_list::iterator itr_l = ll->find(cb->lid);
+
+    if (itr_l == ll->end()) {
+        cl = E_NEW callback_list;
+    } else {
+        cl = itr_l->second;
+    }
+    cl->push_back(cb);
 }
 
 void event_unregist(oid_t lid, int evt)
@@ -48,34 +58,48 @@ void event_unregist(oid_t lid, int evt)
         listener_map::iterator itr = s_listeners.find(evt);
 
         if (itr == s_listeners.end()) {
+            LOG_WARN("event", "<%lld> has NO event %d.",
+                    lid, evt);
             return;
         }
 
-        listener_list *lss = itr->second;
+        listener_list *ll = itr->second;
 
-        assert(lss);
-        listener_list::iterator itr_l = lss->find(lid);
+        assert(ll);
+        listener_list::iterator itr_l = ll->find(lid);
 
-        if (itr_l != lss->end()) {
-            callback_t *cb = itr_l->second;
+        if (itr_l != ll->end()) {
+            callback_list *cl = itr_l->second;
+            callback_list::iterator itr_c = cl->begin();
 
-            E_FREE(cb);
-            lss->erase(itr_l);
+            for (; itr_c != cl->end(); ++itr_c) {
+                callback_t *cb = *itr_c;
+
+                E_FREE(cb);
+            }
+            E_DELETE(cl);
+            ll->erase(itr_l);
         }
     } else {
         listener_map::iterator itr = s_listeners.begin();
 
         for (; itr != s_listeners.end(); ++itr) {
-            listener_list *lss = itr->second;
+            listener_list *ll = itr->second;
 
-            assert(lss);
-            listener_list::iterator itr_l = lss->find(lid);
+            assert(ll);
+            listener_list::iterator itr_l = ll->find(lid);
 
-            if (itr_l != lss->end()) {
-                callback_t *cb = itr_l->second;
+            if (itr_l != ll->end()) {
+                callback_list *cl = itr_l->second;
+                callback_list::iterator itr_c = cl->begin();
 
-                E_FREE(cb);
-                lss->erase(itr_l);
+                for (; itr_c != cl->end(); ++itr_c) {
+                    callback_t *cb = *itr_c;
+
+                    E_FREE(cb);
+                }
+                E_DELETE(cl);
+                ll->erase(itr_l);
             }
         }
     }
@@ -83,25 +107,38 @@ void event_unregist(oid_t lid, int evt)
 
 void event_emit(int evt, int arg, oid_t oid)
 {
-    listener_map::iterator itr_l = s_listeners.find(evt);
-
-    if (itr_l == s_listeners.end()) {
-        return;
-    }
-
     LOG_TRACE("event", "<%lld> emit %d:%d.",
             oid, evt, arg);
 
-    listener_list *lss = itr_l->second;
-    listener_list::iterator itr = lss->begin();
-    for (; itr != lss->end(); ++itr) {
-        callback_t *cb = itr->second;
+    // get event listeners
+    listener_map::iterator itr = s_listeners.find(evt);
 
-        // not same owner
-        if (oid != cb->oid) continue;
+    if (itr == s_listeners.end()) {
+        return;
+    }
+
+    // get listener
+    listener_list *ll = itr->second;
+    listener_list::iterator itr_l = ll->find(oid);
+
+    if (itr_l == ll->end()) {
+        return;
+    }
+
+    callback_list *cl = itr_l->second;
+    callback_list::iterator itr_c = cl->begin();
+
+    while (itr_c != cl->end()) {
+        callback_t *cb = *itr_c;
+
         cb->tid = oid;
         cb->targ = arg;
-        cb->func(cb);
+        if (cb->func(cb)) {
+            E_FREE(cb);
+            cl->erase(itr_c++);
+        } else {
+            itr_c++;
+        }
     }
 }
 } // namespace elf

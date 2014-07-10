@@ -102,7 +102,7 @@ static int schedule(timer_t *t);
 static void expire(timer_t *t);
 static void bingo(void);
 static void hash(int bucket);
-static void timer_min(void *args);
+static bool timer_min(void *args);
 
 int timer_init(void)
 {
@@ -275,7 +275,6 @@ void timer_remove(const oid_t &tid)
         if (t == s_mgr.timers[bucket]) {
             s_mgr.timers[bucket] = n;
         }
-        S_FREE(t->args);
         destroy(t);
         ++s_mgr.timer_cancelled;
         --s_mgr.timer_remain;
@@ -373,6 +372,7 @@ static timer_t *get(const oid_t &tid, int *bucket)
 static void destroy(timer_t *t)
 {
     if (t) {
+        E_FREE(t->args);
         S_DELETE(t);
     }
 }
@@ -443,7 +443,7 @@ static void hash(int bucket)
         t = n;
     }
 }
-static void timer_min(void *args)
+static bool timer_min(void *args)
 {
     LOG_TRACE("timer", "%s", "BINGO: MIN.");
 
@@ -460,6 +460,7 @@ static void timer_min(void *args)
     for (; itr != s_handlers.end(); ++itr) {
         (*itr)(&cur);
     }
+    return true;
 }
 } // namespace elf
 
