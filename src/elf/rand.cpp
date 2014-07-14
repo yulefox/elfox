@@ -62,9 +62,9 @@ void roll(const roll_req &req, roll_res &res, int times)
 
     // rolling
     for (int i = 0; i < times; ++i) {
-        int rnd = rand(0, 10000);
-
         for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
+            int rnd = rand(1, 10000);
+
             if (rnd <= itr_c->second) {
                 itr_d = res.find(itr_c->first);
                 if (itr_d == res.end()) {
@@ -72,7 +72,6 @@ void roll(const roll_req &req, roll_res &res, int times)
                 } else {
                     ++(itr_d->second);
                 }
-                break;
             }
         }
     }
