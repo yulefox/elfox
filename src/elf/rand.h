@@ -56,7 +56,9 @@ void rand(int min, int max, roll_set &res, int times);
 /// @param req Roll request.
 /// @param res Roll response.
 /// @param times Roll times.
-void roll(const roll_req &req, roll_res &res, int times);
+/// @param exclusive Exclusive rolling.
+///
+void roll(const roll_req &req, roll_res &res, int times, bool exclusive);
 } // namespace elf
 
 #endif /* !ELF_RAND_H */

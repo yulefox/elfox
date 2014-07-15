@@ -55,16 +55,16 @@ void rand(int min, int max, roll_set &res, int times)
     }
 }
 
-void roll(const roll_req &req, roll_res &res, int times)
+void roll(const roll_req &req, roll_res &res, int times, bool exclusive)
 {
     roll_req::const_iterator itr_c = req.begin();
     roll_res::iterator itr_d;
 
     // rolling
     for (int i = 0; i < times; ++i) {
-        for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
-            int rnd = rand(1, 10000);
+        int rnd = rand(1, 10000);
 
+        for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
             if (rnd <= itr_c->second) {
                 itr_d = res.find(itr_c->first);
                 if (itr_d == res.end()) {
@@ -72,7 +72,16 @@ void roll(const roll_req &req, roll_res &res, int times)
                 } else {
                     ++(itr_d->second);
                 }
+                if (exclusive) {
+                    break;
+                }
             }
+            if (exclusive) {
+                rnd -= itr_c->second;
+            } else {
+                rnd = rand(1, 10000);
+            }
+
         }
     }
 }
