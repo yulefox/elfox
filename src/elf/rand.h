@@ -43,22 +43,37 @@ float frand(float min, float max);
 int rand(int min, int max);
 
 ///
-/// Generate several random number in [min, max].
+/// Generate several random numbers in [min, max].
 /// @param min Minimum number.
 /// @param max Maximum number.
 /// @param res Roll result.
 /// @param times Roll times.
 ///
-void rand(int min, int max, roll_set &res, int times);
+void roll(int min, int max, roll_set &res, int times);
 
 ///
-/// Roll around group.
-/// @param req Roll request.
-/// @param res Roll response.
-/// @param times Roll times.
-/// @param exclusive Exclusive rolling.
+/// Generate several random requests in request group.
+/// @param req Random request gorup.
+/// @param res Random response group.
+/// @param times Random times.
 ///
-void roll(const roll_req &req, roll_res &res, int times, bool exclusive);
+void rand(const roll_req &req, roll_res &res, int times);
+
+///
+/// Generate several random requests in request group(put back if hit).
+/// @param req Random request group.
+/// @param res Random response gorup.
+/// @param times Random times.
+///
+void roll_pb(const roll_req &req, roll_res &res, int times);
+
+///
+/// Generate several random requests in request group(remove if hit).
+/// @param req Roll request group.
+/// @param res Roll response group.
+/// @param times Roll times.
+///
+void roll_rm(const roll_req &req, roll_res &res, int times);
 } // namespace elf
 
 #endif /* !ELF_RAND_H */
