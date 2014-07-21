@@ -21,7 +21,7 @@ int rand(int min, int max)
     return (min + ::rand() % range);
 }
 
-void rand(int min, int max, roll_set &res, int times)
+void roll(int min, int max, roll_set &res, int times)
 {
     int range = abs(max - min) + 1;
 
