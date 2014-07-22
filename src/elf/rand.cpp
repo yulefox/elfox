@@ -103,20 +103,20 @@ void roll_rm(const roll_req &req, roll_res &res, int times)
     roll_req::const_iterator itr_c = req.begin();
     roll_res::iterator itr_d;
 
-    for (int i = 0; i < times; ++i) {
+    while (times) {
         int rnd = rand(1, 10000);
 
         for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
             if (rnd <= itr_c->second) {
                 for (itr_d = res.begin(); itr_d != res.end(); ++itr_d) {
                     if (itr_d->second == itr_c->second) {
-                        break; // roll existed
+                        break;
                     }
                 }
                 if (itr_d == res.end()) {
-                    res[i++] = itr_c->first;
+                    res[--times] = itr_c->first;
+                    break;
                 }
-                break; // continue while
             }
             rnd -= itr_c->second;
         }
