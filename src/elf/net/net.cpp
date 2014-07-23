@@ -599,7 +599,7 @@ int net_connect(oid_t peer, const std::string &name,
         LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
                 name.c_str(), ip.c_str(), port,
                 strerror(errno));
-        context_fini(ctx->peer.id);
+        net_close(ctx->peer.id);
         return -1;
     } else {
         LOG_INFO("net", "[%s] (%s:%d) connect OK.",
@@ -802,7 +802,7 @@ static void on_accept(const epoll_event &evt)
                     ctx->peer.id,
                     ctx->peer.ip.c_str(), ctx->peer.port,
                     strerror(errno));
-            context_fini(ctx->peer.id);
+            net_close(ctx->peer.id);
         } else {
             LOG_INFO("net", "%lld (%s:%d) accepted.",
                     ctx->peer.id,
@@ -833,7 +833,7 @@ static void on_read(const epoll_event &evt)
                         ctx->peer.id,
                         ctx->peer.ip.c_str(), ctx->peer.port,
                         strerror(errno));
-                context_fini(ctx->peer.id);
+                net_close(ctx->peer.id);
                 return;
             }
             break;
@@ -845,7 +845,7 @@ static void on_read(const epoll_event &evt)
             LOG_INFO("net", "%lld (%s:%d) active closed.",
                     ctx->peer.id,
                     ctx->peer.ip.c_str(), ctx->peer.port);
-            context_fini(ctx->peer.id);
+            net_close(ctx->peer.id);
             return;
         }
 
@@ -884,7 +884,7 @@ static void on_write(const epoll_event &evt)
                             ctx->peer.id,
                             ctx->peer.ip.c_str(), ctx->peer.port,
                             strerror(errno));
-                    context_fini(ctx->peer.id);
+                    net_close(ctx->peer.id);
                 } else {
                     push_send(ctx, chunks);
                 }
@@ -913,6 +913,6 @@ static void on_error(const epoll_event &evt)
             ctx->peer.ip.c_str(), ctx->peer.port);
     ctx->evt.events = EPOLLIN|EPOLLET;
     epoll_ctl(s_epoll, EPOLL_CTL_DEL, ctx->peer.sock, &(ctx->evt));
-    context_fini(ctx->peer.id);
+    net_close(ctx->peer.id);
 }
 } // namespace elf
