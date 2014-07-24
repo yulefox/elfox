@@ -6,7 +6,7 @@
 #include <elf/elf.h>
 #include <tut/tut.hpp>
 
-const int TEST_TIMES = 1000;
+const int TEST_TIMES = 2;
 static elf::time64_t start_time = 0;
 static elf::time64_t end_time = 0;
 static int req_times = 0;

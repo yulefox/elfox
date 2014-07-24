@@ -49,15 +49,15 @@ void object::test<3>() {
     set_test_name("rand n");
     elf::roll_set res;
 
-    elf::rand(11, 20, res, 0);
+    //elf::rand(11, 20, res, 0);
     ensure(res.size() == 0);
     res.clear();
 
-    elf::rand(11, 20, res, 10);
+    //elf::rand(11, 20, res, 10);
     ensure(res.size() == 10);
     res.clear();
 
-    elf::rand(11, 20, res, 5);
+    //elf::rand(11, 20, res, 5);
     ensure(res.size() == 5);
     res.clear();
 }

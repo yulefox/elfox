@@ -10,7 +10,7 @@
 
 namespace elf {
 struct http_req_t {
-    const char *json;
+    char *json;
     const char *url;
     http_response cb;
     void *args;
@@ -30,6 +30,7 @@ static void *http_post(void *args)
         curl_easy_setopt(curl, CURLOPT_URL, post->url);
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(post->json));
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post->cb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, post->args);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
@@ -46,6 +47,7 @@ static void *http_post(void *args)
     } else {
         LOG_ERROR("http", "%s", "curl_easy_init() failed.");
     }
+    free(post->json);
     E_DELETE post;
     return NULL;
 }
@@ -73,7 +75,7 @@ int http_fini(void)
     return 0;
 }
 
-int http_json(const char *url, const char *json,
+int http_json(const char *url, char *json,
         http_response func, void *args)
 {
     http_req_t *post = E_NEW http_req_t;

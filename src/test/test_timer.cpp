@@ -54,7 +54,6 @@ void object::test<2>() {
 
     for (int i = 0; i < TIMER_NUMBER; ++i) {
         elf::timer_add(rand() % TIMER_MAX_LIFE, "timer.onTimeout");
-        elf::timer_add(0, bingo, NULL);
     }
 
     while (elf::timer_size()) {

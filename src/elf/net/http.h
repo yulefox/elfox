@@ -42,7 +42,7 @@ int http_fini(void);
 /// @param args Callback arguments.
 /// @return (0).
 ///
-int http_json(const char *url, const char *json,
+int http_json(const char *url, char *json,
         http_response func, void *args);
 } // namespace elf
 
