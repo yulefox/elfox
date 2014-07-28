@@ -398,6 +398,7 @@ static context_t *context_init(oid_t peer, int fd,
 static void context_fini(elf::oid_t peer)
 {
     recv_message_t *msg = recv_message_init();
+    context_t *ctx = NULL;
 
     msg->name = "Fini.Req";
     msg->peer = peer;
@@ -407,15 +408,17 @@ static void context_fini(elf::oid_t peer)
     context_list::iterator itr = s_contexts.find(peer);
 
     if (itr != s_contexts.end()) {
-        context_t *ctx = itr->second;
+        ctx = itr->second;
+        s_contexts.erase(itr);
+    }
+    mutex_unlock(&s_context_lock);
 
+    if (ctx != NULL) {
         mutex_fini(&ctx->lock);
         shutdown(ctx->peer.sock, SHUT_RDWR);
         close(ctx->peer.sock);
         E_DELETE ctx;
-        s_contexts.erase(itr);
     }
-    mutex_unlock(&s_context_lock);
 }
 
 static context_t *context_find(oid_t peer)
