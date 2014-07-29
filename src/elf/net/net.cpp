@@ -439,7 +439,14 @@ static void push_recv(context_t *ctx, chunk_t *c)
 {
     assert(ctx && c);
 
-    // @todo need lock?
+    if (context_find(ctx->peer.id) != ctx) {
+        chunk_fini(c);
+        LOG_ERROR("net", "%lld (%s:%d) is RELEASED.",
+                ctx->peer.id,
+                ctx->peer.ip.c_str(), ctx->peer.port);
+        return;
+    }
+
     ctx->recv_data.size += c->size;
     ctx->recv_data.chunks.push_back(c);
 
