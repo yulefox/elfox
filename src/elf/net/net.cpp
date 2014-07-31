@@ -839,7 +839,7 @@ static void on_read(const epoll_event &evt)
         if (size < 0) {
             chunk_fini(c);
             if (errno != EINTR && errno != EAGAIN) {
-                LOG_ERROR("net", "%lld (%s:%d) recv FAILED: %s.",
+                LOG_TRACE("net", "%lld (%s:%d) recv FAILED: %s.",
                         ctx->peer.id,
                         ctx->peer.ip.c_str(), ctx->peer.port,
                         strerror(errno));
