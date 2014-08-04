@@ -32,7 +32,7 @@ struct recv_message_t;
 struct context_t;
 
 typedef std::list<chunk_t *> chunk_queue;
-typedef std::queue<oid_t> free_context_queue;
+typedef std::queue<context_t *> free_context_queue;
 typedef std::deque<recv_message_t *> recv_message_queue;
 typedef xqueue<recv_message_t *> recv_message_xqueue;
 
@@ -117,10 +117,7 @@ static void *context_thread(void *args)
         pre_peers = s_pre_contexts;
         s_pre_contexts.clear();
         mutex_unlock(&s_context_lock);
-        if (pre_peers.empty()) {
-            usleep(500);
-            continue;
-        }
+
         for (itr = pre_peers.begin(); itr != pre_peers.end(); ++itr) {
             context_fini(*itr);
         }
@@ -129,25 +126,20 @@ static void *context_thread(void *args)
 
         mutex_lock(&s_context_lock);
         while (!s_free_contexts.empty()) {
-            oid_t peer = s_free_contexts.front();
-            context_t *ctx = NULL;
-            context_map::iterator itr = s_contexts.find(peer);
+            context_t *ctx = s_free_contexts.front();
 
-            if (itr != s_contexts.end()) {
-                ctx = itr->second;
-                if ((ct - ctx->close_time) < CONTEXT_CLOSE_TIME) {
-                    break;
-                }
-                s_contexts.erase(ctx->peer.id);
-                LOG_TRACE("net", "%lld (%s:%d) is FREED.",
-                        ctx->peer.id,
-                        ctx->peer.ip.c_str(), ctx->peer.port);
-                mutex_fini(&ctx->lock);
-                E_DELETE(ctx);
+            if ((ct - ctx->close_time) < CONTEXT_CLOSE_TIME) {
+                break;
             }
+            LOG_TRACE("net", "%lld (%s:%d) is FREED.",
+                    ctx->peer.id,
+                    ctx->peer.ip.c_str(), ctx->peer.port);
+            mutex_fini(&ctx->lock);
+            E_DELETE(ctx);
             s_free_contexts.pop();
         }
         mutex_unlock(&s_context_lock);
+        usleep(500);
     }
     return NULL;
 }
@@ -191,10 +183,9 @@ static void set_nonblock(int sock)
     // set linger
     struct linger lg;
 
-    lg.l_onoff = 1;
-    lg.l_linger = 10;
-    rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg,
-            sizeof(lg));
+    lg.l_onoff = 0;
+    lg.l_linger = 0;
+    rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg));
     if (rc != 0) {
         LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
         return;
@@ -419,31 +410,34 @@ static context_t *context_init(oid_t peer, int fd,
 
 static void context_fini(elf::oid_t peer)
 {
-    recv_message_t *msg = recv_message_init();
     context_t *ctx = NULL;
-
-    msg->name = "Fini.Req";
-    msg->peer = peer;
-    s_recv_msgs.push(msg);
 
     mutex_lock(&s_context_lock);
     context_map::iterator itr = s_contexts.find(peer);
 
     if (itr != s_contexts.end()) {
         ctx = itr->second;
-        s_free_contexts.push(ctx->peer.id);
+        s_free_contexts.push(ctx);
+        s_contexts.erase(itr);
     }
     mutex_unlock(&s_context_lock);
 
-    if (ctx != NULL) {
-        shutdown(ctx->peer.sock, SHUT_RDWR);
-        close(ctx->peer.sock);
-        ctx->close_time = elf::time_s();
-        LOG_TRACE("net", "%lld (%s:%d) is RELEASED.",
-                ctx->peer.id,
-                ctx->peer.ip.c_str(), ctx->peer.port);
-        epoll_ctl(s_epoll, EPOLL_CTL_DEL, ctx->peer.sock, &(ctx->evt));
+    if (ctx == NULL) {
+        return;
     }
+
+    recv_message_t *msg = recv_message_init();
+
+    msg->name = "Fini.Req";
+    msg->peer = peer;
+    s_recv_msgs.push(msg);
+
+    close(ctx->peer.sock);
+    ctx->close_time = elf::time_s();
+    LOG_TRACE("net", "%lld (%s:%d) is RELEASED.",
+            ctx->peer.id,
+            ctx->peer.ip.c_str(), ctx->peer.port);
+    epoll_ctl(s_epoll, EPOLL_CTL_DEL, ctx->peer.sock, &(ctx->evt));
 }
 
 static context_t *context_find(oid_t peer)
@@ -658,8 +652,6 @@ void net_peer_addr(oid_t peer, char *str)
 {
     context_t *ctx = context_find(peer);
     if (ctx == NULL) {
-        LOG_TRACE("net", "%lld is NOT found.",
-                peer);
         return;
     }
     sprintf(str, "%s:%d",
@@ -717,8 +709,6 @@ bool net_decode(recv_message_t *msg)
 
     context_t *ctx = context_find(msg->peer);
     if (ctx == NULL) {
-        LOG_TRACE("net", "%lld is NOT found.",
-                msg->peer);
         return false;
     }
     ctx->last_time = elf::time_s();
@@ -731,8 +721,6 @@ int net_send(oid_t peer, blob_t *msg)
 
     context_t *ctx = context_find(peer);
     if (ctx == NULL) {
-        LOG_TRACE("net", "%lld is NOT found to be sent.",
-                peer);
         return -1;
     }
 
