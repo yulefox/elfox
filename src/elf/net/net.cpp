@@ -18,9 +18,11 @@
 #include <deque>
 #include <list>
 #include <map>
+#include <queue>
 #include <string>
 
 namespace elf {
+static const int CONTEXT_CLOSE_TIME = 6;
 static const int CHUNK_DEFAULT_SIZE = 1024;
 
 struct peer_t;
@@ -30,10 +32,7 @@ struct recv_message_t;
 struct context_t;
 
 typedef std::list<chunk_t *> chunk_queue;
-
-typedef std::deque<oid_t> context_queue;
-typedef xqueue<oid_t> context_xqueue;
-
+typedef std::queue<oid_t> free_context_queue;
 typedef std::deque<recv_message_t *> recv_message_queue;
 typedef xqueue<recv_message_t *> recv_message_xqueue;
 
@@ -65,12 +64,13 @@ struct context_t {
     blob_t send_data;
     epoll_event evt;
     int start_time;
+    int close_time;
     int last_time;
     int error_times;
 };
 
-typedef std::map<int, id_set *> lasy_peer_map;
-typedef std::map<oid_t, context_t *> context_list;
+typedef std::map<oid_t, context_t *> context_map;
+typedef std::set<oid_t> context_set;
 const int SIZE_INT = sizeof(int(0));
 const int SIZE_INTX2 = sizeof(int(0)) * 2;
 
@@ -79,10 +79,10 @@ static thread_t s_cid; // context thread
 static mutex_t s_context_lock;
 static int s_epoll;
 static int s_sock;
-static context_list s_contexts;
 static recv_message_xqueue s_recv_msgs;
-static context_xqueue s_free_contexts;
-static lasy_peer_map s_lasy_peers;
+static context_map s_contexts;
+static context_set s_pre_contexts;
+static free_context_queue s_free_contexts;
 
 ///
 /// Running.
@@ -110,21 +110,44 @@ static void *net_thread(void *args)
 static void *context_thread(void *args)
 {
     while (true) {
-        context_queue peers;
-        context_queue::iterator itr;
+        context_set pre_peers;
+        context_set::iterator itr;
 
-        s_free_contexts.swap(peers);
-        if (peers.empty()) {
+        mutex_lock(&s_context_lock);
+        pre_peers = s_pre_contexts;
+        s_pre_contexts.clear();
+        mutex_unlock(&s_context_lock);
+        if (pre_peers.empty()) {
             usleep(500);
             continue;
         }
-        LOG_TRACE("net", "%d contexts closing ...",
-                peers.size());
-        for (itr = peers.begin(); itr != peers.end(); ++itr) {
+        for (itr = pre_peers.begin(); itr != pre_peers.end(); ++itr) {
             context_fini(*itr);
         }
-        LOG_TRACE("net", "%d contexts closed.",
-                peers.size());
+
+        time_t ct = time_s();
+
+        mutex_lock(&s_context_lock);
+        while (!s_free_contexts.empty()) {
+            oid_t peer = s_free_contexts.front();
+            context_t *ctx = NULL;
+            context_map::iterator itr = s_contexts.find(peer);
+
+            if (itr != s_contexts.end()) {
+                ctx = itr->second;
+                if ((ct - ctx->close_time) < CONTEXT_CLOSE_TIME) {
+                    break;
+                }
+                s_contexts.erase(ctx->peer.id);
+                LOG_TRACE("net", "%lld (%s:%d) is FREED.",
+                        ctx->peer.id,
+                        ctx->peer.ip.c_str(), ctx->peer.port);
+                mutex_fini(&ctx->lock);
+                E_DELETE(ctx);
+            }
+            s_free_contexts.pop();
+        }
+        mutex_unlock(&s_context_lock);
     }
     return NULL;
 }
@@ -159,8 +182,7 @@ static void set_nonblock(int sock)
     int rc = 0;
     int reuse = 1;
 
-    rc = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse,
-            sizeof(reuse));
+    rc = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
     if (rc != 0) {
         LOG_ERROR("net", "setsockopt(REUSE) FAILED: %s.", strerror(errno));
         return;
@@ -364,7 +386,6 @@ static void event_init(context_t *ctx)
     epoll_event *evt = &(ctx->evt);
 
     memset(evt, 0, sizeof(*evt));
-    evt->data.fd = -1;
     evt->data.ptr = ctx;
     evt->events = EPOLLIN|EPOLLOUT|EPOLLET|EPOLLERR;
 }
@@ -379,6 +400,7 @@ static context_t *context_init(oid_t peer, int fd,
     ctx->peer.ip = inet_ntoa(addr.sin_addr);
     ctx->peer.port = ntohs(addr.sin_port);
     ctx->last_time = ctx->start_time = time_s();
+    ctx->close_time = 0;
     blob_init(&(ctx->recv_data));
     blob_init(&(ctx->send_data));
     event_init(ctx);
@@ -405,26 +427,29 @@ static void context_fini(elf::oid_t peer)
     s_recv_msgs.push(msg);
 
     mutex_lock(&s_context_lock);
-    context_list::iterator itr = s_contexts.find(peer);
+    context_map::iterator itr = s_contexts.find(peer);
 
     if (itr != s_contexts.end()) {
         ctx = itr->second;
-        s_contexts.erase(itr);
+        s_free_contexts.push(ctx->peer.id);
     }
     mutex_unlock(&s_context_lock);
 
     if (ctx != NULL) {
-        mutex_fini(&ctx->lock);
         shutdown(ctx->peer.sock, SHUT_RDWR);
         close(ctx->peer.sock);
-        E_DELETE ctx;
+        ctx->close_time = elf::time_s();
+        LOG_TRACE("net", "%lld (%s:%d) is RELEASED.",
+                ctx->peer.id,
+                ctx->peer.ip.c_str(), ctx->peer.port);
+        epoll_ctl(s_epoll, EPOLL_CTL_DEL, ctx->peer.sock, &(ctx->evt));
     }
 }
 
 static context_t *context_find(oid_t peer)
 {
     context_t *ctx = NULL;
-    context_list::const_iterator itr;
+    context_map::const_iterator itr;
 
     mutex_lock(&s_context_lock);
     itr = s_contexts.find(peer);
@@ -438,14 +463,6 @@ static context_t *context_find(oid_t peer)
 static void push_recv(context_t *ctx, chunk_t *c)
 {
     assert(ctx && c);
-
-    if (context_find(ctx->peer.id) != ctx) {
-        chunk_fini(c);
-        LOG_ERROR("net", "%lld (%s:%d) is RELEASED.",
-                ctx->peer.id,
-                ctx->peer.ip.c_str(), ctx->peer.port);
-        return;
-    }
 
     ctx->recv_data.size += c->size;
     ctx->recv_data.chunks.push_back(c);
@@ -468,13 +485,7 @@ static void push_send(context_t *ctx, blob_t *msg)
     ctx->send_data.total_size += msg->size;
     mutex_unlock(&(ctx->lock));
 
-    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock,
-                &(ctx->evt))) {
-        LOG_ERROR("net", "%lld (%s:%d) epoll_ctl FAILED: %s.",
-                ctx->peer.id,
-                ctx->peer.ip.c_str(), ctx->peer.port,
-                strerror(errno));
-    }
+    epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt));
 }
 
 static void push_send(context_t *ctx, chunk_queue &chunks)
@@ -489,13 +500,7 @@ static void push_send(context_t *ctx, chunk_queue &chunks)
     }
     mutex_unlock(&(ctx->lock));
 
-    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock,
-                &(ctx->evt))) {
-        LOG_ERROR("net", "%lld (%s:%d) epoll_ctl FAILED: %s.",
-                ctx->peer.id,
-                ctx->peer.ip.c_str(), ctx->peer.port,
-                strerror(errno));
-    }
+    epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt));
 }
 
 static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
@@ -620,7 +625,12 @@ int net_connect(oid_t peer, const std::string &name,
 
 void net_close(oid_t peer)
 {
-    s_free_contexts.push(peer);
+    if (peer <= 0) {
+        return;
+    }
+    mutex_lock(&s_context_lock);
+    s_pre_contexts.insert(peer);
+    mutex_unlock(&s_context_lock);
 }
 
 int net_proc(void)
@@ -829,7 +839,7 @@ static void on_accept(const epoll_event &evt)
 
 static void on_read(const epoll_event &evt)
 {
-    context_t *ctx = (context_t *)(evt.data.ptr);
+    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
     int size = CHUNK_DEFAULT_SIZE;
 
     while (size > 0) {
@@ -874,8 +884,8 @@ static void on_read(const epoll_event &evt)
 
 static void on_write(const epoll_event &evt)
 {
+    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
     chunk_queue chunks;
-    context_t *ctx = (context_t *)(evt.data.ptr);
 
     pop_send(ctx, chunks);
 
@@ -910,19 +920,15 @@ static void on_write(const epoll_event &evt)
         chunk_fini(c);
         itr = chunks.erase(itr);
     }
-    mutex_lock(&(ctx->lock));
-    mutex_unlock(&(ctx->lock));
 }
 
 static void on_error(const epoll_event &evt)
 {
-    context_t *ctx = (context_t *)(evt.data.ptr);
+    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
 
     LOG_ERROR("net", "%lld (%s:%d), UNKNOWN ERROR.",
             ctx->peer.id,
             ctx->peer.ip.c_str(), ctx->peer.port);
-    ctx->evt.events = EPOLLIN|EPOLLET;
-    epoll_ctl(s_epoll, EPOLL_CTL_DEL, ctx->peer.sock, &(ctx->evt));
     net_close(ctx->peer.id);
 }
 } // namespace elf
