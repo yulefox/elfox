@@ -16,7 +16,12 @@ thread_t thread_init(thread_func func, void *args)
         NULL);
     assert(tid != NULL);
 #elif defined(ELF_PLATFORM_LINUX)
-    pthread_create(&tid, NULL, func, args);
+    pthread_attr_t attr;
+
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_create(&tid, &attr, func, args);
+    pthread_attr_destroy(&attr);
 #endif // ELF_PLATFORM_WIN32
     return tid;
 }
