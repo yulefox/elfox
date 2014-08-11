@@ -87,6 +87,13 @@ int net_proc(void);
 void net_stat(void);
 
 ///
+/// Check if connected.
+/// @param peer Peer id.
+/// @return true if connected, or false.
+///
+bool net_connected(oid_t peer);
+
+///
 /// Get peer address ip:port.
 /// @param[in] peer Peer id.
 /// @param[out] str Peer info.

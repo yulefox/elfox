@@ -10,9 +10,5 @@
 #include <sys/msg.h>
 
 namespace elf {
-msgget
-
-    msgrcv
-    msgsnd
 } // namespace elf
 

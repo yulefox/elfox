@@ -31,17 +31,6 @@ int msg_init(void);
 /// @return (0).
 ///
 int msg_fini(void);
-
-///
-/// MSG request in json.
-/// @param url URL.
-/// @param json json.
-/// @param func MSG response callback handle.
-/// @param args Callback arguments.
-/// @return (0).
-///
-int msg_json(const char *url, char *json,
-        msg_response func, void *args);
 } // namespace elf
 
 #endif /* !ELF_NET_MSG_H */

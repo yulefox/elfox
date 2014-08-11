@@ -183,8 +183,8 @@ static void set_nonblock(int sock)
     // set linger
     struct linger lg;
 
-    lg.l_onoff = 0;
-    lg.l_linger = 0;
+    lg.l_onoff = 1;
+    lg.l_linger = 5;
     rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg));
     if (rc != 0) {
         LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
@@ -646,6 +646,11 @@ void net_stat(void)
     LOG_INFO("net", "%d clients connected.",
             s_contexts.size());
     mutex_unlock(&s_context_lock);
+}
+
+bool net_connected(oid_t peer)
+{
+    return (context_find(peer) != NULL);
 }
 
 void net_peer_addr(oid_t peer, char *str)
