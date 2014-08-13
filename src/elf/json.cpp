@@ -61,10 +61,7 @@ pb_t *json_pb(const char *pb_type, const char *json_type, const char *data)
 
         cJSON *ofd = cJSON_GetObjectItem(ref, item->string);
 
-        if (!ofd) {
-            cJSON_Delete(json);
-            return NULL;
-        }
+        if (!ofd) continue;
 
         const FieldDescriptor *fd = des->FindFieldByName(ofd->valuestring);
 
