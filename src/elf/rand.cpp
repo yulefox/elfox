@@ -122,5 +122,10 @@ void roll_rm(const roll_req &req, roll_res &res, int times)
         }
     }
 }
+
+void rand_str(char *rnds, int len)
+{
+    LOG_NOIMPL();
+}
 } // namespace elf
 

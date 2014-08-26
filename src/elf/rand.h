@@ -74,6 +74,13 @@ void roll_pb(const roll_req &req, roll_res &res, int times);
 /// @param times Roll times.
 ///
 void roll_rm(const roll_req &req, roll_res &res, int times);
+
+///
+/// Generate random string(CDKEY).
+/// @param rnds Generated random string.
+/// @param len String length.
+///
+void rand_str(char *rnds, int len);
 } // namespace elf
 
 #endif /* !ELF_RAND_H */
