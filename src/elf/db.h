@@ -39,7 +39,7 @@ enum db_rc {
 
 namespace elf {
 // DB query session callback function
-typedef void (*db_callback)(oid_t, pb_t *);
+typedef void (*db_callback)(oid_t, void *);
 
 /**
  * Initialize the DB module.
@@ -75,22 +75,14 @@ int db_ping(void);
 ///
 /// DB request(asynchronous).
 /// @param[in] cmd SQL command.
+/// @param[in] proc Callback function.
 /// @param[in] oid Object id for checking.
 /// @param[out] out Store query data.
 /// @param[in] field pb field.
-/// @param[in] proc Callback function.
-/// @warning: only one query statement is supported if `out` is NOT NULL.
 ///
-void db_req(const char *cmd, oid_t oid = OID_NIL, pb_t *out = NULL,
-        const std::string &field = "", db_callback proc = NULL);
-
-///
-/// DB response, fetch query result.
-/// @param[in] res MYSQL_RES result.
-/// @param[out] out Store query data.
-/// @param[in] field Field.
-///
-void db_res(MYSQL_RES *res, pb_t *out, const std::string &field = "");
+void db_req(const char *cmd, db_callback proc = NULL,
+        oid_t oid = OID_NIL, pb_t *out = NULL,
+        const std::string &field = "");
 
 ///
 /// DB request(synchronous).

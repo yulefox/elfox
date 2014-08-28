@@ -16,138 +16,141 @@
 using namespace google::protobuf;
 
 namespace elf {
-struct db_req_t {
-    bool read; // need restore query result
-    std::string cmd; // sql command
-    oid_t sid; // session id
+enum query_type {
+    QUERY_NO_RES,       // no response
+    QUERY_RAW,          // response with raw result
+    QUERY_FIELD,        // response with PB field result
+    QUERY_PB,           // response with PB result
+};
+
+struct query_t {
+    query_type type;    // type
+    std::string cmd;    // command
+    oid_t oid;          // associated object id
+    MYSQL_RES *data;    // query result
+    pb_t *pb;           // store query data
+    std::string field;  // pb field
+    db_callback proc;   // callback function
     elf::time64_t stamp; // request time stamp
 };
 
-struct db_res_t {
-    int status; // status
-    MYSQL_RES *data; // query result
-    oid_t sid; // session id
-};
-
-struct session_t {
-    oid_t id; // session id
-    oid_t oid; // associated object id
-    pb_t *out; // store query data
-    std::string field; // pb field
-    db_callback proc; // callback function
-};
-
-typedef std::map<oid_t, session_t *> session_list;
-
-static session_list s_sessions;
 static MYSQL *s_mysql = NULL;
 static thread_t s_tid_req = 0;
-static xqueue<db_req_t *> s_queue_req;
-static xqueue<db_res_t *> s_queue_res;
+static xqueue<query_t *> s_queue_req;
+static xqueue<query_t *> s_queue_res;
 
 static void *handle(void *args);
-static void query(db_req_t *req);
-static void retrieve(MYSQL_RES *res, pb_t *out);
-static void retrieve(MYSQL_RES *res, pb_t *out, const std::string &field);
+static void query(query_t *q);
+static void destroy(query_t *q);
+static void response(query_t *q);
+static void retrieve_pb(query_t *q);
+static void retrieve_field(query_t *q);
 
 static void *handle(void *args)
 {
     while (true) {
-        db_req_t *req;
+        query_t *q;
 
-        s_queue_req.pop(req);
-        query(req);
-        E_DELETE(req);
+        s_queue_req.pop(q);
+        query(q);
     }
     return NULL;
 }
 
-static void query(db_req_t *req)
+static void query(query_t *q)
 {
     try {
-        assert(req);
+        assert(q);
+
+        elf::time64_t ct = time_ms();
+        elf::time64_t delta = time_diff(ct, q->stamp);
+        static elf::time64_t leap = 5000; // 5s
+        static elf::time64_t times = 1;
+
+        if (delta > leap * times) {
+            LOG_WARN("db", "DB Server is busying for %d.%03ds.",
+                    delta / 1000,
+                    delta % 1000,
+                    q->cmd.c_str());
+            ++times;
+        } else if (delta < leap) {
+            times = 1;
+        }
 
         // query
-        int status = mysql_query(s_mysql, req->cmd.c_str());
-        db_res_t *res = E_NEW db_res_t;
+        int status = mysql_query(s_mysql, q->cmd.c_str());
 
-        res->sid = req->sid;
-        res->status = status;
-        res->data = NULL;
-
-        if (res->status != 0) {
+        if (status != 0) {
             LOG_ERROR("db", "`%s` failed: %s.",
-                    req->cmd.c_str(), mysql_error(s_mysql));
-        } else {
-            do {
-                MYSQL_RES *data = mysql_store_result(s_mysql);
-
-                if (data) {
-                    if (req->read) {
-                        res->data = data;
-                    } else {
-                        mysql_free_result(data);
-                    }
-                }
-            } while (!mysql_next_result(s_mysql));
-
-            elf::time64_t ct = time_ms();
-            elf::time64_t delta = time_diff(ct, req->stamp);
-            static elf::time64_t leap = 5000; // 5s
-            static elf::time64_t times = 1;
-
-            if (delta > leap * times) {
-                LOG_WARN("db", "DB Server is busying for %d.%03ds.",
-                        delta / 1000,
-                        delta % 1000,
-                        req->cmd.c_str());
-                ++times;
-            } else if (delta < leap) {
-                times = 1;
-            }
+                    q->cmd.c_str(), mysql_error(s_mysql));
+            destroy(q);
+            return;
         }
-        s_queue_res.push(res);
+        if (q->type == QUERY_NO_RES) {
+            destroy(q);
+            return;
+        }
+
+        do {
+            q->data = mysql_store_result(s_mysql);
+            s_queue_res.push(q);
+        } while (!mysql_next_result(s_mysql));
     } catch(...) {
         LOG_ERROR("db", "`%s` failed: %s.",
-                req->cmd.c_str(), mysql_error(s_mysql));
+                q->cmd.c_str(), mysql_error(s_mysql));
     }
 }
 
-static void retrieve(MYSQL_RES *res, pb_t *out)
+static void destroy(query_t *q)
 {
-    const Descriptor *des = out->GetDescriptor();
-    const int field_num = mysql_num_fields(res);
-    const MYSQL_ROW row = mysql_fetch_row(res);
+    assert(q);
+
+    if (q->data) {
+        mysql_free_result(q->data);
+    }
+    E_DELETE(q->pb);
+    E_DELETE(q);
+}
+
+static void retrieve_pb(query_t *q)
+{
+    assert(q && q->data && q->pb);
+
+    const Descriptor *des = q->pb->GetDescriptor();
+    const int field_num = mysql_num_fields(q->data);
+    const MYSQL_ROW row = mysql_fetch_row(q->data);
 
     for (int c = 0; c < field_num; ++c) {
-        const MYSQL_FIELD *ifd = mysql_fetch_field_direct(res, c);
+        const MYSQL_FIELD *ifd = mysql_fetch_field_direct(q->data, c);
         const FieldDescriptor *ofd = des->FindFieldByName(ifd->name);
 
         assert(ofd);
         if (row[c] == NULL || (strlen(row[c]) == 0)) {
-            pb_set_field(out, ofd, "");
+            pb_set_field(q->pb, ofd, "");
         } else {
-            pb_set_field(out, ofd, row[c]);
+            pb_set_field(q->pb, ofd, row[c]);
         }
     }
 }
 
-static void retrieve(MYSQL_RES *res, pb_t *out, const std::string &field)
+static void retrieve_field(query_t *q)
 {
-    const Reflection *ref = out->GetReflection();
-    const Descriptor *des = out->GetDescriptor();
-    const FieldDescriptor *ctn = des->FindFieldByName(field);
-    const int row_num = mysql_num_rows(res);
-    const int field_num = mysql_num_fields(res);
+    assert(q && q->data && q->pb);
+
+    const Reflection *ref = q->pb->GetReflection();
+    const Descriptor *des = q->pb->GetDescriptor();
+    const FieldDescriptor *ctn = des->FindFieldByName(q->field);
+    const int row_num = mysql_num_rows(q->data);
+    const int field_num = mysql_num_fields(q->data);
 
     assert(ctn);
     for (int r = 0; r < row_num; ++r) {
-        pb_t *item = ref->AddMessage(out, ctn);
-        const MYSQL_ROW row = mysql_fetch_row(res);
+        pb_t *item = ref->AddMessage(q->pb, ctn);
+        const MYSQL_ROW row = mysql_fetch_row(q->data);
 
         des = item->GetDescriptor();
         for (int c = 0; c < field_num; ++c) {
-            const MYSQL_FIELD *ifd = mysql_fetch_field_direct(res, c);
+            const MYSQL_FIELD *ifd = mysql_fetch_field_direct(q->data, c);
             const FieldDescriptor *ofd =
                 des->FindFieldByName(ifd->name);
 
@@ -207,63 +210,63 @@ int db_proc(void)
 {
     if (s_mysql == NULL) return -1;
 
-    std::deque<db_res_t *> list;
-    std::deque<db_res_t *>::iterator itr;
+    std::deque<query_t *> list;
+    std::deque<query_t *>::iterator itr;
 
     s_queue_res.swap(list);
     for (itr = list.begin(); itr != list.end(); ++itr) {
-        db_res_t *res = *itr;
-        session_list::iterator itr_s = s_sessions.find(res->sid);
-
-        assert(itr_s != s_sessions.end());
-
-        session_t *s = itr_s->second;
-
-        assert(s);
+        query_t *q = *itr;
 
         // object has not been destroyed
-        if (res->status == 0 && res->data != NULL
-                && s->out != NULL && s->proc != NULL) {
-            db_res(res->data, s->out, s->field);
-            s->proc(s->oid, s->out);
-        }
-        if (res->data != NULL) {
-            mysql_free_result(res->data);
-        }
-        E_DELETE(res);
+        response(q);
     }
     return 0;
 }
 
-void db_req(const char *cmd, oid_t oid, pb_t *out,
-        const std::string &field, db_callback proc)
+void db_req(const char *cmd, db_callback proc,
+        oid_t oid, pb_t *out, const std::string &field)
 {
-    db_req_t *req = E_NEW db_req_t;
-    session_t *s = E_NEW session_t;
+    query_t *q = E_NEW query_t;
 
-    s->id = oid_gen();
-    s->oid = oid;
-    s->out = out;
-    s->field = field;
-    s->proc = proc;
-    s_sessions[s->id] = s;
-
-    req->cmd = cmd;
-    req->sid = s->id;
-    req->stamp = time_ms();
-    req->read = (out != NULL);
-    s_queue_req.push(req);
+    if (proc == NULL) {
+        q->type = QUERY_NO_RES;
+    } else if (out == NULL) {
+        q->type = QUERY_RAW;
+    } else if (field == "") {
+        q->type = QUERY_PB;
+    } else {
+        q->type = QUERY_FIELD;
+    }
+    q->cmd = cmd;
+    q->stamp = time_ms();
+    q->oid = oid;
+    q->pb = out;
+    q->field = field;
+    q->proc = proc;
+    q->data = NULL;
+    s_queue_req.push(q);
 }
 
-void db_res(MYSQL_RES *res, pb_t *out, const std::string &field)
+void response(query_t *q)
 {
-    assert(res && out);
-
-    if (field == "") {
-        retrieve(res, out);
-    } else {
-        retrieve(res, out, field);
+    assert(q);
+    switch (q->type) {
+        case QUERY_RAW:
+            q->proc(q->oid, q->data);
+            break;
+        case QUERY_PB:
+            retrieve_pb(q);
+            q->proc(q->oid, q->pb);
+            break;
+        case QUERY_FIELD:
+            retrieve_field(q);
+            q->proc(q->oid, q->pb);
+            break;
+        default:
+            assert(0);
+            break;
     }
+    destroy(q);
 }
 
 db_rc db_query(const char *cmd)
