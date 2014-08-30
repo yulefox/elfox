@@ -83,6 +83,8 @@ static recv_message_xqueue s_recv_msgs;
 static context_map s_contexts;
 static context_set s_pre_contexts;
 static free_context_queue s_free_contexts;
+static encrypt_func s_encry = NULL;
+static encrypt_func s_decry = NULL;
 
 ///
 /// Running.
@@ -531,6 +533,12 @@ int net_fini(void)
     return 0;
 }
 
+void net_encrypt(encrypt_func encry, encrypt_func decry)
+{
+    s_encry = encry;
+    s_decry = decry;
+}
+
 int net_listen(oid_t peer, const std::string &name,
         const std::string &ip, int port)
 {
@@ -702,15 +710,46 @@ blob_t *net_encode(const pb_t &pb)
     msg->size = name_len + body_len + SIZE_INTX2;
     message_set(msg->chunks, &(msg->size), SIZE_INT);
     message_set(msg->chunks, &name_len, SIZE_INT);
-    message_set(msg->chunks, pb.GetTypeName().data(), name_len);
-    message_set(msg->chunks, buf.data(), body_len);
+
+    if (s_encry) { // encrypt
+        char *name = (char *)E_ALLOC(sizeof(name_len));
+        char *body = (char *)E_ALLOC(sizeof(body_len));
+
+        memcpy(name, pb.GetTypeName().data(), name_len);
+        memcpy(body, buf.data(), body_len);
+        s_encry(name, name_len);
+        s_encry(body, body_len);
+        message_set(msg->chunks, name, name_len);
+        message_set(msg->chunks, body, body_len);
+        E_FREE(name);
+        E_FREE(body);
+    } else {
+        message_set(msg->chunks, pb.GetTypeName().data(), name_len);
+        message_set(msg->chunks, buf.data(), body_len);
+    }
     return msg;
 }
 
 bool net_decode(recv_message_t *msg)
 {
     assert(msg && msg->pb);
-    msg->pb->ParseFromString(msg->body);
+    if (s_decry) { // decrypt
+        int name_len = msg->name.size();
+        int body_len = msg->body.size();
+        char *name = (char *)E_ALLOC(sizeof(name_len));
+        char *body = (char *)E_ALLOC(sizeof(body_len));
+
+        memcpy(name, msg->name.data(), name_len);
+        memcpy(body, msg->body.data(), body_len);
+        s_decry(name, name_len);
+        s_decry(body, body_len);
+        msg->name = name;
+        msg->pb->ParseFromString(body);
+        E_FREE(name);
+        E_FREE(body);
+    } else {
+        msg->pb->ParseFromString(msg->body);
+    }
 
     context_t *ctx = context_find(msg->peer);
     if (ctx == NULL) {

@@ -93,7 +93,10 @@ static void query(query_t *q)
 
         do {
             q->data = mysql_store_result(s_mysql);
-            s_queue_res.push(q);
+            if (q->data != NULL) {
+                s_queue_res.push(q);
+                break;
+            }
         } while (!mysql_next_result(s_mysql));
     } catch(...) {
         LOG_ERROR("db", "`%s` failed: %s.",
@@ -281,14 +284,6 @@ db_rc db_query(const char *cmd)
                     cmd, mysql_error(s_mysql));
             return ELF_RC_DB_EXECUTE_FAILED;
         }
-
-        do {
-            MYSQL_RES *res = mysql_store_result(s_mysql);
-
-            if (res) {
-                mysql_free_result(res);
-            }
-        } while (!mysql_next_result(s_mysql));
         return ELF_RC_DB_OK;
     } catch(...) {
         LOG_ERROR("db", "`%s` failed: %s.",

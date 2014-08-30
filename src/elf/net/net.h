@@ -25,6 +25,7 @@
 #include <string>
 
 namespace elf {
+typedef void (*encrypt_func)(char* buf, int len);
 struct blob_t;
 
 struct recv_message_t {
@@ -45,6 +46,13 @@ int net_init(void);
 /// @return (0).
 ///
 int net_fini(void);
+
+///
+/// Add encrypt/decrypt function.
+/// @param encry Encrypt function.
+/// @param decry Decrypt function.
+///
+void net_encrypt(encrypt_func encry, encrypt_func decry);
 
 ///
 /// Start server.
