@@ -52,6 +52,13 @@ time_t time_s(void);
 time64_t time_ms(void);
 
 time64_t time_diff(time64_t end, time64_t start);
+
+///
+/// Get month days.
+/// @param t Time.
+/// @return Month days.
+///
+int time_month_days(time_t t);
 } // namespace elf
 
 #endif /* !ELF_TIME_H */

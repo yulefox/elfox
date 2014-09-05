@@ -12,8 +12,26 @@ namespace elf {
  * Do same thing as Linux.
  */
 #ifdef ELF_PLATFORM_WIN32
-static int gettimeofday(struct timeval *tp, void *tzp);
-#endif
+static int gettimeofday(struct timeval *tp, void *tzp)
+{
+    FILETIME ft;
+    LARGE_INTEGER li;           /* union defination  */
+    long long t;
+    static int tzflag;
+
+    if (tp) {
+        GetSystemTimeAsFileTime(&ft);
+        li.LowPart = ft.dwLowDateTime;
+        li.HighPart = ft.dwHighDateTime;
+        t = li.QuadPart;        /* In 100-nanosecond intervals */
+        t -= EPOCHFILETIME;     /* Offset to the Epoch time */
+        t /= 10;                /* In microseconds */
+        tp->tv_sec  = (long)(t / 1000000LL);
+        tp->tv_usec = (long)(t % 1000000LL);
+    }
+    return 0;
+}
+#endif /* ELF_PLATFORM_WIN32 */
 
 time_t time_s(void)
 {
@@ -41,41 +59,23 @@ time64_t time_diff(time64_t end, time64_t start)
     return (end - start);
 }
 
-#ifdef ELF_PLATFORM_WIN32
-static int gettimeofday(struct timeval *tp, void *tzp)
+int time_month_days(time_t t)
 {
-    FILETIME ft;
-    LARGE_INTEGER li;           /* union defination  */
-    long long t;
-    static int tzflag;
+    static const int MONTH_DAY[]= {31,28,31,30,31,30,31,31,30,31,30,31};
+    struct tm ltm;
 
-    if (tp) {
-        GetSystemTimeAsFileTime(&ft);
-        li.LowPart = ft.dwLowDateTime;
-        li.HighPart = ft.dwHighDateTime;
-        t = li.QuadPart;        /* In 100-nanosecond intervals */
-        t -= EPOCHFILETIME;     /* Offset to the Epoch time */
-        t /= 10;                /* In microseconds */
-        tp->tv_sec  = (long)(t / 1000000LL);
-        tp->tv_usec = (long)(t % 1000000LL);
+    localtime_r(&t, &ltm);
+
+    int y = ltm.tm_year + 1900;
+    int m = ltm.tm_mon;
+    int d;
+
+    if (2 == m) {
+        d = ((((0 == y % 4) && (0 != y % 100)) || ( 0 == y % 400)) ? 29 : 28);
+    } else {
+        d = MONTH_DAY[m];
     }
-
-    /** @menuHandler timezone? */
-    /*
-    if (tzp)
-    {
-        if (!tzflag)
-        {
-            _tzset();
-            tzflag++;
-        }
-        (struct timezone *)tzp->tz_minuteswest = _timezone / 60;
-        (struct timezone *)tzp->tz_dsttime = _daylight;
-    }
-    */
-
-    return 0;
+    return d;
 }
-#endif /* ELF_PLATFORM_WIN32 */
 } // namespace elf
 

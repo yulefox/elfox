@@ -712,8 +712,8 @@ blob_t *net_encode(const pb_t &pb)
     message_set(msg->chunks, &name_len, SIZE_INT);
 
     if (s_encry) { // encrypt
-        char *name = (char *)E_ALLOC(sizeof(name_len));
-        char *body = (char *)E_ALLOC(sizeof(body_len));
+        char *name = (char *)E_ALLOC(name_len);
+        char *body = (char *)E_ALLOC(body_len);
 
         memcpy(name, pb.GetTypeName().data(), name_len);
         memcpy(body, buf.data(), body_len);
@@ -736,8 +736,8 @@ bool net_decode(recv_message_t *msg)
     if (s_decry) { // decrypt
         int name_len = msg->name.size();
         int body_len = msg->body.size();
-        char *name = (char *)E_ALLOC(sizeof(name_len));
-        char *body = (char *)E_ALLOC(sizeof(body_len));
+        char *name = (char *)E_ALLOC(name_len);
+        char *body = (char *)E_ALLOC(body_len);
 
         memcpy(name, msg->name.data(), name_len);
         memcpy(body, msg->body.data(), body_len);
