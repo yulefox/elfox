@@ -68,7 +68,7 @@ static void query(query_t *q)
         static elf::time64_t times = 1;
 
         if (delta > leap * times) {
-            LOG_WARN("db", "DB Server is busying for %d.%03ds.",
+            LOG_WARN("db", "%d.%03ds: %s.",
                     delta / 1000,
                     delta % 1000,
                     q->cmd.c_str());
@@ -91,13 +91,17 @@ static void query(query_t *q)
             return;
         }
 
-        do {
-            q->data = mysql_store_result(s_mysql);
-            if (q->data != NULL) {
-                s_queue_res.push(q);
-                break;
+        q->data = mysql_store_result(s_mysql);
+        if (q->data != NULL) {
+            s_queue_res.push(q);
+        }
+        while (!mysql_next_result(s_mysql)) {
+            MYSQL_RES *res = mysql_store_result(s_mysql);
+
+            if (res) {
+                mysql_free_result(res);
             }
-        } while (!mysql_next_result(s_mysql));
+        }
     } catch(...) {
         LOG_ERROR("db", "`%s` failed: %s.",
                 q->cmd.c_str(), mysql_error(s_mysql));
@@ -284,6 +288,13 @@ db_rc db_query(const char *cmd)
                     cmd, mysql_error(s_mysql));
             return ELF_RC_DB_EXECUTE_FAILED;
         }
+        do {
+            MYSQL_RES *res = mysql_store_result(s_mysql);
+
+            if (res) {
+                mysql_free_result(res);
+            }
+        } while (!mysql_next_result(s_mysql));
         return ELF_RC_DB_OK;
     } catch(...) {
         LOG_ERROR("db", "`%s` failed: %s.",
@@ -328,7 +339,13 @@ db_rc db_query(const char *cmd, pb_t *out)
                     pb_set_field(out, ofd, row[c]);
                 }
             }
-            mysql_free_result(res);
+            while (!mysql_next_result(s_mysql)) {
+                MYSQL_RES *res = mysql_store_result(s_mysql);
+
+                if (res) {
+                    mysql_free_result(res);
+                }
+            }
             return ELF_RC_DB_OK;
         } else if (mysql_field_count(s_mysql) == 0) {
             return ELF_RC_DB_OK;
@@ -389,6 +406,13 @@ db_rc db_query(const char *cmd, pb_t *out, const std::string &field)
                 }
             }
             mysql_free_result(res);
+            while (!mysql_next_result(s_mysql)) {
+                MYSQL_RES *res = mysql_store_result(s_mysql);
+
+                if (res) {
+                    mysql_free_result(res);
+                }
+            }
             return ELF_RC_DB_OK;
         } else if (mysql_field_count(s_mysql) == 0) {
             return ELF_RC_DB_OK;
