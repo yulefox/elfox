@@ -91,17 +91,19 @@ static void query(query_t *q)
             return;
         }
 
-        q->data = mysql_store_result(s_mysql);
-        if (q->data != NULL) {
-            s_queue_res.push(q);
-        }
-        while (!mysql_next_result(s_mysql)) {
+        q->data = NULL;
+        do {
             MYSQL_RES *res = mysql_store_result(s_mysql);
 
             if (res) {
-                mysql_free_result(res);
+                if (q->data == NULL) {
+                    q->data = res;
+                    s_queue_res.push(q);
+                } else {
+                    mysql_free_result(res);
+                }
             }
-        }
+        } while (!mysql_next_result(s_mysql));
     } catch(...) {
         LOG_ERROR("db", "`%s` failed: %s.",
                 q->cmd.c_str(), mysql_error(s_mysql));
