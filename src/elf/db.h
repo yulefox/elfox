@@ -90,7 +90,7 @@ void db_req(const char *cmd, db_callback proc = NULL,
 /// @param[out] out Store query data.
 /// @return ELF_RC_DB_OK(0).
 ///
-db_rc db_query(const char *cmd);
+//db_rc db_query(const char *cmd);
 
 ///
 /// DB request(synchronous).
@@ -99,7 +99,7 @@ db_rc db_query(const char *cmd);
 /// @return ELF_RC_DB_OK(0).
 /// @warning: only one query statement is supported.
 ///
-db_rc db_query(const char *cmd, pb_t *out);
+//db_rc db_query(const char *cmd, pb_t *out);
 
 ///
 /// DB request(synchronous).
@@ -109,7 +109,7 @@ db_rc db_query(const char *cmd, pb_t *out);
 /// @return ELF_RC_DB_OK(0).
 /// @warning: only one query statement is supported.
 ///
-db_rc db_query(const char *cmd, pb_t *out, const std::string &field);
+//db_rc db_query(const char *cmd, pb_t *out, const std::string &field);
 } // namespace elf
 
 #endif /* !ELF_DB_H */
