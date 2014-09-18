@@ -51,17 +51,16 @@ struct peer_t {
 
 struct blob_t {
     chunk_queue chunks;
-    int size;
-    int msg_size;
-    int total_size;
-    int pending_size;
+    int msg_size; // current recv msg size(for splicing)
+    int total_size; // total send/recv msg size
+    int pending_size; // pending send/recv msg size
 };
 
 struct context_t {
     peer_t peer;
     mutex_t lock;
-    blob_t recv_data;
-    blob_t send_data;
+    blob_t *recv_data;
+    blob_t *send_data;
     epoll_event evt;
     int start_time;
     int close_time;
@@ -94,7 +93,8 @@ static int net_update(void);
 
 static context_t *context_init(oid_t peer, int fd,
         const struct sockaddr_in &addr);
-static void context_fini(elf::oid_t peer);
+static void context_close(elf::oid_t peer);
+static void context_fini(context_t *ctx);
 static void on_accept(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
 static void on_write(const epoll_event &evt);
@@ -121,7 +121,7 @@ static void *context_thread(void *args)
         mutex_unlock(&s_context_lock);
 
         for (itr = pre_peers.begin(); itr != pre_peers.end(); ++itr) {
-            context_fini(*itr);
+            context_close(*itr);
         }
 
         time_t ct = time_s();
@@ -133,11 +133,7 @@ static void *context_thread(void *args)
             if ((ct - ctx->close_time) < CONTEXT_CLOSE_TIME) {
                 break;
             }
-            LOG_TRACE("net", "%lld (%s:%d) is FREED.",
-                    ctx->peer.id,
-                    ctx->peer.ip.c_str(), ctx->peer.port);
-            mutex_fini(&ctx->lock);
-            E_DELETE(ctx);
+            context_fini(ctx);
             s_free_contexts.pop();
         }
         mutex_unlock(&s_context_lock);
@@ -326,26 +322,26 @@ static bool message_splice(context_t *ctx)
 {
     assert(ctx);
 
-    if (ctx->recv_data.size < SIZE_INTX2) return false;
+    if (ctx->recv_data->pending_size < SIZE_INTX2) return false;
 
-    int &msg_size = ctx->recv_data.msg_size;
+    int &msg_size = ctx->recv_data->msg_size;
     if (msg_size == 0) {
-        message_get(ctx->recv_data.chunks, &msg_size, SIZE_INT);
+        message_get(ctx->recv_data->chunks, &msg_size, SIZE_INT);
     }
 
-    if (ctx->recv_data.size < msg_size) return false;
+    if (ctx->recv_data->pending_size < msg_size) return false;
 
     int name_len = 0;
-    message_get(ctx->recv_data.chunks, &name_len, SIZE_INT);
+    message_get(ctx->recv_data->chunks, &name_len, SIZE_INT);
 
     recv_message_t *msg = recv_message_init();
     int body_len = msg_size - SIZE_INTX2 - name_len;
 
-    message_get(ctx->recv_data.chunks, msg->name, name_len);
-    message_get(ctx->recv_data.chunks, msg->body, body_len);
+    message_get(ctx->recv_data->chunks, msg->name, name_len);
+    message_get(ctx->recv_data->chunks, msg->body, body_len);
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
-    ctx->recv_data.size -= msg_size;
+    ctx->recv_data->pending_size -= msg_size;
     msg_size = 0;
     return true;
 }
@@ -354,7 +350,6 @@ static void blob_init(blob_t *blob)
 {
     assert(blob);
     blob->chunks.clear();
-    blob->size = 0;
     blob->msg_size = 0;
     blob->total_size = 0;
     blob->pending_size = 0;
@@ -394,8 +389,10 @@ static context_t *context_init(oid_t peer, int fd,
     ctx->peer.port = ntohs(addr.sin_port);
     ctx->last_time = ctx->start_time = time_s();
     ctx->close_time = 0;
-    blob_init(&(ctx->recv_data));
-    blob_init(&(ctx->send_data));
+    ctx->recv_data = E_NEW blob_t;
+    ctx->send_data = E_NEW blob_t;
+    blob_init(ctx->recv_data);
+    blob_init(ctx->send_data);
     event_init(ctx);
     mutex_init(&ctx->lock);
     mutex_lock(&s_context_lock);
@@ -410,7 +407,7 @@ static context_t *context_init(oid_t peer, int fd,
     return ctx;
 }
 
-static void context_fini(elf::oid_t peer)
+static void context_close(elf::oid_t peer)
 {
     context_t *ctx = NULL;
 
@@ -439,7 +436,22 @@ static void context_fini(elf::oid_t peer)
     LOG_TRACE("net", "%lld (%s:%d) is RELEASED.",
             ctx->peer.id,
             ctx->peer.ip.c_str(), ctx->peer.port);
-    epoll_ctl(s_epoll, EPOLL_CTL_DEL, ctx->peer.sock, &(ctx->evt));
+}
+
+static void context_fini(context_t *ctx)
+{
+    assert(ctx);
+    mutex_fini(&ctx->lock);
+    LOG_TRACE("net", "%lld (%s:%d) is FREED. S: %d/%d D: %d/%d.",
+            ctx->peer.id,
+            ctx->peer.ip.c_str(), ctx->peer.port,
+            ctx->send_data->pending_size,
+            ctx->send_data->total_size,
+            ctx->recv_data->pending_size,
+            ctx->recv_data->total_size);
+    blob_fini(ctx->send_data);
+    blob_fini(ctx->recv_data);
+    E_DELETE(ctx);
 }
 
 static context_t *context_find(oid_t peer)
@@ -460,8 +472,8 @@ static void push_recv(context_t *ctx, chunk_t *c)
 {
     assert(ctx && c);
 
-    ctx->recv_data.size += c->size;
-    ctx->recv_data.chunks.push_back(c);
+    ctx->recv_data->pending_size += c->size;
+    ctx->recv_data->chunks.push_back(c);
 
     while (message_splice(ctx));
 }
@@ -475,13 +487,18 @@ static void push_send(context_t *ctx, blob_t *msg)
     for (; itr != msg->chunks.end(); ++itr) {
         chunk_t *c = chunk_clone(**itr);
 
-        ctx->send_data.chunks.push_back(c);
+        ctx->send_data->chunks.push_back(c);
     }
-    ctx->send_data.pending_size += msg->size;
-    ctx->send_data.total_size += msg->size;
+    ctx->send_data->pending_size += msg->total_size;
+    ctx->send_data->total_size += msg->total_size;
     mutex_unlock(&(ctx->lock));
 
-    epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt));
+    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
+        LOG_ERROR("net", "%lld (%s:%d) epoll_ctl FAILED: %s.",
+            ctx->peer.id,
+            ctx->peer.ip.c_str(), ctx->peer.port,
+            strerror(errno));
+    }
 }
 
 static void push_send(context_t *ctx, chunk_queue &chunks)
@@ -492,11 +509,16 @@ static void push_send(context_t *ctx, chunk_queue &chunks)
     chunk_queue::const_reverse_iterator itr = chunks.rbegin();
 
     for (; itr != chunks.rend(); ++itr) {
-        ctx->send_data.chunks.push_front(*itr);
+        ctx->send_data->chunks.push_front(*itr);
     }
     mutex_unlock(&(ctx->lock));
 
-    epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt));
+    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
+        LOG_ERROR("net", "%lld (%s:%d) epoll_ctl FAILED: %s.",
+            ctx->peer.id,
+            ctx->peer.ip.c_str(), ctx->peer.port,
+            strerror(errno));
+    }
 }
 
 static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
@@ -505,8 +527,8 @@ static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
 
     chunk_t *c = NULL;
     mutex_lock(&(ctx->lock));
-    clone = ctx->send_data.chunks;
-    ctx->send_data.chunks.clear();
+    clone = ctx->send_data->chunks;
+    ctx->send_data->chunks.clear();
     mutex_unlock(&(ctx->lock));
     return c;
 }
@@ -707,8 +729,8 @@ blob_t *net_encode(const pb_t &pb)
     int name_len = pb.GetTypeName().size();
     int body_len = buf.size();
 
-    msg->size = name_len + body_len + SIZE_INTX2;
-    message_set(msg->chunks, &(msg->size), SIZE_INT);
+    msg->total_size = name_len + body_len + SIZE_INTX2;
+    message_set(msg->chunks, &(msg->total_size), SIZE_INT);
     message_set(msg->chunks, &name_len, SIZE_INT);
 
     if (s_encry) { // encrypt
@@ -945,8 +967,8 @@ static void on_write(const epoll_event &evt)
                 rem -= num;
                 c->offset += num;
                 total += num;
-                ctx->send_data.pending_size -= num;
-                ctx->send_data.size += num;
+                ctx->send_data->pending_size -= num;
+                ctx->send_data->total_size += num;
             }
         }
         chunk_fini(c);

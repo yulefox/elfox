@@ -91,17 +91,19 @@ static void query(query_t *q)
             return;
         }
 
-        q->data = mysql_store_result(s_mysql);
-        if (q->data != NULL) {
-            s_queue_res.push(q);
-        }
-        while (!mysql_next_result(s_mysql)) {
+        q->data = NULL;
+        do {
             MYSQL_RES *res = mysql_store_result(s_mysql);
 
             if (res) {
-                mysql_free_result(res);
+                if (q->data == NULL) {
+                    q->data = res;
+                    s_queue_res.push(q);
+                } else {
+                    mysql_free_result(res);
+                }
             }
-        }
+        } while (!mysql_next_result(s_mysql));
     } catch(...) {
         LOG_ERROR("db", "`%s` failed: %s.",
                 q->cmd.c_str(), mysql_error(s_mysql));
@@ -235,7 +237,7 @@ void db_req(const char *cmd, db_callback proc,
 {
     query_t *q = E_NEW query_t;
 
-    if (proc == NULL) {
+    if (proc == NULL && out == NULL) {
         q->type = QUERY_NO_RES;
     } else if (out == NULL) {
         q->type = QUERY_RAW;
@@ -259,15 +261,21 @@ void response(query_t *q)
     assert(q);
     switch (q->type) {
         case QUERY_RAW:
-            q->proc(q->oid, q->data);
+            if (q->proc) {
+                q->proc(q->oid, q->data);
+            }
             break;
         case QUERY_PB:
             retrieve_pb(q);
-            q->proc(q->oid, q->pb);
+            if (q->proc) {
+                q->proc(q->oid, q->pb);
+            }
             break;
         case QUERY_FIELD:
             retrieve_field(q);
-            q->proc(q->oid, q->pb);
+            if (q->proc) {
+                q->proc(q->oid, q->pb);
+            }
             break;
         default:
             assert(0);
@@ -339,6 +347,7 @@ db_rc db_query(const char *cmd, pb_t *out)
                     pb_set_field(out, ofd, row[c]);
                 }
             }
+            mysql_free_result(res);
             while (!mysql_next_result(s_mysql)) {
                 MYSQL_RES *res = mysql_store_result(s_mysql);
 

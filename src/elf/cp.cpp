@@ -178,7 +178,8 @@ bool load_cfg(const std::string &path, pb_t *cfg)
     return true;
 }
 
-static bool load_tbl(const std::string &tbl_name, pb_t *cfg)
+static bool load_tbl(const std::string &tbl_name, pb_t *cfg,
+        int type, db_callback proc)
 {
     char sql[1024];
 
@@ -186,31 +187,12 @@ static bool load_tbl(const std::string &tbl_name, pb_t *cfg)
             tbl_name.c_str());
     LOG_TRACE("db",
             "SQL: `%s'", sql);
-
-    db_query(sql, cfg, "item");
-    LOG_TRACE("cp",
-            "Load config from DB `%s'DONE.",
-            tbl_name.c_str());
+    db_req(sql, proc, type, cfg, "item");
     return true;
 }
 
-static bool load_tbl(const std::string &tbl_name, oid_t sid)
-{
-    char sql[1024];
-
-    sprintf(sql, "SELECT * FROM `%s`;",
-            tbl_name.c_str());
-    LOG_TRACE("db",
-            "SQL: `%s'", sql);
-
-    db_req(sql, OID_NIL, NULL, NULL, NULL);
-    LOG_TRACE("cp",
-            "Load config from DB `%s'DONE.",
-            tbl_name.c_str());
-    return true;
-}
-
-pb_t *config_load(const std::string &name, const std::string &path)
+pb_t *config_load(const std::string &name, const std::string &path,
+       int type, db_callback proc)
 {
     pb_t *cfg = pb_create(name);
     std::string ext = path;
@@ -224,7 +206,7 @@ pb_t *config_load(const std::string &name, const std::string &path)
     } else if (ext == "conf") {
         res = load_cfg(path, cfg);
     } else if (ext == path) {
-        res = load_tbl(path, cfg);
+        res = load_tbl(path, cfg, type, proc);
     }
 
     if (!res) {
@@ -235,20 +217,6 @@ pb_t *config_load(const std::string &name, const std::string &path)
         return NULL;
     }
     return cfg;
-}
-
-bool config_load(const std::string &path, oid_t sid)
-{
-    std::string ext = path;
-
-    get_ext(ext);
-    if (ext == path) {
-        return load_tbl(path, sid);
-    }
-    LOG_ERROR("cp",
-            "Invalid config file format: %s.",
-            path.c_str());
-    return false;
 }
 } // namespace elf
 

@@ -18,26 +18,22 @@
 #define ELF_CP_H
 
 #include <elf/config.h>
+#include <elf/db.h>
 #include <elf/oid.h>
 #include <elf/pb.h>
 #include <string>
 
 namespace elf {
 ///
-/// Load configuration file(synchronous).
+/// Load configuration file(DB asynchronous).
 /// @param[in] name Configuration protobuf name.
 /// @param[in] path Configuration file path.
+/// @param[in] type Configuration type.
+/// @param proc Callback function.
 /// @return Config object if loaded done, or NULL.
 ///
-pb_t *config_load(const std::string &name, const std::string &path);
-
-///
-/// Load configuration file(asynchronous).
-/// @param[in] path Configuration file path.
-/// @param[in] sid Session id.
-/// @return true if loaded okey, or false.
-///
-bool config_load(const std::string &path, oid_t sid);
+pb_t *config_load(const std::string &name, const std::string &path,
+        int type = 0, db_callback proc = NULL);
 } // namespace elf
 
 #endif /* !ELF_CP_H */
