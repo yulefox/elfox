@@ -165,7 +165,7 @@ void timer_run(void)
         return;
     }
     // while processors is busy
-    if (frame > 1) {
+    if (frame > 5) {
         LOG_WARN("timer", "(%u)%08X: %llu - %llu(%d).",
                 s_mgr.round, s_mgr.cursor.a,
                 s_mgr.cur_time, s_mgr.last_time,
@@ -236,6 +236,10 @@ const oid_t &timer_add(time64_t life, callback func, void *args)
                 "Timer added FAILED: invalid timer life(%lld) [0, %lld).",
                 life, MAX_LIFE);
         return OID_NIL;
+    }
+    if (life == 0) {
+        func(args);
+        E_FREE(t->args);
     }
 
     timer_t *t = E_NEW timer_t;
