@@ -279,9 +279,7 @@ static void message_get(chunk_queue &chunks, void *buf, int size)
     while (rem > 0 && itr != chunks.end()) {
         chunk_t *c = *itr;
 
-        if (c->size < c->offset) {
-            LOG_WARN("net", "Invalid chunk: %d/%d.",
-                    c->offset, c->size);
+        if (c == NULL || c->size == 0 || c->size < c->offset) {
             return;
         }
 
@@ -459,13 +457,11 @@ static void context_close(elf::oid_t peer)
         return;
     }
 
-    if (ctx->error_times == 0) {
-        recv_message_t *msg = recv_message_init();
+    recv_message_t *msg = recv_message_init();
 
-        msg->name = "Fini.Req";
-        msg->peer = peer;
-        s_recv_msgs.push(msg);
-    }
+    msg->name = "Fini.Req";
+    msg->peer = peer;
+    s_recv_msgs.push(msg);
 
     close(ctx->peer.sock);
     ctx->close_time = elf::time_s();
