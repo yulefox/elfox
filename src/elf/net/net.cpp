@@ -928,19 +928,21 @@ static void on_read(const epoll_event &evt)
 {
     context_t *ctx = static_cast<context_t *>(evt.data.ptr);
     int size = CHUNK_DEFAULT_SIZE;
+    oid_t peer = ctx->peer.id;
+    int sock = ctx->peer.sock;
 
     while (size > 0) {
         chunk_t *c = chunk_init();
 
-        size = recv(ctx->peer.sock, c->data, sizeof(c->data), 0);
+        size = recv(sock, c->data, sizeof(c->data), 0);
         if (size < 0) {
             chunk_fini(c);
             if (errno != EINTR && errno != EAGAIN) {
                 LOG_TRACE("net", "%lld (%s:%d) recv FAILED: %s.",
-                        ctx->peer.id,
+                        peer,
                         ctx->peer.ip.c_str(), ctx->peer.port,
                         strerror(errno));
-                net_close(ctx->peer.id);
+                net_close(peer);
                 return;
             }
             break;
@@ -950,14 +952,17 @@ static void on_read(const epoll_event &evt)
         if (0 == size) {
             chunk_fini(c);
             LOG_INFO("net", "%lld (%s:%d) active closed.",
-                    ctx->peer.id,
+                    peer,
                     ctx->peer.ip.c_str(), ctx->peer.port);
-            net_close(ctx->peer.id);
+            net_close(peer);
             return;
         }
 
         // append received chunk
         c->size = size;
+        if (context_find(peer) != ctx) {
+            break;
+        }
         push_recv(ctx, c);
     }
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock,
