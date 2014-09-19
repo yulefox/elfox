@@ -24,6 +24,10 @@
 namespace elf {
 static const int CONTEXT_CLOSE_TIME = 6;
 static const int CHUNK_DEFAULT_SIZE = 1024;
+static const int SIZE_INT = sizeof(int(0));
+static const int SIZE_INTX2 = sizeof(int(0)) * 2;
+static const int MESSAGE_MAX_VALID_SIZE = 10000000;
+static const int MESSAGE_MAX_PENDING_SIZE = 10000000;
 
 struct peer_t;
 struct chunk_t;
@@ -66,12 +70,11 @@ struct context_t {
     int close_time;
     int last_time;
     int error_times;
+    int recv_num; // recv msg num
 };
 
 typedef std::map<oid_t, context_t *> context_map;
 typedef std::set<oid_t> context_set;
-const int SIZE_INT = sizeof(int(0));
-const int SIZE_INTX2 = sizeof(int(0)) * 2;
 
 static thread_t s_tid; // io thread
 static thread_t s_cid; // context thread
@@ -275,6 +278,13 @@ static void message_get(chunk_queue &chunks, void *buf, int size)
 
     while (rem > 0 && itr != chunks.end()) {
         chunk_t *c = *itr;
+
+        if (c->size < c->offset) {
+            LOG_WARN("net", "Invalid chunk: %d/%d.",
+                    c->offset, c->size);
+            return;
+        }
+
         int real = c->size - c->offset;
         char *src = c->data + c->offset;
         char *dst = (char *)buf + offset;
@@ -301,6 +311,13 @@ static void message_get(chunk_queue &chunks, std::string &buf, int size)
 
     while (rem > 0 && itr != chunks.end()) {
         chunk_t *c = *itr;
+
+        if (c->size < c->offset) {
+            LOG_WARN("net", "Invalid chunk: %d/%d.",
+                    c->offset, c->size);
+            return;
+        }
+
         int real = c->size - c->offset;
         char *src = c->data + c->offset;
 
@@ -329,6 +346,22 @@ static bool message_splice(context_t *ctx)
         message_get(ctx->recv_data->chunks, &msg_size, SIZE_INT);
     }
 
+    if (ctx->recv_data->pending_size > MESSAGE_MAX_PENDING_SIZE) {
+        LOG_TRACE("net", "%lld (%s:%d) OVER PENDING message: %d.",
+                ctx->peer.id,
+                ctx->peer.ip.c_str(), ctx->peer.port,
+                ctx->recv_data->pending_size);
+        shutdown(ctx->peer.sock, SHUT_RD);
+        return false;
+    }
+    if (msg_size > MESSAGE_MAX_VALID_SIZE) {
+        LOG_TRACE("net", "%lld (%s:%d) OVER LENGTH message: %d.",
+                ctx->peer.id,
+                ctx->peer.ip.c_str(), ctx->peer.port,
+                msg_size);
+        shutdown(ctx->peer.sock, SHUT_RD);
+        return false;
+    }
     if (ctx->recv_data->pending_size < msg_size) return false;
 
     int name_len = 0;
@@ -342,6 +375,7 @@ static bool message_splice(context_t *ctx)
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
     ctx->recv_data->pending_size -= msg_size;
+    ctx->recv_data->total_size += msg_size;
     msg_size = 0;
     return true;
 }
@@ -425,11 +459,13 @@ static void context_close(elf::oid_t peer)
         return;
     }
 
-    recv_message_t *msg = recv_message_init();
+    if (ctx->error_times == 0) {
+        recv_message_t *msg = recv_message_init();
 
-    msg->name = "Fini.Req";
-    msg->peer = peer;
-    s_recv_msgs.push(msg);
+        msg->name = "Fini.Req";
+        msg->peer = peer;
+        s_recv_msgs.push(msg);
+    }
 
     close(ctx->peer.sock);
     ctx->close_time = elf::time_s();
@@ -442,7 +478,7 @@ static void context_fini(context_t *ctx)
 {
     assert(ctx);
     mutex_fini(&ctx->lock);
-    LOG_TRACE("net", "%lld (%s:%d) is FREED. S: %d/%d D: %d/%d.",
+    LOG_TRACE("net", "%lld (%s:%d) is FREED. S: %d/%d R: %d/%d.",
             ctx->peer.id,
             ctx->peer.ip.c_str(), ctx->peer.port,
             ctx->send_data->pending_size,
@@ -701,7 +737,8 @@ void net_peer_info(oid_t peer, char *str)
                 peer);
         return;
     }
-    sprintf(str, "%lld (%s:%d)",
+    sprintf(str, "<%d>%lld (%s:%d)",
+            ctx->peer.sock,
             ctx->peer.id,
             ctx->peer.ip.c_str(), ctx->peer.port);
 }

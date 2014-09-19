@@ -84,6 +84,9 @@ void event_unregist(oid_t lid, int evt)
             }
             E_DELETE(cl);
             ll->erase(itr_l);
+            if (ll->empty()) {
+                E_DELETE(ll);
+            }
         }
     } else {
         listener_map::iterator itr = s_listeners.begin();
@@ -105,6 +108,9 @@ void event_unregist(oid_t lid, int evt)
                 }
                 E_DELETE(cl);
                 ll->erase(itr_l);
+                if (ll->empty()) {
+                    E_DELETE(ll);
+                }
             }
         }
     }

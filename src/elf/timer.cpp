@@ -239,7 +239,8 @@ const oid_t &timer_add(time64_t life, callback func, void *args)
     }
     if (life == 0) {
         func(args);
-        E_FREE(t->args);
+        E_FREE(args);
+        return OID_NIL;
     }
 
     timer_t *t = E_NEW timer_t;
@@ -449,8 +450,6 @@ static void hash(int bucket)
 }
 static bool timer_min(void *args)
 {
-    LOG_TRACE("timer", "%s", "BINGO: MIN.");
-
     time_t cur = elf::time_s();
     elf::time64_t tm_timer;
     struct tm tm_cur;
