@@ -49,13 +49,15 @@ void message_handle(recv_message_t *msg)
         net_decode(msg);
         hdl->proc(*msg);
     } else {
-        char addr[30];
+        std::string info;
 
         net_error(msg->peer);
-        net_peer_info(msg->peer, addr);
-        LOG_WARN("net", "`%s' is NOT found, peer: %s.",
-                msg->name.c_str(), addr);
-        net_close(msg->peer);
+        net_peer_info(msg->peer, info);
+        if (!info.empty()) {
+            LOG_WARN("net", "%s INVALID message `%s'.",
+                    info.c_str(), msg->name.c_str());
+            net_close(msg->peer);
+        }
     }
 }
 } // namespace elf

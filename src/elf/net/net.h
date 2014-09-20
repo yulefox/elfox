@@ -102,20 +102,18 @@ void net_stat(void);
 bool net_connected(oid_t peer);
 
 ///
-/// Get peer address ip:port.
+/// Get peer address ip.
 /// @param[in] peer Peer id.
-/// @param[out] str Peer info.
-/// @return Peer address info.
+/// @return Peer info.
 ///
-void net_peer_addr(oid_t peer, char *str);
+const char *net_peer_ip(oid_t peer);
 
 ///
 /// Get peer address info.
 /// @param[in] peer Peer id.
-/// @param[out] str Peer info.
-/// @return Peer address info.
+/// @return Peer info.
 ///
-void net_peer_info(oid_t peer, char *str);
+const char *net_peer_info(oid_t peer);
 
 ///
 /// Error occurred.
