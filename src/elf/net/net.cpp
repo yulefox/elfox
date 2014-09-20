@@ -22,7 +22,7 @@
 #include <string>
 
 namespace elf {
-static const int CONTEXT_CLOSE_TIME = 6;
+static const int CONTEXT_CLOSE_TIME = 600;
 static const int CHUNK_DEFAULT_SIZE = 1024;
 static const int SIZE_INT = sizeof(int(0));
 static const int SIZE_INTX2 = sizeof(int(0)) * 2;
@@ -70,7 +70,6 @@ struct context_t {
     int close_time;
     int last_time;
     int error_times;
-    int recv_num; // recv msg num
 };
 
 typedef std::map<oid_t, context_t *> context_map;
@@ -96,7 +95,7 @@ static int net_update(void);
 
 static context_t *context_init(oid_t peer, int fd,
         const struct sockaddr_in &addr);
-static void context_close(elf::oid_t peer);
+static void context_close(oid_t peer);
 static void context_fini(context_t *ctx);
 static void on_accept(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
@@ -129,7 +128,6 @@ static void *context_thread(void *args)
 
         time_t ct = time_s();
 
-        mutex_lock(&s_context_lock);
         while (!s_free_contexts.empty()) {
             context_t *ctx = s_free_contexts.front();
 
@@ -139,7 +137,6 @@ static void *context_thread(void *args)
             context_fini(ctx);
             s_free_contexts.pop();
         }
-        mutex_unlock(&s_context_lock);
         usleep(500);
     }
     return NULL;
@@ -185,7 +182,7 @@ static void set_nonblock(int sock)
     struct linger lg;
 
     lg.l_onoff = 1;
-    lg.l_linger = 0;
+    lg.l_linger = 10;
     rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg));
     if (rc != 0) {
         LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
@@ -439,7 +436,7 @@ static context_t *context_init(oid_t peer, int fd,
     return ctx;
 }
 
-static void context_close(elf::oid_t peer)
+static void context_close(oid_t peer)
 {
     context_t *ctx = NULL;
 
@@ -448,7 +445,6 @@ static void context_close(elf::oid_t peer)
 
     if (itr != s_contexts.end()) {
         ctx = itr->second;
-        s_free_contexts.push(ctx);
         s_contexts.erase(itr);
     }
     mutex_unlock(&s_context_lock);
@@ -457,14 +453,17 @@ static void context_close(elf::oid_t peer)
         return;
     }
 
+    close(ctx->peer.sock);
+
     recv_message_t *msg = recv_message_init();
 
     msg->name = "Fini.Req";
     msg->peer = peer;
     s_recv_msgs.push(msg);
 
-    close(ctx->peer.sock);
-    ctx->close_time = elf::time_s();
+    ctx->close_time = time_s();
+    s_free_contexts.push(ctx);
+
     LOG_TRACE("net", "%lld (%s:%d) is RELEASED.",
             ctx->peer.id,
             ctx->peer.ip.c_str(), ctx->peer.port);
@@ -810,7 +809,7 @@ bool net_decode(recv_message_t *msg)
     if (ctx == NULL) {
         return false;
     }
-    ctx->last_time = elf::time_s();
+    ctx->last_time = time_s();
     return true;
 }
 
