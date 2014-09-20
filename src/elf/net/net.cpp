@@ -962,6 +962,8 @@ static void on_read(const epoll_event &evt)
         c->size = size;
         if (context_find(peer) != ctx) {
             break;
+        } else if (ctx->peer.sock <= 0) {
+            break;
         }
         push_recv(ctx, c);
     }
