@@ -49,14 +49,14 @@ void message_handle(recv_message_t *msg)
         net_decode(msg);
         hdl->proc(*msg);
     } else {
-        std::string info;
+        if (net_connected(msg->peer)) {
+            const char *info = net_peer_info(msg->peer);
 
-        net_error(msg->peer);
-        net_peer_info(msg->peer, info);
-        if (!info.empty()) {
-            LOG_WARN("net", "%s INVALID message `%s'.",
-                    info.c_str(), msg->name.c_str());
+            net_error(msg->peer);
             net_close(msg->peer);
+            LOG_WARN("net", "%s INVALID message: %s.",
+                    info,
+                    msg->name.c_str());
         }
     }
 }

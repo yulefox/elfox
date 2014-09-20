@@ -22,10 +22,11 @@
 #include <string>
 
 namespace elf {
-static const int CONTEXT_CLOSE_TIME = 6;
+static const int CONTEXT_CLOSE_TIME = 600;
 static const int CHUNK_DEFAULT_SIZE = 1024;
 static const int SIZE_INT = sizeof(int(0));
 static const int SIZE_INTX2 = sizeof(int(0)) * 2;
+static const int MESSAGE_MAX_NAME_LENGTH = 100;
 static const int MESSAGE_MAX_VALID_SIZE = 10000000;
 static const int MESSAGE_MAX_PENDING_SIZE = 10000000;
 
@@ -96,7 +97,7 @@ static int net_update(void);
 
 static context_t *context_init(oid_t peer, int fd,
         const struct sockaddr_in &addr);
-static void context_close(elf::oid_t peer);
+static void context_close(oid_t peer);
 static void context_fini(context_t *ctx);
 static void on_accept(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
@@ -129,7 +130,6 @@ static void *context_thread(void *args)
 
         time_t ct = time_s();
 
-        mutex_lock(&s_context_lock);
         while (!s_free_contexts.empty()) {
             context_t *ctx = s_free_contexts.front();
 
@@ -139,7 +139,6 @@ static void *context_thread(void *args)
             context_fini(ctx);
             s_free_contexts.pop();
         }
-        mutex_unlock(&s_context_lock);
         usleep(500);
     }
     return NULL;
@@ -185,7 +184,7 @@ static void set_nonblock(int sock)
     struct linger lg;
 
     lg.l_onoff = 1;
-    lg.l_linger = 0;
+    lg.l_linger = 10;
     rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg));
     if (rc != 0) {
         LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
@@ -343,28 +342,46 @@ static bool message_splice(context_t *ctx)
     if (msg_size == 0) {
         message_get(ctx->recv_data->chunks, &msg_size, SIZE_INT);
     }
-
-    if (ctx->recv_data->pending_size > MESSAGE_MAX_PENDING_SIZE) {
-        LOG_TRACE("net", "%s OVER PENDING message: %d.",
-                ctx->peer.info,
-                ctx->recv_data->pending_size);
-        shutdown(ctx->peer.sock, SHUT_RD);
-        return false;
-    }
-    if (msg_size > MESSAGE_MAX_VALID_SIZE) {
-        LOG_TRACE("net", "%s OVER LENGTH message: %d.",
+    
+    if (msg_size < 0 || msg_size > MESSAGE_MAX_VALID_SIZE) {
+        LOG_WARN("net", "%s INVALID message size: %d.",
                 ctx->peer.info,
                 msg_size);
-        shutdown(ctx->peer.sock, SHUT_RD);
+        net_close(ctx->peer.id);
         return false;
     }
+
+    if (ctx->recv_data->pending_size > MESSAGE_MAX_PENDING_SIZE) {
+        LOG_WARN("net", "%s OVER PENDING message: %d.",
+                ctx->peer.info,
+                ctx->recv_data->pending_size);
+        net_close(ctx->peer.id);
+        return false;
+    }
+
     if (ctx->recv_data->pending_size < msg_size) return false;
 
     int name_len = 0;
     message_get(ctx->recv_data->chunks, &name_len, SIZE_INT);
 
+    if (name_len < 0 || name_len > MESSAGE_MAX_NAME_LENGTH) {
+        LOG_WARN("net", "%s INVALID name length: %d:%d.",
+                ctx->peer.info,
+                msg_size, name_len);
+        net_close(ctx->peer.id);
+        return false;
+    }
+
     recv_message_t *msg = recv_message_init();
     int body_len = msg_size - SIZE_INTX2 - name_len;
+
+    if (body_len < 0 || body_len > MESSAGE_MAX_VALID_SIZE) {
+        LOG_WARN("net", "%s INVALID message size %d:%d:%d.",
+                ctx->peer.info,
+                msg_size, name_len, body_len);
+        net_close(ctx->peer.id);
+        return false;
+    }
 
     message_get(ctx->recv_data->chunks, msg->name, name_len);
     message_get(ctx->recv_data->chunks, msg->body, body_len);
@@ -443,7 +460,7 @@ static context_t *context_init(oid_t peer, int fd,
     return ctx;
 }
 
-static void context_close(elf::oid_t peer)
+static void context_close(oid_t peer)
 {
     context_t *ctx = NULL;
 
@@ -452,7 +469,6 @@ static void context_close(elf::oid_t peer)
 
     if (itr != s_contexts.end()) {
         ctx = itr->second;
-        s_free_contexts.push(ctx);
         s_contexts.erase(itr);
     }
     mutex_unlock(&s_context_lock);
@@ -461,6 +477,8 @@ static void context_close(elf::oid_t peer)
         return;
     }
 
+    close(ctx->peer.sock);
+
     recv_message_t *msg = recv_message_init();
 
     msg->name = "Fini.Req";
@@ -468,7 +486,8 @@ static void context_close(elf::oid_t peer)
     s_recv_msgs.push(msg);
 
     close(ctx->peer.sock);
-    ctx->close_time = elf::time_s();
+    ctx->close_time = time_s();
+    s_free_contexts.push(ctx);
     LOG_TRACE("net", "%s is RELEASED.",
             ctx->peer.info);
 }
@@ -506,10 +525,19 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
 {
     assert(ctx);
 
-    ctx->recv_data->pending_size += c->size;
-    ctx->recv_data->chunks.push_back(c);
+    mutex_lock(&(ctx->lock));
 
+    chunk_queue::iterator itr = chunks.begin();
+
+    for (; itr != chunks.end(); ++itr) {
+        chunk_t *c = *itr;
+
+        ctx->recv_data->pending_size += c->size;
+        ctx->recv_data->chunks.push_back(c);
+    }
     while (message_splice(ctx));
+    mutex_unlock(&(ctx->lock));
+    chunks.clear();
 }
 
 static void push_send(context_t *ctx, blob_t *msg)
@@ -806,7 +834,7 @@ bool net_decode(recv_message_t *msg)
     if (ctx == NULL) {
         return false;
     }
-    ctx->last_time = elf::time_s();
+    ctx->last_time = time_s();
     return true;
 }
 
@@ -922,9 +950,7 @@ static void on_read(const epoll_event &evt)
 {
     context_t *ctx = static_cast<context_t *>(evt.data.ptr);
     int size = CHUNK_DEFAULT_SIZE;
-    oid_t peer = ctx->peer.id;
     int sock = ctx->peer.sock;
-    bool closing = false;
     chunk_queue chunks;
 
     while (size > 0) {
@@ -937,8 +963,6 @@ static void on_read(const epoll_event &evt)
                 LOG_TRACE("net", "%s recv FAILED: %s.",
                         ctx->peer.info,
                         strerror(errno));
-                net_close(peer);
-                closing = true;
             }
             break;
         }
@@ -948,8 +972,6 @@ static void on_read(const epoll_event &evt)
             chunk_fini(c);
             LOG_INFO("net", "%s active closed.",
                     ctx->peer.info);
-            net_close(peer);
-            closing = true;
             break;
         }
 
@@ -958,9 +980,6 @@ static void on_read(const epoll_event &evt)
         chunks.push_back(c);
     }
     push_recv(ctx, chunks);
-    if (closing) {
-        return;
-    }
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock,
                 &(ctx->evt))) {
         LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
@@ -986,13 +1005,13 @@ static void on_write(const epoll_event &evt)
                     c->data + c->offset, rem, 0);
             if (num < 0) {
                 if (errno != EINTR && errno != EAGAIN) {
+                    for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
+                        chunk_fini(*itr);
+                    }
+                    net_close(ctx->peer.id);
                     LOG_ERROR("net", "%s send FAILED: %s.",
                             ctx->peer.info,
                             strerror(errno));
-                    net_close(ctx->peer.id);
-                    for (itr = chunks.begin(); itr != chunks.end() ++itr) {
-                        chunk_fini(c);
-                    }
                 } else {
                     push_send(ctx, chunks);
                 }
