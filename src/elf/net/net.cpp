@@ -184,7 +184,7 @@ static void set_nonblock(int sock)
     struct linger lg;
 
     lg.l_onoff = 1;
-    lg.l_linger = 10;
+    lg.l_linger = 0;
     rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg));
     if (rc != 0) {
         LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
@@ -960,10 +960,14 @@ static void on_read(const epoll_event &evt)
         if (size < 0) {
             chunk_fini(c);
             if (errno != EINTR && errno != EAGAIN) {
+                for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
+                    chunk_fini(*itr);
+                }
                 LOG_TRACE("net", "%s recv FAILED: %s.",
                         ctx->peer.info,
                         strerror(errno));
                 net_close(ctx->peer.id);
+                return;
             }
             break;
         }
@@ -971,10 +975,13 @@ static void on_read(const epoll_event &evt)
         // client disconnect socket
         if (0 == size) {
             chunk_fini(c);
+            for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
+                chunk_fini(*itr);
+            }
+            net_close(ctx->peer.id);
             LOG_INFO("net", "%s active closed.",
                     ctx->peer.info);
-            net_close(ctx->peer.id);
-            break;
+            return;
         }
 
         // append received chunk
