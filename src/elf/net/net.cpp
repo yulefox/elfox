@@ -184,7 +184,7 @@ static void set_nonblock(int sock)
     struct linger lg;
 
     lg.l_onoff = 1;
-    lg.l_linger = 10;
+    lg.l_linger = 0;
     rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg));
     if (rc != 0) {
         LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
