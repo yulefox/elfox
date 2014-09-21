@@ -364,7 +364,7 @@ static bool message_splice(context_t *ctx)
     int name_len = 0;
     message_get(ctx->recv_data->chunks, &name_len, SIZE_INT);
 
-    if (name_len < 0 || name_len > MESSAGE_MAX_NAME_LENGTH) {
+    if (name_len < 0 || name_len > msg_size) {
         LOG_WARN("net", "%s INVALID name length: %d:%d.",
                 ctx->peer.info,
                 msg_size, name_len);
@@ -434,7 +434,7 @@ static context_t *context_init(oid_t peer, int fd,
     ctx->peer.sock = fd;
     strcpy(ctx->peer.ip, inet_ntoa(addr.sin_addr));
     ctx->peer.port = ntohs(addr.sin_port);
-    sprintf(ctx->peer.info, "<%d>%lld(%s:%d)",
+    sprintf(ctx->peer.info, "<%d>%lld (%s:%d)",
             ctx->peer.sock,
             ctx->peer.id,
             ctx->peer.ip,
@@ -963,6 +963,7 @@ static void on_read(const epoll_event &evt)
                 LOG_TRACE("net", "%s recv FAILED: %s.",
                         ctx->peer.info,
                         strerror(errno));
+                net_close(ctx->peer.id);
             }
             break;
         }
@@ -972,6 +973,7 @@ static void on_read(const epoll_event &evt)
             chunk_fini(c);
             LOG_INFO("net", "%s active closed.",
                     ctx->peer.info);
+            net_close(ctx->peer.id);
             break;
         }
 
