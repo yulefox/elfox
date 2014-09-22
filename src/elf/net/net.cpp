@@ -22,24 +22,34 @@
 #include <string>
 
 namespace elf {
-static const int CONTEXT_CLOSE_TIME = 600;
-static const int CHUNK_DEFAULT_SIZE = 1024;
+static const int LINGER_ONOFF = 1;
+static const int LINGER_TIME = 5;
+static const int CONTEXT_CLOSE_TIME = 10;
 static const int SIZE_INT = sizeof(int(0));
 static const int SIZE_INTX2 = sizeof(int(0)) * 2;
+static const int CHUNK_DEFAULT_SIZE = 1024;
+static const size_t CHUNK_MAX_NUM = 10000;
 static const int MESSAGE_MAX_NAME_LENGTH = 100;
-static const int MESSAGE_MAX_VALID_SIZE = 10000000;
-static const int MESSAGE_MAX_PENDING_SIZE = 10000000;
+static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_DEFAULT_SIZE;
+static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 
-struct peer_t;
-struct chunk_t;
 struct blob_t;
-struct recv_message_t;
+struct chunk_t;
 struct context_t;
+struct peer_t;
+struct recv_message_t;
 
 typedef std::list<chunk_t *> chunk_queue;
 typedef std::queue<context_t *> free_context_queue;
 typedef std::deque<recv_message_t *> recv_message_queue;
 typedef xqueue<recv_message_t *> recv_message_xqueue;
+
+struct blob_t {
+    chunk_queue chunks;
+    int msg_size; // current recv msg size(for splicing)
+    int total_size; // total send/recv msg size
+    int pending_size; // pending send/recv msg size
+};
 
 struct chunk_t {
     char data[CHUNK_DEFAULT_SIZE];
@@ -53,13 +63,6 @@ struct peer_t {
     char ip[20];
     int port;
     char info[64];
-};
-
-struct blob_t {
-    chunk_queue chunks;
-    int msg_size; // current recv msg size(for splicing)
-    int total_size; // total send/recv msg size
-    int pending_size; // pending send/recv msg size
 };
 
 struct context_t {
@@ -183,8 +186,8 @@ static void set_nonblock(int sock)
     // set linger
     struct linger lg;
 
-    lg.l_onoff = 1;
-    lg.l_linger = 0;
+    lg.l_onoff = LINGER_ONOFF;
+    lg.l_linger = LINGER_TIME;
     rc = setsockopt(sock, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg));
     if (rc != 0) {
         LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
@@ -278,9 +281,7 @@ static void message_get(chunk_queue &chunks, void *buf, int size)
     while (rem > 0 && itr != chunks.end()) {
         chunk_t *c = *itr;
 
-        if (c == NULL || c->size == 0 || c->size < c->offset) {
-            return;
-        }
+        assert(c != NULL && c->size > 0 && c->size > c->offset);
 
         int real = c->size - c->offset;
         char *src = c->data + c->offset;
@@ -309,11 +310,7 @@ static void message_get(chunk_queue &chunks, std::string &buf, int size)
     while (rem > 0 && itr != chunks.end()) {
         chunk_t *c = *itr;
 
-        if (c->size < c->offset) {
-            LOG_WARN("net", "Invalid chunk: %d/%d.",
-                    c->offset, c->size);
-            return;
-        }
+        assert(c != NULL && c->size > 0 && c->size > c->offset);
 
         int real = c->size - c->offset;
         char *src = c->data + c->offset;
@@ -338,7 +335,16 @@ static bool message_splice(context_t *ctx)
 
     if (ctx->recv_data->pending_size < SIZE_INTX2) return false;
 
+    if (ctx->recv_data->pending_size > MESSAGE_MAX_PENDING_SIZE) {
+        LOG_WARN("net", "%s OVER PENDING message: %d.",
+                ctx->peer.info,
+                ctx->recv_data->pending_size);
+        net_close(ctx->peer.id);
+        return false;
+    }
+
     int &msg_size = ctx->recv_data->msg_size;
+
     if (msg_size == 0) {
         message_get(ctx->recv_data->chunks, &msg_size, SIZE_INT);
     }
@@ -347,14 +353,6 @@ static bool message_splice(context_t *ctx)
         LOG_WARN("net", "%s INVALID message size: %d.",
                 ctx->peer.info,
                 msg_size);
-        net_close(ctx->peer.id);
-        return false;
-    }
-
-    if (ctx->recv_data->pending_size > MESSAGE_MAX_PENDING_SIZE) {
-        LOG_WARN("net", "%s OVER PENDING message: %d.",
-                ctx->peer.info,
-                ctx->recv_data->pending_size);
         net_close(ctx->peer.id);
         return false;
     }
@@ -372,16 +370,17 @@ static bool message_splice(context_t *ctx)
         return false;
     }
 
-    recv_message_t *msg = recv_message_init();
     int body_len = msg_size - SIZE_INTX2 - name_len;
 
-    if (body_len < 0 || body_len > MESSAGE_MAX_VALID_SIZE) {
+    if (body_len < 0) {
         LOG_WARN("net", "%s INVALID message size %d:%d:%d.",
                 ctx->peer.info,
                 msg_size, name_len, body_len);
         net_close(ctx->peer.id);
         return false;
     }
+
+    recv_message_t *msg = recv_message_init();
 
     message_get(ctx->recv_data->chunks, msg->name, name_len);
     message_get(ctx->recv_data->chunks, msg->body, body_len);
@@ -733,7 +732,7 @@ int net_proc(void)
 void net_stat(void)
 {
     mutex_lock(&s_context_lock);
-    LOG_INFO("net", "%d clients connected.",
+    LOG_INFO("net", "%d connections.",
             s_contexts.size());
     mutex_unlock(&s_context_lock);
 }
@@ -960,6 +959,8 @@ static void on_read(const epoll_event &evt)
         if (size < 0) {
             chunk_fini(c);
             if (errno != EINTR && errno != EAGAIN) {
+                chunk_queue::iterator itr = chunks.begin();
+
                 for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
                     chunk_fini(*itr);
                 }
@@ -975,11 +976,14 @@ static void on_read(const epoll_event &evt)
         // client disconnect socket
         if (0 == size) {
             chunk_fini(c);
+
+            chunk_queue::iterator itr = chunks.begin();
+
             for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
                 chunk_fini(*itr);
             }
             net_close(ctx->peer.id);
-            LOG_INFO("net", "%s active closed.",
+            LOG_TRACE("net", "%s active closed.",
                     ctx->peer.info);
             return;
         }
@@ -987,6 +991,17 @@ static void on_read(const epoll_event &evt)
         // append received chunk
         c->size = size;
         chunks.push_back(c);
+        if (chunks.size() > CHUNK_MAX_NUM) {
+            chunk_queue::iterator itr = chunks.begin();
+
+            for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
+                chunk_fini(*itr);
+            }
+            net_close(ctx->peer.id);
+            LOG_WARN("net", "%s INVALID peer closed.",
+                    ctx->peer.info);
+            return;
+        }
     }
     push_recv(ctx, chunks);
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock,
