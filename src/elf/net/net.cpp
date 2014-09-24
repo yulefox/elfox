@@ -749,7 +749,7 @@ const char *net_peer_ip(oid_t peer)
     if (ctx != NULL) {
         return ctx->peer.ip;
     }
-    return NULL;
+    return "----";
 }
 
 const char *net_peer_info(oid_t peer)
@@ -759,7 +759,7 @@ const char *net_peer_info(oid_t peer)
     if (ctx != NULL) {
         return ctx->peer.info;
     }
-    return NULL;
+    return "----";
 }
 
 int net_error(oid_t peer)
