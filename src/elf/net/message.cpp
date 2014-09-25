@@ -48,16 +48,12 @@ void message_handle(recv_message_t *msg)
         msg->pb = hdl->init();
         net_decode(msg);
         hdl->proc(*msg);
-    } else {
-        if (net_connected(msg->peer)) {
-            const char *info = net_peer_info(msg->peer);
-
-            net_error(msg->peer);
-            net_close(msg->peer);
-            LOG_WARN("net", "%s INVALID message: %s.",
-                    info,
-                    msg->name.c_str());
-        }
+    } else if (msg->ctx != NULL) {
+        net_error(msg->ctx);
+        net_close(msg->peer);
+        LOG_WARN("net", "%lld INVALID message: %s.",
+                msg->peer,
+                msg->name.c_str());
     }
 }
 } // namespace elf

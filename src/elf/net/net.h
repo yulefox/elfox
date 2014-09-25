@@ -27,11 +27,13 @@
 namespace elf {
 typedef void (*encrypt_func)(char* buf, int len);
 struct blob_t;
+struct context_t;
 
 struct recv_message_t {
     std::string name;
     std::string body;
     oid_t peer;
+    context_t *ctx;
     pb_t *pb;
 };
 
@@ -95,32 +97,25 @@ int net_proc(void);
 void net_stat(void);
 
 ///
-/// Check if connected.
-/// @param peer Peer id.
-/// @return true if connected, or false.
-///
-bool net_connected(oid_t peer);
-
-///
 /// Get peer address ip.
-/// @param[in] peer Peer id.
+/// @param[in] ctx Context.
 /// @return Peer info.
 ///
-const char *net_peer_ip(oid_t peer);
+const char *net_peer_ip(const context_t *ctx);
 
 ///
 /// Get peer address info.
-/// @param[in] peer Peer id.
+/// @param[in] ctx Context.
 /// @return Peer info.
 ///
-const char *net_peer_info(oid_t peer);
+const char *net_peer_info(const context_t *ctx);
 
 ///
 /// Error occurred.
-/// @param[in] peer Peer id.
+/// @param[in] ctx Context.
 /// @return Error occurred times.
 ///
-int net_error(oid_t peer);
+int net_error(context_t *ctx);
 
 ///
 /// Encode sent message.

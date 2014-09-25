@@ -24,7 +24,7 @@
 namespace elf {
 static const int LINGER_ONOFF = 1;
 static const int LINGER_TIME = 5;
-static const int CONTEXT_CLOSE_TIME = 10;
+static const int CONTEXT_CLOSE_TIME = 300;
 static const int SIZE_INT = sizeof(int(0));
 static const int SIZE_INTX2 = sizeof(int(0)) * 2;
 static const int CHUNK_DEFAULT_SIZE = 1024;
@@ -230,12 +230,13 @@ static chunk_t *chunk_clone(const chunk_t &src)
     return dst;
 }
 
-static recv_message_t *recv_message_init(void)
+static recv_message_t *recv_message_init(context_t *ctx)
 {
     recv_message_t *msg = E_NEW recv_message_t;
 
     msg->peer = OID_NIL;
     msg->pb = NULL;
+    msg->ctx = ctx;
     return msg;
 }
 
@@ -380,7 +381,7 @@ static bool message_splice(context_t *ctx)
         return false;
     }
 
-    recv_message_t *msg = recv_message_init();
+    recv_message_t *msg = recv_message_init(ctx);
 
     message_get(ctx->recv_data->chunks, msg->name, name_len);
     message_get(ctx->recv_data->chunks, msg->body, body_len);
@@ -451,7 +452,7 @@ static context_t *context_init(oid_t peer, int fd,
     s_contexts[ctx->peer.id] = ctx;
     mutex_unlock(&s_context_lock);
 
-    recv_message_t *msg = recv_message_init();
+    recv_message_t *msg = recv_message_init(ctx);
 
     msg->name = "Init.Req";
     msg->peer = ctx->peer.id;
@@ -478,7 +479,7 @@ static void context_close(oid_t peer)
 
     close(ctx->peer.sock);
 
-    recv_message_t *msg = recv_message_init();
+    recv_message_t *msg = recv_message_init(ctx);
 
     msg->name = "Fini.Req";
     msg->peer = peer;
@@ -524,8 +525,6 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
 {
     assert(ctx);
 
-    mutex_lock(&(ctx->lock));
-
     chunk_queue::iterator itr = chunks.begin();
 
     for (; itr != chunks.end(); ++itr) {
@@ -535,7 +534,6 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
         ctx->recv_data->chunks.push_back(c);
     }
     while (message_splice(ctx));
-    mutex_unlock(&(ctx->lock));
     chunks.clear();
 }
 
@@ -731,43 +729,27 @@ int net_proc(void)
 
 void net_stat(void)
 {
-    mutex_lock(&s_context_lock);
-    LOG_INFO("net", "%d connections.",
-            s_contexts.size());
-    mutex_unlock(&s_context_lock);
 }
 
-bool net_connected(oid_t peer)
+const char *net_peer_ip(const context_t *ctx)
 {
-    return (context_find(peer) != NULL);
-}
-
-const char *net_peer_ip(oid_t peer)
-{
-    context_t *ctx = context_find(peer);
-
     if (ctx != NULL) {
         return ctx->peer.ip;
     }
-    return "----";
+    return "0.0.0.0";
 }
 
-const char *net_peer_info(oid_t peer)
+const char *net_peer_info(const context_t *ctx)
 {
-    context_t *ctx = context_find(peer);
-
     if (ctx != NULL) {
         return ctx->peer.info;
     }
-    return "----";
+    return "INVALID PEER";
 }
 
-int net_error(oid_t peer)
+int net_error(context_t *ctx)
 {
-    context_t *ctx = context_find(peer);
     if (ctx == NULL) {
-        LOG_TRACE("net", "%lld is NOT found.",
-                peer);
         return -1;
     }
     ++(ctx->error_times);
@@ -811,6 +793,12 @@ blob_t *net_encode(const pb_t &pb)
 bool net_decode(recv_message_t *msg)
 {
     assert(msg && msg->pb);
+
+    context_t *ctx = msg->ctx;
+
+    if (ctx == NULL) {
+        return false;
+    }
     if (s_decry) { // decrypt
         int name_len = msg->name.size();
         int body_len = msg->body.size();
@@ -829,10 +817,6 @@ bool net_decode(recv_message_t *msg)
         msg->pb->ParseFromString(msg->body);
     }
 
-    context_t *ctx = context_find(msg->peer);
-    if (ctx == NULL) {
-        return false;
-    }
     ctx->last_time = time_s();
     return true;
 }
