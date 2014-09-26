@@ -36,8 +36,8 @@ static void *http_post(void *args)
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
         res = curl_easy_perform(curl);
         if(res != CURLE_OK) {
-            LOG_ERROR("http", "curl_easy_perform() failed: %s %s, %s.",
-                    curl_easy_strerror(res), post->url, post->json);
+            LOG_ERROR("http", "curl_easy_perform() failed(%d): %s %s, %s.",
+                    res, curl_easy_strerror(res), post->url, post->json);
             if (post->cb) {
                 post->cb(0, 0, 0, post->args);
             }

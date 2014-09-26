@@ -553,7 +553,7 @@ static void push_send(context_t *ctx, blob_t *msg)
     mutex_unlock(&(ctx->lock));
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
-        LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
+        LOG_INFO("net", "%s epoll_ctl FAILED: %s.",
             ctx->peer.info,
             strerror(errno));
     }
