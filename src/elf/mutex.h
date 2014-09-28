@@ -37,6 +37,20 @@ void mutex_fini(mutex_t *m);
 void mutex_lock(mutex_t *m);
 
 void mutex_unlock(mutex_t *m);
+
+class lock {
+public:
+    lock(mutex_t *m) :
+        m_lock(m)
+    {
+        mutex_lock(m_lock);
+    }
+    ~lock(void) {
+        mutex_unlock(m_lock);
+    }
+private:
+    mutex_t *m_lock;
+};
 } // namespace elf
 
 #endif /* !ELF_MUTEX_H */

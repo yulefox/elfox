@@ -40,15 +40,17 @@ bool json_unbind(const char *path)
     return true;
 }
 
-pb_t *json_pb(const char *pb_type, const char *json_type, const char *data)
+void json_pb(pb_t *pb, const char *json_type, const char *data)
 {
+    assert(pb);
+
     cJSON *json = cJSON_Parse(data);
 
-    if (json == NULL) return NULL;
-
-    pb_t *pb = pb_create(pb_type);
-
-    assert(pb);
+    if (json == NULL) {
+        LOG_WARN("INVALID json: %s.",
+                data);
+        return;
+    }
 
     const Descriptor *des = pb->GetDescriptor();
     cJSON *ref = cJSON_GetObjectItem(s_json, json_type);
@@ -69,7 +71,6 @@ pb_t *json_pb(const char *pb_type, const char *json_type, const char *data)
         pb_set_field(pb, fd, item->valuestring);
     }
     cJSON_Delete(json);
-    return pb;
 }
 } // namespace elf
 
