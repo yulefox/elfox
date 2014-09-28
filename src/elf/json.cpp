@@ -47,7 +47,7 @@ void json_pb(pb_t *pb, const char *json_type, const char *data)
     cJSON *json = cJSON_Parse(data);
 
     if (json == NULL) {
-        LOG_WARN("INVALID json: %s.",
+        LOG_WARN("json", "INVALID json: %s.",
                 data);
         return;
     }
