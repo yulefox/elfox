@@ -40,6 +40,38 @@ bool json_unbind(const char *path)
     return true;
 }
 
+pb_t *json_pb(const char *pb_type, const char *json_type, const char *data)
+{
+    cJSON *json = cJSON_Parse(data);
+
+    if (json == NULL) return NULL;
+ 
+    pb_t *pb = pb_create(pb_type);
+ 
+    assert(pb);
+
+    const Descriptor *des = pb->GetDescriptor();
+    cJSON *ref = cJSON_GetObjectItem(s_json, json_type);
+
+    assert(ref);
+    cJSON *item = json->child;
+    for (; item; item = item->next) {
+        if (item->type != cJSON_String) continue;
+        if (strlen(item->valuestring) <= 0) continue;
+
+        cJSON *ofd = cJSON_GetObjectItem(ref, item->string);
+
+        if (!ofd) continue;
+
+        const FieldDescriptor *fd = des->FindFieldByName(ofd->valuestring);
+
+        if (!fd) continue;
+        pb_set_field(pb, fd, item->valuestring);
+    }
+    cJSON_Delete(json);
+    return pb;
+}
+
 void json_pb(pb_t *pb, const char *json_type, const char *data)
 {
     assert(pb);
