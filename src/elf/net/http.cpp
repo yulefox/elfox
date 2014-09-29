@@ -10,7 +10,7 @@
 
 namespace elf {
 struct http_req_t {
-    char *json;
+    const char *json;
     const char *url;
     http_response cb;
     void *args;
@@ -47,7 +47,6 @@ static void *http_post(void *args)
     } else {
         LOG_ERROR("http", "%s", "curl_easy_init() failed.");
     }
-    free(post->json);
     E_DELETE post;
     return NULL;
 }
@@ -75,7 +74,7 @@ int http_fini(void)
     return 0;
 }
 
-int http_json(const char *url, char *json,
+int http_json(const char *url, const char *json,
         http_response func, void *args)
 {
     http_req_t *post = E_NEW http_req_t;
