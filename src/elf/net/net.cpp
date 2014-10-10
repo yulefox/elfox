@@ -584,8 +584,13 @@ static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
 
     chunk_t *c = NULL;
     mutex_lock(&(ctx->lock));
-    clone = ctx->send_data->chunks;
-    ctx->send_data->chunks.clear();
+    if (!ctx->send_data->chunks.empty()) {
+        c = ctx->send_data->chunks.front();
+        ctx->send_data->chunks.pop_front();
+        clone.push_back(c);
+
+        epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt));			
+    }
     mutex_unlock(&(ctx->lock));
     return c;
 }
