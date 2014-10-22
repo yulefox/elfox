@@ -7,10 +7,6 @@
 #include <elf/db.h>
 #include <stdio.h>
 #include <tut/tut.hpp>
-/*
-#include "cfg/cls.pb.h"
-#include "cfg/setup.pb.h"
-*/
 
 namespace tut {
 struct cp {
@@ -64,5 +60,13 @@ void object::test<3>() {
     elf::config_load("CONFIG/setup.conf", &cfg);
     ensure("Key 'a.b.int' gets FAILED.", cfg.login().port() == 6666);
     */
+}
+
+template<>
+template<>
+void object::test<4>() {
+    putchar('\n');
+    set_test_name("Load .xml");
+    elf::config_load("AppBase", "CONFIG/setup.xml");
 }
 }

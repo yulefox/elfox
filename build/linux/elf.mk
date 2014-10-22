@@ -18,6 +18,7 @@ CFLAGS		:= \
 	-I/opt/local/include \
 	-I/opt/local/include/mysql55 \
 	-I/usr/include/lua \
+	-I/usr/include/libxml2 \
 	-I$(INCDIR)
 CPPFLAGS	:= \
 	-DELF_HAVE_PRAGMA_ONCE

@@ -6,6 +6,7 @@
 #include <elf/cp.h>
 #include <elf/db.h>
 #include <elf/log.h>
+#include <libxml/parser.h>
 #include <fstream>
 #include <string>
 
@@ -178,6 +179,65 @@ bool load_cfg(const std::string &path, pb_t *cfg)
     return true;
 }
 
+static bool xmlattr_parse(pb_t *pb, xmlAttrPtr attr)
+{
+    assert(pb && attr);
+
+    const Reflection *ref = pb->GetReflection();
+    const Descriptor *des = pb->GetDescriptor();
+
+    while (attr) {
+        const FieldDescriptor *fd = des->FindFieldByName((const char *)(attr->name));
+
+        pb_set_field(pb, fd, (const char *)(attr->children->content));
+    }
+    return true;
+}
+
+static bool xmlnode_parse(pb_t *pb, xmlNodePtr node)
+{
+    assert(pb && node);
+
+    const Reflection *ref = pb->GetReflection();
+    const Descriptor *des = pb->GetDescriptor();
+    xmlNodePtr cur = node->children;
+
+    while (cur) {
+        if (cur->properties) {
+        }
+        const FieldDescriptor *fd = des->FindFieldByName((const char *)(cur->name));
+        pb_t *item = ref->AddMessage(pb, fd);
+
+        pb_set_field(item, fd, (const char *)(cur->content));
+        xmlnode_parse(item, cur);
+    }
+    return true;
+}
+
+static bool load_xml(const std::string &path, pb_t *cfg)
+{
+    xmlDocPtr doc = xmlReadFile(path.c_str(), "utf8", XML_PARSE_RECOVER);
+    if (!doc) {
+        LOG_ERROR("cp",
+                "Can NOT open file %s.", path.c_str());
+        return false;
+    }
+
+    xmlNodePtr node = xmlDocGetRootElement(doc);
+    if (!node) {
+        LOG_ERROR("cp",
+                "Can NOT parse file %s.", path.c_str());
+        xmlFreeDoc(doc);
+        return false;
+    }
+    xmlnode_parse(cfg, node);
+    LOG_TRACE("cp",
+            "Load config file %s DONE.",
+            path.c_str());
+    xmlFreeDoc(doc);
+    return true;
+}
+
 static bool load_tbl(const std::string &tbl_name, pb_t *cfg,
         int type, db_callback proc)
 {
@@ -205,6 +265,8 @@ pb_t *config_load(const std::string &name, const std::string &path,
         res = load_csv(path, cfg);
     } else if (ext == "conf") {
         res = load_cfg(path, cfg);
+    } else if (ext == "xml") {
+        res = load_xml(path, cfg);
     } else if (ext == path) {
         res = load_tbl(path, cfg, type, proc);
     }

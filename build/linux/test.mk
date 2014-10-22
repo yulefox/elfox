@@ -17,9 +17,9 @@ LIBRARY		:= NO
 PROFILE		:= NO
 CFLAGS		:= \
 	-I/usr/include/lua \
+	-I/usr/local/include/pb \
 	-I$(INCDIR) \
-	-I$(INCDIR)/test \
-	-I$(INCDIR)/test/pb
+	-I$(INCDIR)/test
 CPPFLAGS	:= \
 	-DELF_HAVE_PRAGMA_ONCE \
 	-DELF_USE_ALL
@@ -27,9 +27,11 @@ LIBS		:= \
 	-lcurl \
 	-llog4cplus \
 	-llua \
-	-ltolua++ \
 	-lmysqlclient \
-	-lprotoc
+	-lprotobuf \
+	-lprotoc \
+	-ltolua++ \
+	-lxml2
 
 ifeq (YES, $(DEBUG))
 	LIBS	+= \
@@ -38,7 +40,8 @@ ifeq (YES, $(DEBUG))
 else
 	LIBS	+= \
 	-lcjson \
-	-lelfox
+	-lelfox \
+	-lpb
 endif
 
 LDFLAGS		:= \

@@ -24,7 +24,7 @@
 #include <set>
 
 namespace elf {
-typedef uint64_t oid_t;
+typedef int64_t oid_t;
 typedef std::list<oid_t> id_list;
 typedef std::set<oid_t> id_set;
 typedef std::map<oid_t, int> id_map;
