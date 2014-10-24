@@ -179,39 +179,61 @@ bool load_cfg(const std::string &path, pb_t *cfg)
     return true;
 }
 
-static bool xmlattr_parse(pb_t *pb, xmlAttrPtr attr)
+static void xmlattr_parse(pb_t *pb, xmlAttrPtr attr)
 {
     assert(pb && attr);
 
-    const Reflection *ref = pb->GetReflection();
     const Descriptor *des = pb->GetDescriptor();
 
-    while (attr) {
+    do {
         const FieldDescriptor *fd = des->FindFieldByName((const char *)(attr->name));
 
         pb_set_field(pb, fd, (const char *)(attr->children->content));
-    }
-    return true;
+        attr = attr->next;
+    } while (attr);
 }
 
-static bool xmlnode_parse(pb_t *pb, xmlNodePtr node)
+static void xmlnode_parse(pb_t *pb, xmlNodePtr node)
 {
     assert(pb && node);
 
     const Reflection *ref = pb->GetReflection();
     const Descriptor *des = pb->GetDescriptor();
-    xmlNodePtr cur = node->children;
+    xmlNodePtr cur = xmlFirstElementChild(node);
 
     while (cur) {
-        if (cur->properties) {
-        }
         const FieldDescriptor *fd = des->FindFieldByName((const char *)(cur->name));
-        pb_t *item = ref->AddMessage(pb, fd);
 
-        pb_set_field(item, fd, (const char *)(cur->content));
-        xmlnode_parse(item, cur);
+        if (fd->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
+            pb_t *item = NULL;
+
+            switch (fd->label()) {
+                case FieldDescriptor::LABEL_OPTIONAL:
+                    item = ref->MutableMessage(pb, fd);
+                    break;
+                case FieldDescriptor::LABEL_REQUIRED:
+                    item = ref->MutableMessage(pb, fd);
+                    break;
+                case FieldDescriptor::LABEL_REPEATED:
+                    item = ref->AddMessage(pb, fd);
+                    break;
+            }
+
+            if (cur->properties) {
+                xmlattr_parse(item, cur->properties);
+            } else if (cur->content) {
+                pb_set_field(pb, fd, (const char *)(cur->content));
+            }
+            xmlnode_parse(item, cur);
+        } else {
+            if (cur->properties) {
+                xmlattr_parse(pb, cur->properties);
+            } else if (cur->content) {
+                pb_set_field(pb, fd, (const char *)(cur->content));
+            }
+        }
+        cur = xmlNextElementSibling(cur);
     }
-    return true;
 }
 
 static bool load_xml(const std::string &path, pb_t *cfg)
