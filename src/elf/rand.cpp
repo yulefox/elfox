@@ -125,6 +125,13 @@ void roll_rm(const roll_req &req, roll_res &res, int times)
 
 void rand_str(char *rnds, int len)
 {
+    static const int BASE_LEN = 62;
+    static const char BASE[64] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+    for (int i = 0; i < len; ++i) {
+        rnds[i] = BASE[::rand() % BASE_LEN];
+    }
+    rnds[len] = '\0';
 }
 } // namespace elf
 

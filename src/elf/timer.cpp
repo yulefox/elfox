@@ -45,6 +45,7 @@ struct timer_t {
     void *args; // callback arguments
     timer_t *next; // the next node of the tail node is NULL
     timer_t *prev; // the previous node of the head node is the tail
+    bool manual; // manual destroy args
 };
 
 struct mgr_t {
@@ -122,7 +123,7 @@ int timer_init(void)
     localtime_r(&cur, &tm_cur);
     tm_timer = (60 - tm_cur.tm_sec) * 1000llu - ms;
 
-    timer_add(tm_timer, timer_min, NULL);
+    timer_add(tm_timer, timer_min, NULL, true);
     return 0;
 }
 
@@ -223,13 +224,14 @@ const oid_t &timer_add(time64_t life, const char *func)
     t->script = true;
     strcpy(t->cb.script, func);
     t->args = NULL;
+    t->manual = true;
     schedule(t);
     ++s_mgr.timer_total;
     ++s_mgr.timer_remain;
     return t->id;
 }
 
-const oid_t &timer_add(time64_t life, callback func, void *args)
+const oid_t &timer_add(time64_t life, callback func, void *args, bool manual)
 {
     if (life < 0 || life >= MAX_LIFE) {
         LOG_WARN("timer",
@@ -252,6 +254,7 @@ const oid_t &timer_add(time64_t life, callback func, void *args)
     t->script = false;
     t->cb.func = func;
     t->args = args;
+    t->manual = manual;
     schedule(t);
     ++s_mgr.timer_total;
     ++s_mgr.timer_remain;
@@ -377,7 +380,9 @@ static timer_t *get(const oid_t &tid, int *bucket)
 static void destroy(timer_t *t)
 {
     if (t) {
-        E_FREE(t->args);
+        if (!t->manual) {
+            E_FREE(t->args);
+        }
         S_DELETE(t);
     }
 }
@@ -456,7 +461,7 @@ static bool timer_min(void *args)
 
     localtime_r(&cur, &tm_cur);
     tm_timer = (60 - tm_cur.tm_sec) * 1000llu;
-    timer_add(tm_timer, timer_min, NULL);
+    timer_add(tm_timer, timer_min, NULL, true);
 
     handler_list::const_iterator itr = s_handlers.begin();
 

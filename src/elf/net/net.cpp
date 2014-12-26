@@ -442,6 +442,7 @@ static context_t *context_init(oid_t peer, int fd,
 
     ctx->last_time = ctx->start_time = time_s();
     ctx->close_time = 0;
+    ctx->error_times = 0;
     ctx->recv_data = E_NEW blob_t;
     ctx->send_data = E_NEW blob_t;
     blob_init(ctx->recv_data);
@@ -488,8 +489,6 @@ static void context_close(oid_t peer)
     close(ctx->peer.sock);
     ctx->close_time = time_s();
     s_free_contexts.push(ctx);
-    LOG_TRACE("net", "%s is RELEASED.",
-            ctx->peer.info);
 }
 
 static void context_fini(context_t *ctx)
@@ -664,8 +663,6 @@ int net_listen(oid_t peer, const std::string &name,
         close(s_sock);
         return -1;
     }
-    LOG_INFO("net", "[%s] (%s:%d) listen OK.",
-            name.c_str(), ip.c_str(), port);
 
     // @todo ON_LISTEN
     return 0;
@@ -702,9 +699,6 @@ int net_connect(oid_t peer, const std::string &name,
                 strerror(errno));
         net_close(ctx->peer.id);
         return -1;
-    } else {
-        LOG_INFO("net", "[%s] (%s:%d) connect OK.",
-               name.c_str(), ip.c_str(), port);
     }
     return 0;
 }
@@ -789,8 +783,11 @@ blob_t *net_encode(const pb_t &pb)
         E_FREE(name);
         E_FREE(body);
     } else {
-        message_set(msg->chunks, pb.GetTypeName().data(), name_len);
+        const char *name = pb.GetTypeName().data();
+        message_set(msg->chunks, name, name_len);
         message_set(msg->chunks, buf.data(), body_len);
+        LOG_TRACE("net", "<- %s.",
+                name);
     }
     return msg;
 }
@@ -820,6 +817,15 @@ bool net_decode(recv_message_t *msg)
         E_FREE(body);
     } else {
         msg->pb->ParseFromString(msg->body);
+        if (msg->pb->IsInitialized()) {
+            LOG_WARN("net", "INVALID request: %s %s.",
+                    net_peer_info(ctx),
+                    msg->name.c_str());
+            return false;
+        }
+        LOG_TRACE("net", "-> %s %s.",
+                net_peer_info(ctx),
+                msg->name.c_str());
     }
 
     ctx->last_time = time_s();
@@ -866,6 +872,19 @@ void net_send(const obj_map_id &peers, const pb_t &pb)
 
     blob_t *msg = net_encode(pb);
     obj_map_id::const_iterator itr = peers.begin();
+
+    for (; itr != peers.end(); ++itr) {
+        net_send(itr->first, msg);
+    }
+    blob_fini(msg);
+}
+
+void net_send(const pb_map_id &peers, const pb_t &pb)
+{
+    if (peers.empty()) return;
+
+    blob_t *msg = net_encode(pb);
+    pb_map_id::const_iterator itr = peers.begin();
 
     for (; itr != peers.end(); ++itr) {
         net_send(itr->first, msg);
@@ -921,9 +940,6 @@ static void on_accept(const epoll_event &evt)
                     ctx->peer.info,
                     strerror(errno));
             net_close(ctx->peer.id);
-        } else {
-            LOG_INFO("net", "%s accepted.",
-                    ctx->peer.info);
         }
         len = sizeof(addr);
     }
@@ -972,8 +988,6 @@ static void on_read(const epoll_event &evt)
                 chunk_fini(*itr);
             }
             net_close(ctx->peer.id);
-            LOG_TRACE("net", "%s active closed.",
-                    ctx->peer.info);
             return;
         }
 

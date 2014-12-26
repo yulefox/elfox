@@ -49,9 +49,10 @@ const oid_t &timer_add(time64_t life, const char *func);
 /// @param life Life time of the timer(ms).
 /// @param func Callback function.
 /// @param args Callback arguments.
+/// @param manual Manual destroy args.
 /// @return id of the timer.
 ///
-const oid_t &timer_add(time64_t life, callback func, void *args);
+const oid_t &timer_add(time64_t life, callback func, void *args, bool manual);
 
 ///
 /// Add cycle timer, period of one minte.

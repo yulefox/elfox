@@ -82,6 +82,21 @@ public:
     }
 
     ///
+    /// Find object by id with dynamic_cast.
+    /// @param id Object id.
+    /// @return Pointer to object if found, or NULL.
+    ///
+    template<class Type>
+    static Type *SafeFind(oid_t id) {
+        obj_map_id::const_iterator itr =s_objs.find(id);
+
+        if (itr != s_objs.end()) {
+            return dynamic_cast<Type *>(itr->second);
+        }
+        return NULL;
+    }
+
+    ///
     /// Find PB by id.
     /// @param id Object id.
     /// @return Pointer to object if found, or NULL.

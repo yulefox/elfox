@@ -46,8 +46,9 @@ void message_handle(recv_message_t *msg)
         message_handler_t *hdl = itr->second;
 
         msg->pb = hdl->init();
-        net_decode(msg);
-        hdl->proc(*msg);
+        if (net_decode(msg)) {
+            hdl->proc(*msg);
+        }
     } else if (msg->ctx != NULL) {
         net_error(msg->ctx);
         net_close(msg->peer);

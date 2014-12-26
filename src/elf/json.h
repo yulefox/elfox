@@ -45,12 +45,13 @@ bool json_unbind(const char *path);
 pb_t *json_pb(const char *pb_type, const char *json_type, const char *data);
 
 ///
-/// Convert json string to new protobuf object.
+/// Convert json string to existed protobuf object.
 /// @param[in] pb Protobuf object.
 /// @param[in] json_type json type.
 /// @param[in] data json string.
+/// @return Converted protobuf object if converted done, or NULL.
 ///
-void json_pb(pb_t *pb, const char *json_type, const char *data);
+pb_t *json_pb(pb_t *pb, const char *json_type, const char *data);
 } // namespace elf
 
 #endif /* !ELF_JSON_H */

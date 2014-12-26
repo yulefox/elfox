@@ -76,7 +76,7 @@ void roll_pb(const roll_req &req, roll_res &res, int times);
 void roll_rm(const roll_req &req, roll_res &res, int times);
 
 ///
-/// Generate random string(CDKEY).
+/// Generate random string.
 /// @param rnds Generated random string.
 /// @param len String length.
 ///
