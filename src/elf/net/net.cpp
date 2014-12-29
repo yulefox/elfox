@@ -478,8 +478,6 @@ static void context_close(oid_t peer)
         return;
     }
 
-    close(ctx->peer.sock);
-
     recv_message_t *msg = recv_message_init(ctx);
 
     msg->name = "Fini.Req";
