@@ -815,7 +815,7 @@ bool net_decode(recv_message_t *msg)
         E_FREE(body);
     } else {
         msg->pb->ParseFromString(msg->body);
-        if (msg->pb->IsInitialized()) {
+        if (!(msg->pb->IsInitialized())) {
             LOG_WARN("net", "INVALID request: %s %s.",
                     net_peer_info(ctx),
                     msg->name.c_str());
