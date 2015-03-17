@@ -21,7 +21,35 @@ int rand(int min, int max)
     return (min + ::rand() % range);
 }
 
-void roll(int min, int max, roll_set &res, int times)
+int rand_hit(int range, int times)
+{
+    int hit = 0;
+
+    for (int i = 0; i < times; ++i) {
+        if (rand(1, 10000) <= range) {
+            ++hit;
+        }
+    }
+    return hit;
+}
+
+void roll_pb(int min, int max, roll_res &res, int times)
+{
+    roll_res::iterator itr_d;
+
+    while (times--) {
+        int n = rand(min, max);
+
+        itr_d = res.find(n);
+        if (itr_d == res.end()) {
+            res[n] = 1;
+        } else {
+            ++(itr_d->second);
+        }
+    }
+}
+
+void roll_rm(int min, int max, roll_res &res, int times)
 {
     int range = abs(max - min) + 1;
 
@@ -31,13 +59,13 @@ void roll(int min, int max, roll_set &res, int times)
             int n = rand(min, max);
 
             if (res.find(n) == res.end()) {
-                res.insert(n);
+                res[n] = 1;
                 --times;
             }
         }
     } else { // dec
         for (int i = min; i <= max; ++i) {
-            res.insert(i);
+            res[i] = 1;
         }
         times = range - times;
         while (times) {
@@ -77,7 +105,6 @@ void roll_pb(const roll_req &req, roll_res &res, int times)
     roll_req::const_iterator itr_c = req.begin();
     roll_res::iterator itr_d;
 
-    // rolling
     while (times--) {
         int rnd = rand(1, 10000);
 
@@ -114,12 +141,13 @@ void roll_rm(const roll_req &req, roll_res &res, int times)
                     }
                 }
                 if (itr_d == res.end()) {
-                    res[--times] = itr_c->first;
+                    res[itr_c->first] = 1;
                     break;
                 }
             }
             rnd -= itr_c->second;
         }
+        --times;
     }
 }
 

@@ -7,6 +7,8 @@ while getopts "a:i:r:d:" opt ; do
             make -f $OPTARG -j8 DEBUG=YES
             ;;
         i)
+            make -f $OPTARG -j8 DEBUG=NO
+            make -f $OPTARG -j8 DEBUG=YES
             sudo make -f $OPTARG install DEBUG=NO
             sudo make -f $OPTARG install DEBUG=YES
             ;;

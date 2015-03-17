@@ -22,9 +22,8 @@
 #include <map>
 
 namespace elf {
-typedef std::set<int> roll_set;
-typedef std::map<int, int> roll_req;
-typedef std::map<int, int> roll_res;
+typedef std::map<int, int> roll_req; // map<val, rate>
+typedef std::map<int, int> roll_res; // map<val, num>
 
 ///
 /// Generate float random number in [min, max].
@@ -43,16 +42,33 @@ float frand(float min, float max);
 int rand(int min, int max);
 
 ///
-/// Generate several random numbers in [min, max].
+/// Hit times within range.
+/// @param range Target range [0, 10000].
+/// @param times Run times.
+/// @return Hit times.
+///
+int rand_hit(int range, int times);
+
+///
+/// Generate several random numbers in [min, max](put back if hit).
 /// @param min Minimum number.
 /// @param max Maximum number.
 /// @param res Roll result.
 /// @param times Roll times.
 ///
-void roll(int min, int max, roll_set &res, int times);
+void roll_pb(int min, int max, roll_res &res, int times);
 
 ///
-/// Generate several random requests in request group.
+/// Generate several random numbers in [min, max](remove if hit).
+/// @param min Minimum number.
+/// @param max Maximum number.
+/// @param res Roll result.
+/// @param times Roll times.
+///
+void roll_rm(int min, int max, roll_res &res, int times);
+
+///
+/// Generate several random requests in request group(independent).
 /// @param req Random request gorup.
 /// @param res Random response group.
 /// @param times Random times.
