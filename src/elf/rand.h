@@ -80,16 +80,21 @@ void rand(const roll_req &req, roll_res &res, int times);
 /// @param req Random request group.
 /// @param res Random response gorup.
 /// @param times Random times.
+/// @param weight With weight if true.
 ///
-void roll_pb(const roll_req &req, roll_res &res, int times);
+void roll_pb(const roll_req &req, roll_res &res, int times,
+        bool weight = false);
 
 ///
 /// Generate several random requests in request group(remove if hit).
 /// @param req Roll request group.
 /// @param res Roll response group.
 /// @param times Roll times.
+/// @param weight With weight if true.
 ///
-void roll_rm(const roll_req &req, roll_res &res, int times);
+void roll_rm(const roll_req &req, roll_res &res, int times,
+        bool weight = false);
+
 
 ///
 /// Generate random string.

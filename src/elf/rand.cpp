@@ -100,46 +100,58 @@ void rand(const roll_req &req, roll_res &res, int times)
     }
 }
 
-void roll_pb(const roll_req &req, roll_res &res, int times)
+void roll_pb(const roll_req &req, roll_res &res, int times, bool weight)
 {
     roll_req::const_iterator itr_c = req.begin();
     roll_res::iterator itr_d;
+    int weight_sum = 0;
+
+    if (weight) {
+        for (; itr_c != req.end(); ++itr_c) {
+            weight_sum += itr_c->second;
+        }
+    } else {
+        weight_sum = 10000;
+    }
 
     while (times--) {
-        int rnd = rand(1, 10000);
+        int rnd = rand(1, weight_sum);
 
         for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
-            if (rnd <= itr_c->second) {
+            if (rnd <= itr_c->second) { // hit
                 itr_d = res.find(itr_c->first);
                 if (itr_d == res.end()) {
                     res[itr_c->first] = 1;
                 } else {
                     ++(itr_d->second);
                 }
+                break;
             }
             rnd -= itr_c->second;
         }
     }
 }
 
-void roll_rm(const roll_req &req, roll_res &res, int times)
+void roll_rm(const roll_req &req, roll_res &res, int times, bool weight)
 {
-    int range = req.size();
-
-    assert(range >= times);
     roll_req::const_iterator itr_c = req.begin();
     roll_res::iterator itr_d;
+    int weight_sum = 0;
+
+    if (weight) {
+        for (; itr_c != req.end(); ++itr_c) {
+            weight_sum += itr_c->second;
+        }
+    } else {
+        weight_sum = 10000;
+    }
 
     while (times) {
-        int rnd = rand(1, 10000);
+        int rnd = rand(1, weight_sum);
 
         for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
-            if (rnd <= itr_c->second) {
-                for (itr_d = res.begin(); itr_d != res.end(); ++itr_d) {
-                    if (itr_d->second == itr_c->second) {
-                        break;
-                    }
-                }
+            if (rnd <= itr_c->second) { // hit
+                itr_d = res.find(itr_c->first);
                 if (itr_d == res.end()) {
                     res[itr_c->first] = 1;
                     break;
