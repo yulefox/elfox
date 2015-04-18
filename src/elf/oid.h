@@ -37,8 +37,9 @@ const oid_t OID_NIL = 0;
 
 struct callback_t {
     oid_t tid; // trigger id
-    int ttype; // trigger type
-    int targ; // trigger argument
+    int evt; // trigger event
+    int targ_a; // trigger argument a
+    int targ_b; // trigger argument b
     oid_t lid; // listener id
     oid_t oid; // object id
     int ltype; // listner type

@@ -154,12 +154,12 @@ void roll_rm(const roll_req &req, roll_res &res, int times, bool weight)
                 itr_d = res.find(itr_c->first);
                 if (itr_d == res.end()) {
                     res[itr_c->first] = 1;
+                    --times;
                     break;
                 }
             }
             rnd -= itr_c->second;
         }
-        --times;
     }
 }
 

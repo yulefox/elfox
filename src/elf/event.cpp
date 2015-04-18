@@ -110,10 +110,10 @@ void event_unregist(oid_t lid, int evt)
     }
 }
 
-void event_emit(int evt, int arg, oid_t lid)
+void event_emit(int evt, int arg_a, int arg_b, oid_t lid)
 {
-    LOG_TRACE("event", "<%lld> emit event %d:%d.",
-            lid, evt, arg);
+    LOG_TRACE("event", "<%lld> emit event %d:%d(%d).",
+            lid, evt, arg_a, arg_b);
 
     // get event listeners
     listener_map::iterator itr = s_listeners.find(evt);
@@ -137,7 +137,8 @@ void event_emit(int evt, int arg, oid_t lid)
         callback_t *cb = *itr_c;
 
         cb->tid = lid;
-        cb->targ = arg;
+        cb->targ_a = arg_a;
+        cb->targ_b = arg_b;
         if (cb->func(cb)) {
             E_FREE(cb);
             cl->erase(itr_c++);

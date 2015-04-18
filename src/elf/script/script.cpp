@@ -50,7 +50,7 @@ lua_State *script_get_state(void)
 
 int script_str_exec(const char *cmd)
 {
-    int err = 0, handler;
+    int err = 0, handler = 0;
 
     if ((err = luaL_loadstring(L, cmd)) != 0) {
         return script_error(L);
@@ -62,6 +62,12 @@ int script_str_exec(const char *cmd)
     lua_remove(L, handler);
     if (err) {
         return script_error(L);
+    }
+    if (strstr(cmd, "res_code = ") != NULL) {
+        lua_getglobal(L, "res_code");
+        if (lua_isnumber(L, -1)) {
+            return lua_tointeger(L, -1);
+        }
     }
     return SCRIPT_RC_OK;
 }

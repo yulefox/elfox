@@ -44,10 +44,11 @@ void event_unregist(oid_t lid, int evt = 0);
 ///
 /// Emit event.
 /// @param evt Event type.
-/// @param arg Event argument.
+/// @param arg_a Event argument.
+/// @param arg_b Event argument.
 /// @param lid Listener id.
 ///
-void event_emit(int evt, int arg, oid_t lid);
+void event_emit(int evt, int arg_a, int arg_b, oid_t lid);
 } // namespace elf
 
 #endif /* !ELF_EVENT_H */
