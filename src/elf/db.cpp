@@ -31,7 +31,7 @@ struct query_t {
     pb_t *pb;           // store query data
     std::string field;  // pb field
     db_callback proc;   // callback function
-    elf::time64_t stamp; // request time stamp
+    time64_t stamp;     // request time stamp
 };
 
 static MYSQL *s_mysql = NULL;
@@ -62,10 +62,10 @@ static void query(query_t *q)
     try {
         assert(q);
 
-        elf::time64_t ct = time_ms();
-        elf::time64_t delta = time_diff(ct, q->stamp);
-        static elf::time64_t leap = 5000; // 5s
-        static elf::time64_t times = 1;
+        time64_t ct = time_ms();
+        time64_t delta = time_diff(ct, q->stamp);
+        static time64_t leap = 5000; // 5s
+        static time64_t times = 1;
 
         if (delta > leap * times) {
             LOG_WARN("db", "%d.%03ds: %s.",
@@ -133,7 +133,9 @@ static void retrieve_pb(query_t *q)
         const MYSQL_FIELD *ifd = mysql_fetch_field_direct(q->data, c);
         const FieldDescriptor *ofd = des->FindFieldByName(ifd->name);
 
-        assert(ofd);
+        if (ofd == NULL) {
+            continue;
+        }
         if (row[c] == NULL || (strlen(row[c]) == 0)) {
             pb_set_field(q->pb, ofd, "");
         } else {
@@ -163,7 +165,9 @@ static void retrieve_field(query_t *q)
             const FieldDescriptor *ofd =
                 des->FindFieldByName(ifd->name);
 
-            assert(ofd);
+            if (ofd == NULL) {
+                continue;
+            }
             if (row[c] == NULL || (strlen(row[c]) == 0)) {
                 pb_set_field(item, ofd, "");
             } else {
@@ -340,7 +344,9 @@ db_rc db_query(const char *cmd, pb_t *out)
                 const FieldDescriptor *ofd =
                     des->FindFieldByName(ifd->name);
 
-                assert(ofd);
+                if (ofd == NULL) {
+                    continue;
+                }
                 if (row[c] == NULL || (strlen(row[c]) == 0)) {
                     pb_set_field(out, ofd, "");
                 } else {
@@ -406,7 +412,9 @@ db_rc db_query(const char *cmd, pb_t *out, const std::string &field)
                     const FieldDescriptor *ofd =
                         des->FindFieldByName(ifd->name);
 
-                    assert(ofd);
+                    if (ofd == NULL) {
+                        continue;
+                    }
                     if (row[c] == NULL || (strlen(row[c]) == 0)) {
                         pb_set_field(item, ofd, "");
                     } else {

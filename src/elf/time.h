@@ -40,22 +40,28 @@ struct timeval
 #endif /* ELF_PLATFORM_WIN32 */
 
 ///
-/// time.
+/// time(in second).
 /// @return Current time.
 ///
 time_t time_s(void);
 
 ///
-/// gettimeofday.
+/// gettimeofday(in millisecond).
 /// @return Current time.
 ///
 time64_t time_ms(void);
 
+///
+/// Calculate difference of time(in millisecond).
+/// @param[in] end End time.
+/// @param[in] start Start time.
+/// @return Difference of time.
+///
 time64_t time_diff(time64_t end, time64_t start);
 
 ///
 /// Get month days.
-/// @param t Time.
+/// @param[in] t Time.
 /// @return Month days.
 ///
 int time_month_days(time_t t);

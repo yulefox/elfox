@@ -4,6 +4,7 @@
  */
 
 #include <elf/oid.h>
+#include <elf/memory.h>
 #include <elf/time.h>
 
 namespace elf {
@@ -26,6 +27,20 @@ oid_t oid_gen(void)
         id = cid;
     }
     return id;
+}
+void oid_ipmap_add(id_ipmap &mm, int idx, oid_t id_1, oid_t id_2)
+{
+    id_pmap *m = NULL;
+    id_ipmap::iterator itr = mm.find(idx);
+
+    if (itr == mm.end()) {
+        m = E_NEW id_pmap;
+        mm[idx] = m;
+    } else {
+        m = itr->second;
+    }
+    assert(m);
+    (*m)[id_1] = id_2;
 }
 } // namespace elf
 

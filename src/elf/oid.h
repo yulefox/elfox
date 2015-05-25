@@ -30,7 +30,9 @@ typedef std::set<oid_t> id_set;
 typedef std::map<oid_t, int> id_map;
 typedef std::map<int, oid_t> id_imap;
 typedef std::map<oid_t, oid_t> id_pmap;
-typedef std::map<oid_t, id_set *> id_smap;
+typedef std::map<oid_t, id_set *> id_psmap;
+typedef std::map<int, id_pmap *> id_ipmap;
+typedef std::map<oid_t, id_pmap *> id_ppmap;
 typedef bool (*callback)(void *args);
 
 const oid_t OID_NIL = 0;
@@ -53,6 +55,15 @@ struct callback_t {
 /// @return Generated OID.
 ///
 oid_t oid_gen(void);
+
+///
+/// Insert into `id_ipmap`.
+/// @param[in out] mm `id_ipmap`.
+/// @param[in] idx `id_ipmap:key`.
+/// @param[in] id_1 `id_pmap:key`.
+/// @param[in] id_2 `id_pmap:value`.
+///
+void oid_ipmap_add(id_ipmap &mm, int idx, oid_t id_1, oid_t id_2);
 } // namespace elf
 
 #endif /* !ELF_OID_H */

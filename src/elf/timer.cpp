@@ -115,9 +115,9 @@ int timer_init(void)
     s_mgr.round = 0;
     memset(s_mgr.timers, 0, sizeof(s_mgr.timers[0]) * MAX_WHEEL_SET_SIZE);
 
-    time_t ms = elf::time_ms() % 1000;
-    time_t cur = elf::time_s();
-    elf::time64_t tm_timer;
+    time_t ms = time_ms() % 1000;
+    time_t cur = time_s();
+    time64_t tm_timer;
     struct tm tm_cur;
 
     localtime_r(&cur, &tm_cur);
@@ -455,8 +455,8 @@ static void hash(int bucket)
 }
 static bool timer_min(void *args)
 {
-    time_t cur = elf::time_s();
-    elf::time64_t tm_timer;
+    time_t cur = time_s();
+    time64_t tm_timer;
     struct tm tm_cur;
 
     localtime_r(&cur, &tm_cur);

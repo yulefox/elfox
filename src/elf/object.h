@@ -16,6 +16,7 @@
 #endif
 
 #include <elf/config.h>
+#include <elf/memory.h>
 #include <elf/oid.h>
 #include <elf/pb.h>
 #include <map>
@@ -23,9 +24,12 @@
 
 namespace elf {
 class Object;
+class PBRef;
+
 typedef std::map<oid_t, Object *> obj_map_id;
 typedef std::map<int, Object *> obj_map_int;
 typedef std::map<std::string, Object *> obj_map_str;
+typedef std::map<oid_t, pb_t *> pb_map_id;
 
 class Object {
 public:
@@ -67,49 +71,101 @@ public:
     void OnInit(void);
 
     ///
+    /// Release all Object/protobuf objects.
+    ///
+    static void Release(void);
+
+    ///
+    /// Add protobuf object.
+    /// @param pb protobuf object.
+    /// @param id protobuf object id.
+    ///
+    template<class Type>
+        static Type *AddPB(const Type &pb, oid_t id, int ref) {
+            PBRef *pr = FindRef(id);
+            Type *dst = NULL;
+
+            if (pr == NULL) {
+                pr = E_NEW PBRef;
+                pr->pb = dst = E_NEW Type(pb);
+                pr->ref = ref;
+                s_pbs[id] = pr;
+            } else {
+                dst = static_cast<Type *>(pr->pb);
+                if (dst != &pb) {
+                    dst->MergeFrom(pb);
+                }
+            }
+            return dst;
+        }
+
+    ///
+    /// Remove protobuf object.
+    /// @param id protobuf object id.
+    ///
+    static void DelPB(oid_t id);
+    ///
+    /// Clone protobuf object.
+    /// @param pb protobuf object.
+    /// @param id protobuf object id.
+    ///
+    template<class Type>
+        static bool ClonePB(pb_t *pb, oid_t id) {
+            assert(pb);
+
+            Type *src = FindPB<Type>(id);
+
+            if (src == NULL) {
+                return false;
+            }
+            pb->CopyFrom(*src);
+            return true;
+        }
+
+    ///
     /// Find object by id.
     /// @param id Object id.
     /// @return Pointer to object if found, or NULL.
     ///
     template<class Type>
-    static Type *Find(oid_t id) {
-        obj_map_id::const_iterator itr =s_objs.find(id);
+        static Type *Find(oid_t id) {
+            obj_map_id::const_iterator itr =s_objs.find(id);
 
-        if (itr != s_objs.end()) {
-            return static_cast<Type *>(itr->second);
+            if (itr != s_objs.end()) {
+                return static_cast<Type *>(itr->second);
+            }
+            return NULL;
         }
-        return NULL;
-    }
 
     ///
     /// Find object by id with dynamic_cast.
     /// @param id Object id.
-    /// @return Pointer to object if found, or NULL.
+    /// @return Pointer to Object if found, or NULL.
     ///
     template<class Type>
-    static Type *SafeFind(oid_t id) {
-        obj_map_id::const_iterator itr =s_objs.find(id);
+        static Type *SafeFind(oid_t id) {
+            obj_map_id::const_iterator itr =s_objs.find(id);
 
-        if (itr != s_objs.end()) {
-            return dynamic_cast<Type *>(itr->second);
+            if (itr != s_objs.end()) {
+                return dynamic_cast<Type *>(itr->second);
+            }
+            return NULL;
         }
-        return NULL;
-    }
 
     ///
     /// Find PB by id.
     /// @param id Object id.
-    /// @return Pointer to object if found, or NULL.
+    /// @return Pointer to pb_t object if found, or NULL.
     ///
     template<class Type>
-    static Type *FindPB(oid_t id) {
-        obj_map_id::const_iterator itr =s_objs.find(id);
+        static Type *FindPB(oid_t id) {
+            pbref_map_id::const_iterator itr =s_pbs.find(id);
 
-        if (itr != s_objs.end()) {
-            return static_cast<Type *>(itr->second->m_pb);
+            if (itr != s_pbs.end()) {
+                return static_cast<Type *>(itr->second->pb);
+            }
+            return NULL;
         }
-        return NULL;
-    }
 
     ///
     /// Get size of object map.
@@ -117,9 +173,29 @@ public:
     ///
     static int Size(void) { return s_objs.size(); }
 
+    ///
+    /// Get size of protobuf map.
+    /// @return Size of object map.
+    ///
+    static int SizePB(void) { return s_pbs.size(); }
+
     virtual ~Object(void);
 
 protected:
+    struct PBRef {
+        pb_t *pb;
+        int ref;
+    };
+
+    ///
+    /// Find PBRef by id.
+    /// @param id Object id.
+    /// @return Pointer to PBRef object if found, or NULL.
+    ///
+    static PBRef *FindRef(oid_t id);
+
+    typedef std::map<oid_t, PBRef *> pbref_map_id;
+
     Object();
     Object(oid_t id);
 
@@ -132,8 +208,14 @@ protected:
     /// pb data
     pb_t *m_pb;
 
-    /// global objects map
+    /// global Object map
     static obj_map_id s_objs;
+
+    /// global protobuf map
+    static pbref_map_id s_pbs;
+
+    /// global protobuf map
+    static pb_map_int s_pbs_i;
 };
 } // namespace elf
 

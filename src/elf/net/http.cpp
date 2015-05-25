@@ -84,7 +84,7 @@ int http_json(const char *url, const char *json,
     post->cb = func;
     post->args = args;
 
-    elf::thread_init(http_post, post);
+    thread_init(http_post, post);
     return 0;
 }
 } // namespace elf
