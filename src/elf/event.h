@@ -36,10 +36,11 @@ void event_regist(int evt, callback_t *cb);
 
 ///
 /// Unregist event listener.
-/// @param lid Listener id.
+/// @param lid Listener id(i.e. Role ID).
+/// @param oid Owner id.
 /// @param evt Event type, unregist all about given listener if 0.
 ///
-void event_unregist(oid_t lid, int evt = 0);
+void event_unregist(oid_t lid,  oid_t oid = OID_NIL, int evt = 0);
 
 ///
 /// Emit event.

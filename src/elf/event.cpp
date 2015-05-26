@@ -50,12 +50,13 @@ void event_regist(int evt, callback_t *cb)
     } else {
         cl = itr_l->second;
     }
+    cb->busy = false;
     cl->push_back(cb);
     LOG_TRACE("event", "<%lld> regist event %d.",
             cb->lid, evt);
 }
 
-void event_unregist(oid_t lid, int evt)
+void event_unregist(oid_t lid, oid_t oid, int evt)
 {
     LOG_TRACE("event", "<%lld> unregist event %d.",
             lid, evt);
@@ -77,13 +78,20 @@ void event_unregist(oid_t lid, int evt)
             callback_list *cl = itr_l->second;
             callback_list::iterator itr_c = cl->begin();
 
-            for (; itr_c != cl->end(); ++itr_c) {
+            while (itr_c != cl->end()) {
                 callback_t *cb = *itr_c;
 
-                E_FREE(cb);
+                if (!(cb->busy) && (oid == OID_NIL || oid == cb->oid)) {
+                    E_FREE(cb);
+                    itr_c = cl->erase(itr_c);
+                } else {
+                    ++itr_c;
+                }
             }
-            E_DELETE(cl);
-            ll->erase(itr_l);
+            if (cl->empty()) {
+                E_DELETE(cl);
+                ll->erase(itr_l);
+            }
         }
     } else {
         listener_map::iterator itr = s_listeners.begin();
@@ -98,13 +106,20 @@ void event_unregist(oid_t lid, int evt)
                 callback_list *cl = itr_l->second;
                 callback_list::iterator itr_c = cl->begin();
 
-                for (; itr_c != cl->end(); ++itr_c) {
+                while (itr_c != cl->end()) {
                     callback_t *cb = *itr_c;
 
-                    E_FREE(cb);
+                    if (!(cb->busy) && (oid == OID_NIL || oid == cb->oid)) {
+                        E_FREE(cb);
+                        itr_c = cl->erase(itr_c);
+                    } else {
+                        ++itr_c;
+                    }
                 }
-                E_DELETE(cl);
-                ll->erase(itr_l);
+                if (cl->empty()) {
+                    E_DELETE(cl);
+                    ll->erase(itr_l);
+                }
             }
         }
     }
@@ -136,6 +151,7 @@ void event_emit(int evt, int arg_a, int arg_b, oid_t lid)
     while (itr_c != cl->end()) {
         callback_t *cb = *itr_c;
 
+        cb->busy = true;
         cb->tid = lid;
         cb->targ_a = arg_a;
         cb->targ_b = arg_b;
@@ -145,6 +161,10 @@ void event_emit(int evt, int arg_a, int arg_b, oid_t lid)
         } else {
             itr_c++;
         }
+    }
+    if (cl->empty()) {
+        E_DELETE(cl);
+        ll->erase(itr_l);
     }
 }
 } // namespace elf
