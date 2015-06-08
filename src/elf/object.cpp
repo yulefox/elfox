@@ -71,7 +71,7 @@ void Object::Release(void)
 
 void Object::DelPB(oid_t id)
 {
-    pbref_map_id::const_iterator itr =s_pbs.find(id);
+    pbref_map_id::const_iterator itr = s_pbs.find(id);
 
     if (itr != s_pbs.end()) {
         PBRef *pr = itr->second;

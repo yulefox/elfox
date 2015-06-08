@@ -28,14 +28,30 @@ oid_t oid_gen(void)
     }
     return id;
 }
-void oid_ipmap_add(id_ipmap &mm, int idx, oid_t id_1, oid_t id_2)
-{
-    id_pmap *m = NULL;
-    id_ipmap::iterator itr = mm.find(idx);
 
-    if (itr == mm.end()) {
-        m = E_NEW id_pmap;
-        mm[idx] = m;
+void oid_ismap_add(id_ismap &ism, int idx, oid_t id)
+{
+    id_set *s = NULL;
+    id_ismap::iterator itr = ism.find(idx);
+
+    if (itr == ism.end()) {
+        s = E_NEW id_set;
+        ism[idx] = s;
+    } else {
+        s = itr->second;
+    }
+    assert(s);
+    s->insert(id);
+}
+
+void oid_illmap_add(id_illmap &illm, int idx, oid_t id_1, oid_t id_2)
+{
+    id_llmap *m = NULL;
+    id_illmap::iterator itr = illm.find(idx);
+
+    if (itr == illm.end()) {
+        m = E_NEW id_llmap;
+        illm[idx] = m;
     } else {
         m = itr->second;
     }

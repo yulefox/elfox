@@ -27,12 +27,13 @@ namespace elf {
 typedef int64_t oid_t;
 typedef std::list<oid_t> id_list;
 typedef std::set<oid_t> id_set;
-typedef std::map<oid_t, int> id_map;
-typedef std::map<int, oid_t> id_imap;
-typedef std::map<oid_t, oid_t> id_pmap;
-typedef std::map<oid_t, id_set *> id_psmap;
-typedef std::map<int, id_pmap *> id_ipmap;
-typedef std::map<oid_t, id_pmap *> id_ppmap;
+typedef std::map<oid_t, int> id_limap;
+typedef std::map<int, oid_t> id_ilmap;
+typedef std::map<oid_t, oid_t> id_llmap;
+typedef std::map<int, id_set *> id_ismap;
+typedef std::map<oid_t, id_set *> id_lsmap;
+typedef std::map<int, id_llmap *> id_illmap;
+typedef std::map<oid_t, id_llmap *> id_lllmap;
 typedef bool (*callback)(void *args);
 
 const oid_t OID_NIL = 0;
@@ -57,13 +58,21 @@ struct callback_t {
 oid_t oid_gen(void);
 
 ///
-/// Insert into `id_ipmap`.
-/// @param[in out] mm `id_ipmap`.
-/// @param[in] idx `id_ipmap:key`.
-/// @param[in] id_1 `id_pmap:key`.
-/// @param[in] id_2 `id_pmap:value`.
+/// Insert into `id_ismap`.
+/// @param[in out] mm `id_ismap`.
+/// @param[in] idx `id_ismap:key`.
+/// @param[in] id `id_ismap:element`.
 ///
-void oid_ipmap_add(id_ipmap &mm, int idx, oid_t id_1, oid_t id_2);
+void oid_ismap_add(id_ismap &ism, int idx, oid_t id);
+
+///
+/// Insert into `id_illmap`.
+/// @param[in out] mm `id_illmap`.
+/// @param[in] idx `id_illmap:key`.
+/// @param[in] id_1 `id_llmap:key`.
+/// @param[in] id_2 `id_llmap:value`.
+///
+void oid_illmap_add(id_illmap &illm, int idx, oid_t id_1, oid_t id_2);
 } // namespace elf
 
 #endif /* !ELF_OID_H */

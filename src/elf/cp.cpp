@@ -291,6 +291,7 @@ pb_t *config_load(const std::string &name, const std::string &path,
         res = load_xml(path, cfg);
     } else if (ext == path) {
         res = load_tbl(path, cfg, type, proc);
+        cfg = NULL;
     }
 
     if (!res) {

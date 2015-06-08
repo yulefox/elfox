@@ -172,14 +172,14 @@ void net_send(const pb_map_id &peers, const pb_t &pb);
 /// @param[in] peers Peers list.
 /// @param[in] pb Message.
 ///
-void net_send(const id_map &peers, const pb_t &pb);
+void net_send(const id_limap &peers, const pb_t &pb);
 
 ///
 /// Multicast to given peers.
 /// @param[in] peers Peers list.
 /// @param[in] pb Message.
 ///
-void net_send(const id_imap &peers, const pb_t &pb);
+void net_send(const id_ilmap &peers, const pb_t &pb);
 
 ///
 /// Multicast to given peers.

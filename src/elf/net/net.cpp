@@ -890,12 +890,12 @@ void net_send(const pb_map_id &peers, const pb_t &pb)
     blob_fini(msg);
 }
 
-void net_send(const id_map &peers, const pb_t &pb)
+void net_send(const id_limap &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
     blob_t *msg = net_encode(pb);
-    id_map::const_iterator itr = peers.begin();
+    id_limap::const_iterator itr = peers.begin();
 
     for (; itr != peers.end(); ++itr) {
         net_send(itr->first, msg);
@@ -903,12 +903,12 @@ void net_send(const id_map &peers, const pb_t &pb)
     blob_fini(msg);
 }
 
-void net_send(const id_imap &peers, const pb_t &pb)
+void net_send(const id_ilmap &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
     blob_t *msg = net_encode(pb);
-    id_imap::const_iterator itr = peers.begin();
+    id_ilmap::const_iterator itr = peers.begin();
 
     for (; itr != peers.end(); ++itr) {
         net_send(itr->second, msg);
