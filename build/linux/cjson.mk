@@ -3,6 +3,10 @@
 
 PROJECT		:= cJSON
 TARGET		:= cjson
+VER_MAJOR	:= 1
+VER_MINOR	:= 0
+VER_BUILD	:= 0
+VERSION		:= $(VER_MAJOR).$(VER_MINOR).$(VER_BUILD)
 ROOTDIR		:= ../..
 OUTDIR		:= $(ROOTDIR)/lib
 INCDIR		:= $(ROOTDIR)/src

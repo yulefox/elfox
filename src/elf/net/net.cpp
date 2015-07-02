@@ -22,7 +22,7 @@
 #include <string>
 
 namespace elf {
-static const int LINGER_ONOFF = 1;
+static const int LINGER_ONOFF = 0;
 static const int LINGER_TIME = 5;
 static const int CONTEXT_CLOSE_TIME = 300;
 static const int SIZE_INT = sizeof(int(0));
@@ -654,7 +654,8 @@ int net_listen(oid_t peer, const std::string &name,
         return -1;
     }
 
-    if (0 != listen(s_sock, 0)) {
+    // backlog: size of pending queue waiting to be accepted
+    if (0 != listen(s_sock, 128)) {
         LOG_ERROR("net", "[%s] (%s:%d) listen FAILED: %s.",
                 name.c_str(), ip.c_str(), port,
                 strerror(errno));
