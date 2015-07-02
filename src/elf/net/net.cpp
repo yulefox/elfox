@@ -32,6 +32,7 @@ static const size_t CHUNK_MAX_NUM = 10000;
 static const int MESSAGE_MAX_NAME_LENGTH = 100;
 static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_DEFAULT_SIZE;
 static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
+static const int BACKLOG = 128;
 
 struct blob_t;
 struct chunk_t;
@@ -655,7 +656,7 @@ int net_listen(oid_t peer, const std::string &name,
     }
 
     // backlog: size of pending queue waiting to be accepted
-    if (0 != listen(s_sock, 128)) {
+    if (0 != listen(s_sock, BACKLOG)) {
         LOG_ERROR("net", "[%s] (%s:%d) listen FAILED: %s.",
                 name.c_str(), ip.c_str(), port,
                 strerror(errno));
