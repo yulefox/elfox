@@ -25,12 +25,12 @@ static void *http_post(void *args)
     if (curl != NULL) {
         struct curl_slist *slist = NULL;
 
-        slist = curl_slist_append(slist, "Expect:");
+        slist = curl_slist_append(slist, "Content-type:application/json;charset=utf-8");
 
         curl_easy_setopt(curl, CURLOPT_URL, post->url);
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(post->json));
+        //curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(post->json));
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post->cb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, post->args);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);

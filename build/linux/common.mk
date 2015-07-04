@@ -21,7 +21,7 @@ endif
 
 ifeq (YES, $(LIBRARY))
 	CPPFLAGS	+= -fPIC
-	LDFLAGS		+= -shared -Wl,-soname,lib$(TARGET).so.$(MAJOR)
+	LDFLAGS		+= -shared -Wl,-soname,lib$(TARGET).so.$(VER_MAJOR)
 	TARGET		:= $(OUTDIR)/lib$(TARGET).so.$(VERSION)
 else
 	TARGET		:= $(OUTDIR)/$(TARGET)

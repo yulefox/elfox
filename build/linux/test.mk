@@ -46,6 +46,7 @@ endif
 
 LDFLAGS		:= \
 	-L$(LIBDIR) \
+	-L$(HOME)/dev/agame/server/lib \
 	-L/usr/lib64/mysql \
 	$(LIBS)
 
