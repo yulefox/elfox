@@ -185,6 +185,7 @@ static void set_nonblock(int sock)
     }
 
     // set linger
+    /*
     struct linger lg;
 
     lg.l_onoff = LINGER_ONOFF;
@@ -194,6 +195,7 @@ static void set_nonblock(int sock)
         LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
         return;
     }
+    */
 
     // set fd status
     int opts = fcntl(sock, F_GETFL);
@@ -934,6 +936,8 @@ static void on_accept(const epoll_event &evt)
         set_nonblock(fd);
 
         context_t *ctx = context_init(OID_NIL, fd, addr);
+
+        LOG_DEBUG("net", "%s", "accept new connection...");
 
         if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
             LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
