@@ -8,7 +8,6 @@
 #include <elf/memory.h>
 #include <elf/pc.h>
 #include <elf/thread.h>
-#include <elf/time.h>
 #include <deque>
 #include <map>
 #include <string>
@@ -34,6 +33,7 @@ struct query_t {
     time64_t stamp;     // request time stamp
 };
 
+static time64_t pending_time = 0;
 static MYSQL *s_mysql = NULL;
 static thread_t s_tid_req = 0;
 static xqueue<query_t *> s_queue_req;
@@ -67,14 +67,18 @@ static void query(query_t *q)
         static time64_t leap = 5000; // 5s
         static time64_t times = 1;
 
-        if (delta > leap * times) {
-            LOG_WARN("db", "%d.%03ds: %s.",
-                    delta / 1000,
-                    delta % 1000,
-                    q->cmd.c_str());
-            ++times;
-        } else if (delta < leap) {
+        if (delta > 1000) {
+            if (delta > leap * times) {
+                LOG_WARN("db", "%d.%03ds: %s.",
+                        delta / 1000,
+                        delta % 1000,
+                        q->cmd.c_str());
+                ++times;
+            }
+            pending_time = delta;
+        } else {
             times = 1;
+            pending_time = 0;
         }
 
         // query
@@ -288,162 +292,9 @@ void response(query_t *q)
     destroy(q);
 }
 
-db_rc db_query(const char *cmd)
+time64_t db_pending_time(void)
 {
-    assert(s_mysql);
-    try {
-        // query
-        int status = mysql_query(s_mysql, cmd);
-
-        if (status != 0) {
-            LOG_ERROR("db", "`%s` failed: %s.",
-                    cmd, mysql_error(s_mysql));
-            return ELF_RC_DB_EXECUTE_FAILED;
-        }
-        do {
-            MYSQL_RES *res = mysql_store_result(s_mysql);
-
-            if (res) {
-                mysql_free_result(res);
-            }
-        } while (!mysql_next_result(s_mysql));
-        return ELF_RC_DB_OK;
-    } catch(...) {
-        LOG_ERROR("db", "`%s` failed: %s.",
-                cmd, mysql_error(s_mysql));
-        return ELF_RC_DB_EXECUTE_FAILED;
-    }
-    return ELF_RC_DB_OK;
-}
-
-db_rc db_query(const char *cmd, pb_t *out)
-{
-    assert(s_mysql && out);
-    LOG_TRACE("db", "Query DB: %s.", cmd);
-    try {
-        // query
-        int status = mysql_query(s_mysql, cmd);
-
-        if (status != 0) {
-            LOG_ERROR("db", "`%s` failed: %s.",
-                    cmd, mysql_error(s_mysql));
-            return ELF_RC_DB_EXECUTE_FAILED;
-        }
-
-        MYSQL_RES *res = mysql_store_result(s_mysql);
-
-        if (res) {
-            const int row_num = mysql_num_rows(res);
-            const Descriptor *des = out->GetDescriptor();
-            const int field_num = mysql_num_fields(res);
-            const MYSQL_ROW row = mysql_fetch_row(res);
-
-            for (int c = 0; row_num > 0 && c < field_num; ++c) {
-                const MYSQL_FIELD *ifd =
-                    mysql_fetch_field_direct(res, c);
-                const FieldDescriptor *ofd =
-                    des->FindFieldByName(ifd->name);
-
-                if (ofd == NULL) {
-                    continue;
-                }
-                if (row[c] == NULL || (strlen(row[c]) == 0)) {
-                    pb_set_field(out, ofd, "");
-                } else {
-                    pb_set_field(out, ofd, row[c]);
-                }
-            }
-            mysql_free_result(res);
-            while (!mysql_next_result(s_mysql)) {
-                MYSQL_RES *res = mysql_store_result(s_mysql);
-
-                if (res) {
-                    mysql_free_result(res);
-                }
-            }
-            return ELF_RC_DB_OK;
-        } else if (mysql_field_count(s_mysql) == 0) {
-            return ELF_RC_DB_OK;
-        } else {
-            LOG_ERROR("db", "`%s` failed: %s.",
-                    cmd, mysql_error(s_mysql));
-            return ELF_RC_DB_EXECUTE_FAILED;
-        }
-    } catch(...) {
-        LOG_ERROR("db", "`%s` failed: %s.",
-                cmd, mysql_error(s_mysql));
-        return ELF_RC_DB_EXECUTE_FAILED;
-    }
-    return ELF_RC_DB_OK;
-}
-
-db_rc db_query(const char *cmd, pb_t *out, const std::string &field)
-{
-    assert(s_mysql && out);
-    LOG_TRACE("db", "Query DB: %s.", cmd);
-    try {
-        // query
-        int status = mysql_query(s_mysql, cmd);
-
-        if (status != 0) {
-            LOG_ERROR("db", "`%s` failed: %s.",
-                    cmd, mysql_error(s_mysql));
-            return ELF_RC_DB_EXECUTE_FAILED;
-        }
-
-        MYSQL_RES *res = mysql_store_result(s_mysql);
-
-        if (res) {
-            const int row_num = mysql_num_rows(res);
-            const Reflection *ref = out->GetReflection();
-            const Descriptor *des = out->GetDescriptor();
-            const FieldDescriptor *ctn = des->FindFieldByName(field);
-            const int field_num = mysql_num_fields(res);
-
-            assert(ctn);
-            for (int r = 0; r < row_num; ++r) {
-                pb_t *item = ref->AddMessage(out, ctn);
-                const MYSQL_ROW row = mysql_fetch_row(res);
-
-                des = item->GetDescriptor();
-                for (int c = 0; c < field_num; ++c) {
-                    const MYSQL_FIELD *ifd =
-                        mysql_fetch_field_direct(res, c);
-                    const FieldDescriptor *ofd =
-                        des->FindFieldByName(ifd->name);
-
-                    if (ofd == NULL) {
-                        continue;
-                    }
-                    if (row[c] == NULL || (strlen(row[c]) == 0)) {
-                        pb_set_field(item, ofd, "");
-                    } else {
-                        pb_set_field(item, ofd, row[c]);
-                    }
-                }
-            }
-            mysql_free_result(res);
-            while (!mysql_next_result(s_mysql)) {
-                MYSQL_RES *res = mysql_store_result(s_mysql);
-
-                if (res) {
-                    mysql_free_result(res);
-                }
-            }
-            return ELF_RC_DB_OK;
-        } else if (mysql_field_count(s_mysql) == 0) {
-            return ELF_RC_DB_OK;
-        } else {
-            LOG_ERROR("db", "`%s` failed: %s.",
-                    cmd, mysql_error(s_mysql));
-            return ELF_RC_DB_EXECUTE_FAILED;
-        }
-    } catch(...) {
-        LOG_ERROR("db", "`%s` failed: %s.",
-                cmd, mysql_error(s_mysql));
-        return ELF_RC_DB_EXECUTE_FAILED;
-    }
-    return ELF_RC_DB_OK;
+    return pending_time;
 }
 } // namespace elf
 

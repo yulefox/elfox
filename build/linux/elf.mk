@@ -3,6 +3,10 @@
 
 PROJECT		:= elf
 TARGET		:= elfox
+VER_MAJOR	:= 1
+VER_MINOR	:= 0
+VER_BUILD	:= 5
+VERSION		:= $(VER_MAJOR).$(VER_MINOR).$(VER_BUILD)
 ROOTDIR		:= ../..
 OUTDIR		:= $(ROOTDIR)/lib
 INCDIR		:= $(ROOTDIR)/src

@@ -23,6 +23,7 @@
 #include <elf/object.h>
 #include <elf/oid.h>
 #include <elf/pb.h>
+#include <elf/time.h>
 #include <mysql/mysql.h>
 #include <string>
 #include <deque>
@@ -85,31 +86,10 @@ void db_req(const char *cmd, db_callback proc = NULL,
         const std::string &field = "");
 
 ///
-/// DB request(synchronous).
-/// @param[in] cmd SQL command.
-/// @param[out] out Store query data.
-/// @return ELF_RC_DB_OK(0).
+/// Get pending time.
+/// @return Pending time(ms).
 ///
-//db_rc db_query(const char *cmd);
-
-///
-/// DB request(synchronous).
-/// @param[in] cmd SQL command.
-/// @param[out] out Store query data.
-/// @return ELF_RC_DB_OK(0).
-/// @warning: only one query statement is supported.
-///
-//db_rc db_query(const char *cmd, pb_t *out);
-
-///
-/// DB request(synchronous).
-/// @param[in] cmd SQL command.
-/// @param[out] out Store query data.
-/// @param[in] field Field.
-/// @return ELF_RC_DB_OK(0).
-/// @warning: only one query statement is supported.
-///
-//db_rc db_query(const char *cmd, pb_t *out, const std::string &field);
+time64_t db_pending_time(void);
 } // namespace elf
 
 #endif /* !ELF_DB_H */

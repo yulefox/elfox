@@ -47,6 +47,7 @@ template<>
 template<>
 void object::test<3>() {
     set_test_name("rand n");
+    /*
     elf::roll_set res;
 
     //elf::rand(11, 20, res, 0);
@@ -60,6 +61,7 @@ void object::test<3>() {
     //elf::rand(11, 20, res, 5);
     ensure(res.size() == 5);
     res.clear();
+    */
 }
 
 template<>

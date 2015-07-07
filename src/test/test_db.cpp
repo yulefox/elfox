@@ -26,6 +26,7 @@ void object::test<1>() {
     set_test_name("Create DB");
     elf::db_connect("127.0.0.1", "agame", "Root@601", "agame", 3306);
     elf::db_req("select 5 + 3");
+    elf::db_pending_time();
     ensure(true);
 }
 }
