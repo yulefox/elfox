@@ -77,6 +77,8 @@ int http_fini(void)
 int http_json(const char *url, const char *json,
         http_response func, void *args)
 {
+    LOG_DEBUG("http", "url: %s", url);
+    LOG_DEBUG("http", "json: %s", json);
     http_req_t *post = E_NEW http_req_t;
 
     post->url = url;

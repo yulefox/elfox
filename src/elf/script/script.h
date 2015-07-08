@@ -25,6 +25,10 @@
 
 #define MAX_SCRIPT_TOKEN_LENGTH     256
 
+#if (LUA_VERSION_NUM >= 503)
+#    define LUA_GLOBALSINDEX    LUA_RIDX_GLOBALS  
+#endif
+
 namespace elf {
 
 enum script_rc {
