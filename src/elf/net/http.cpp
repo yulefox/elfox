@@ -7,11 +7,12 @@
 #include <elf/net/http.h>
 #include <elf/thread.h>
 #include <curl/curl.h>
+#include <string>
 
 namespace elf {
 struct http_req_t {
-    const char *json;
-    const char *url;
+    std::string json;
+    std::string url;
     http_response cb;
     void *args;
 };
@@ -27,9 +28,10 @@ static void *http_post(void *args)
 
         slist = curl_slist_append(slist, "Content-type:application/json;charset=utf-8");
 
-        curl_easy_setopt(curl, CURLOPT_URL, post->url);
+        //LOG_DEBUG("http", "prepare do post: url[%s], json[%s]", post->url.c_str(), post->json.c_str());
+        curl_easy_setopt(curl, CURLOPT_URL, post->url.c_str());
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json.c_str());
         //curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(post->json));
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post->cb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, post->args);
@@ -37,7 +39,7 @@ static void *http_post(void *args)
         res = curl_easy_perform(curl);
         if(res != CURLE_OK) {
             LOG_ERROR("http", "curl_easy_perform() failed(%d): %s %s, %s.",
-                    res, curl_easy_strerror(res), post->url, post->json);
+                    res, curl_easy_strerror(res), post->url.c_str(), post->json.c_str());
             if (post->cb) {
                 post->cb(0, 0, 0, post->args);
             }
@@ -81,8 +83,8 @@ int http_json(const char *url, const char *json,
     LOG_DEBUG("http", "json: %s", json);
     http_req_t *post = E_NEW http_req_t;
 
-    post->url = url;
-    post->json = json;
+    post->url = std::string(url);
+    post->json = std::string(json);
     post->cb = func;
     post->args = args;
 
