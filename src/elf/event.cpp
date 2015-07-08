@@ -10,7 +10,7 @@
 #include <set>
 
 namespace elf {
-typedef std::list<callback_t *> callback_list;
+typedef std::map<oid_t, callback_t *> callback_list;
 typedef std::map<oid_t, callback_list *> listener_list;
 typedef std::map<int, listener_list *> listener_map;
 
@@ -42,49 +42,60 @@ void event_regist(int evt, callback_t *cb)
         ll = itr->second;
     }
 
-    listener_list::iterator itr_l = ll->find(cb->lid);
+    listener_list::iterator itr_l = ll->find(cb->oid);
+    callback_list::iterator itr_c;
 
     if (itr_l == ll->end()) {
         cl = E_NEW callback_list;
-        (*ll)[cb->lid] = cl;
+        (*ll)[cb->oid] = cl;
     } else {
         cl = itr_l->second;
     }
     cb->busy = false;
-    cl->push_back(cb);
-    LOG_TRACE("event", "<%lld> regist event %d.",
-            cb->lid, evt);
+    itr_c = cl->find(cb->lid);
+    if (itr_c != cl->end()) {
+        LOG_WARN("event", "<%lld><%lld> regist event %d (%d) ALREADY.",
+                cb->oid, cb->lid, evt, cb->larg);
+    } else {
+        (*cl)[cb->lid] = cb;
+        LOG_TRACE("event", "<%lld><%lld> regist event %d (%d).",
+                cb->oid, cb->lid, evt, cb->larg);
+    }
 }
 
-void event_unregist(oid_t lid, oid_t oid, int evt)
+void event_unregist(oid_t oid, oid_t lid, int evt)
 {
-    LOG_TRACE("event", "<%lld> unregist event %d.",
-            lid, evt);
+    LOG_TRACE("event", "<%lld> <%lld> unregist event %d.",
+            oid, lid, evt);
     if (evt > 0) {
         listener_map::iterator itr = s_listeners.find(evt);
 
         if (itr == s_listeners.end()) {
             LOG_WARN("event", "<%lld> has NO event %d.",
-                    lid, evt);
+                    oid, evt);
             return;
         }
 
         listener_list *ll = itr->second;
 
         assert(ll);
-        listener_list::iterator itr_l = ll->find(lid);
+        listener_list::iterator itr_l = ll->find(oid);
 
         if (itr_l != ll->end()) {
             callback_list *cl = itr_l->second;
             callback_list::iterator itr_c = cl->begin();
 
             while (itr_c != cl->end()) {
-                callback_t *cb = *itr_c;
+                callback_t *cb = itr_c->second;
 
-                if (!(cb->busy) && (oid == OID_NIL || oid == cb->oid)) {
+                if (!(cb->busy) && (lid == OID_NIL || lid == cb->lid)) {
                     E_FREE(cb);
-                    itr_c = cl->erase(itr_c);
+                    cl->erase(itr_c++);
                 } else {
+                    if (cb->busy && lid == OID_NIL) {
+                        LOG_WARN("event", "<%lld><%lld> unregist event %d (%d) FAILED.",
+                                cb->oid, cb->lid, cb->evt, cb->larg);
+                    }
                     ++itr_c;
                 }
             }
@@ -100,19 +111,23 @@ void event_unregist(oid_t lid, oid_t oid, int evt)
             listener_list *ll = itr->second;
 
             assert(ll);
-            listener_list::iterator itr_l = ll->find(lid);
+            listener_list::iterator itr_l = ll->find(oid);
 
             if (itr_l != ll->end()) {
                 callback_list *cl = itr_l->second;
                 callback_list::iterator itr_c = cl->begin();
 
                 while (itr_c != cl->end()) {
-                    callback_t *cb = *itr_c;
+                    callback_t *cb = itr_c->second;
 
-                    if (!(cb->busy) && (oid == OID_NIL || oid == cb->oid)) {
+                    if (!(cb->busy) && (lid == OID_NIL || lid == cb->lid)) {
                         E_FREE(cb);
-                        itr_c = cl->erase(itr_c);
+                        cl->erase(itr_c++);
                     } else {
+                        if (cb->busy && lid == OID_NIL) {
+                            LOG_WARN("event", "<%lld><%lld> unregist event %d (%d) FAILED.",
+                                    cb->oid, cb->lid, cb->evt, cb->larg);
+                        }
                         ++itr_c;
                     }
                 }
@@ -125,10 +140,10 @@ void event_unregist(oid_t lid, oid_t oid, int evt)
     }
 }
 
-void event_emit(int evt, int arg_a, int arg_b, oid_t lid)
+void event_emit(int evt, int arg_a, int arg_b, oid_t oid)
 {
     LOG_TRACE("event", "<%lld> emit event %d:%d(%d).",
-            lid, evt, arg_a, arg_b);
+            oid, evt, arg_a, arg_b);
 
     // get event listeners
     listener_map::iterator itr = s_listeners.find(evt);
@@ -139,7 +154,7 @@ void event_emit(int evt, int arg_a, int arg_b, oid_t lid)
 
     // get listener
     listener_list *ll = itr->second;
-    listener_list::iterator itr_l = ll->find(lid);
+    listener_list::iterator itr_l = ll->find(oid);
 
     if (itr_l == ll->end()) {
         return;
@@ -149,10 +164,10 @@ void event_emit(int evt, int arg_a, int arg_b, oid_t lid)
     callback_list::iterator itr_c = cl->begin();
 
     while (itr_c != cl->end()) {
-        callback_t *cb = *itr_c;
+        callback_t *cb = itr_c->second;
 
         cb->busy = true;
-        cb->tid = lid;
+        cb->tid = oid;
         cb->targ_a = arg_a;
         cb->targ_b = arg_b;
         if (cb->func(cb)) {

@@ -76,12 +76,13 @@ int db_ping(void);
 ///
 /// DB request(asynchronous).
 /// @param[in] cmd SQL command.
+/// @param[in] sim Run simultaneously.
 /// @param[in] proc Callback function.
 /// @param[in] oid Object id for checking.
 /// @param[out] out Store query data.
 /// @param[in] field pb field.
 ///
-void db_req(const char *cmd, db_callback proc = NULL,
+void db_req(const char *cmd, bool sim = false, db_callback proc = NULL,
         oid_t oid = OID_NIL, pb_t *out = NULL,
         const std::string &field = "");
 

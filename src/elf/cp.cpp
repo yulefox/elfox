@@ -269,7 +269,7 @@ static bool load_tbl(const std::string &tbl_name, pb_t *cfg,
             tbl_name.c_str());
     LOG_TRACE("db",
             "SQL: `%s'", sql);
-    db_req(sql, proc, type, cfg, "item");
+    db_req(sql, false, proc, type, cfg, "item");
     return true;
 }
 

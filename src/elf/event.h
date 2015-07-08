@@ -36,20 +36,20 @@ void event_regist(int evt, callback_t *cb);
 
 ///
 /// Unregist event listener.
-/// @param lid Listener id(i.e. Role ID).
-/// @param oid Owner id.
+/// @param oid Owner id(i.e. Role ID).
+/// @param lid Listener id(i.e. Quest ID).
 /// @param evt Event type, unregist all about given listener if 0.
 ///
-void event_unregist(oid_t lid,  oid_t oid = OID_NIL, int evt = 0);
+void event_unregist(oid_t oid,  oid_t lid = OID_NIL, int evt = 0);
 
 ///
 /// Emit event.
 /// @param evt Event type.
 /// @param arg_a Event argument.
 /// @param arg_b Event argument.
-/// @param lid Listener id.
+/// @param oid Owner id.
 ///
-void event_emit(int evt, int arg_a, int arg_b, oid_t lid);
+void event_emit(int evt, int arg_a, int arg_b, oid_t oid);
 } // namespace elf
 
 #endif /* !ELF_EVENT_H */

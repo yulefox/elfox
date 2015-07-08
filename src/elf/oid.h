@@ -43,8 +43,8 @@ struct callback_t {
     int evt; // trigger event
     int targ_a; // trigger argument a
     int targ_b; // trigger argument b
+    oid_t oid; // owner id
     oid_t lid; // listener id
-    oid_t oid; // object id
     int ltype; // listner type
     int larg; // listener argument
     bool busy; // is used

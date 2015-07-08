@@ -33,14 +33,16 @@ struct query_t {
     time64_t stamp;     // request time stamp
 };
 
-static time64_t pending_time = 0;
-static MYSQL *s_mysql = NULL;
-static thread_t s_tid_req = 0;
-static xqueue<query_t *> s_queue_req;
+static const int THREAD_NUM = 4;
+static const int THREAD_INDEX[THREAD_NUM] = {0, 1, 2, 3};
+static time64_t pending_time[THREAD_NUM] = {0};
+static MYSQL *s_mysqls[THREAD_NUM] = {NULL, NULL, NULL, NULL};
+static thread_t s_threads[THREAD_NUM];
+static xqueue<query_t *> s_queue_req[THREAD_NUM];
 static xqueue<query_t *> s_queue_res;
 
 static void *handle(void *args);
-static void query(query_t *q);
+static void query(int idx);
 static void destroy(query_t *q);
 static void response(query_t *q);
 static void retrieve_pb(query_t *q);
@@ -48,19 +50,22 @@ static void retrieve_field(query_t *q);
 
 static void *handle(void *args)
 {
-    while (true) {
-        query_t *q;
+    int idx = *((int *)args);
 
-        s_queue_req.pop(q);
-        query(q);
+    while (true) {
+        query(idx);
     }
     return NULL;
 }
 
-static void query(query_t *q)
+static void query(int idx)
 {
+    query_t *q;
+    MYSQL *m = s_mysqls[idx];
+
     try {
-        assert(q);
+        s_queue_req[idx].pop(q);
+        assert(m && q);
 
         time64_t ct = time_ms();
         time64_t delta = time_diff(ct, q->stamp);
@@ -75,18 +80,18 @@ static void query(query_t *q)
                         q->cmd.c_str());
                 ++times;
             }
-            pending_time = delta;
+            pending_time[idx] = delta;
         } else {
             times = 1;
-            pending_time = 0;
+            pending_time[idx] = 0;
         }
 
         // query
-        int status = mysql_query(s_mysql, q->cmd.c_str());
+        int status = mysql_query(m, q->cmd.c_str());
 
         if (status != 0) {
             LOG_ERROR("db", "`%s` failed: %s.",
-                    q->cmd.c_str(), mysql_error(s_mysql));
+                    q->cmd.c_str(), mysql_error(m));
             destroy(q);
             return;
         }
@@ -97,7 +102,7 @@ static void query(query_t *q)
 
         q->data = NULL;
         do {
-            MYSQL_RES *res = mysql_store_result(s_mysql);
+            MYSQL_RES *res = mysql_store_result(m);
 
             if (res) {
                 if (q->data == NULL) {
@@ -107,10 +112,10 @@ static void query(query_t *q)
                     mysql_free_result(res);
                 }
             }
-        } while (!mysql_next_result(s_mysql));
+        } while (!mysql_next_result(m));
     } catch(...) {
         LOG_ERROR("db", "`%s` failed: %s.",
-                q->cmd.c_str(), mysql_error(s_mysql));
+                q->cmd.c_str(), mysql_error(m));
     }
 }
 
@@ -190,42 +195,52 @@ int db_init(void)
 int db_fini(void)
 {
     MODULE_IMPORT_SWITCH;
-    thread_fini(s_tid_req);
+
+    for (int i = 0; i < THREAD_NUM; ++i) {
+        thread_fini(s_threads[i]);
+    }
     return ELF_RC_DB_OK;
 }
 
 int db_connect(const std::string &host, const std::string &user,
         const std::string &passwd, const std::string &db, unsigned int port)
 {
-    try {
+    for (int i = 0; i < THREAD_NUM; ++i) {
         char value = 1;
+        MYSQL *m = s_mysqls[i];
 
-        if (s_mysql && 0 == mysql_ping(s_mysql)) {
-            return ELF_RC_DB_OK;
-        }
-        s_mysql = mysql_init(NULL);
-        mysql_options(s_mysql, MYSQL_OPT_RECONNECT, (char *)&value);
-        mysql_options(s_mysql, MYSQL_SET_CHARSET_NAME, "utf8");
-        s_mysql = mysql_real_connect(s_mysql, host.c_str(), user.c_str(),
-                passwd.c_str(), db.c_str(), port,
-                NULL, CLIENT_MULTI_STATEMENTS);
-        if (!s_mysql) {
+        try {
+            if (m && 0 == mysql_ping(m)) {
+                return ELF_RC_DB_OK;
+            }
+            m = mysql_init(NULL);
+            mysql_options(m, MYSQL_OPT_RECONNECT, (char *)&value);
+            mysql_options(m, MYSQL_SET_CHARSET_NAME, "utf8");
+            m = mysql_real_connect(m, host.c_str(), user.c_str(),
+                    passwd.c_str(), db.c_str(), port,
+                    NULL, CLIENT_MULTI_STATEMENTS);
+            if (!m) {
+                LOG_ERROR("db", "Connect DB failed: %s.",
+                        mysql_error(m));
+                return ELF_RC_DB_INIT_FAILED;
+            }
+
+            thread_t tid = thread_init(handle, (void *)(THREAD_INDEX + i));
+
+            s_threads[i] = tid;
+            s_mysqls[i] = m;
+        } catch(...) {
             LOG_ERROR("db", "Connect DB failed: %s.",
-                    mysql_error(s_mysql));
+                    mysql_error(m));
             return ELF_RC_DB_INIT_FAILED;
         }
-    } catch(...) {
-        LOG_ERROR("db", "Connect DB failed: %s.",
-                mysql_error(s_mysql));
-        return ELF_RC_DB_INIT_FAILED;
     }
-    s_tid_req = thread_init(handle, NULL);
     return ELF_RC_DB_OK;
 }
 
 int db_proc(void)
 {
-    if (s_mysql == NULL) return -1;
+    if (s_mysqls[0] == NULL) return -1;
 
     std::deque<query_t *> list;
     std::deque<query_t *>::iterator itr;
@@ -240,9 +255,10 @@ int db_proc(void)
     return 0;
 }
 
-void db_req(const char *cmd, db_callback proc,
+void db_req(const char *cmd, bool sim, db_callback proc,
         oid_t oid, pb_t *out, const std::string &field)
 {
+    int idx = 0;
     query_t *q = E_NEW query_t;
 
     if (proc == NULL && out == NULL) {
@@ -261,7 +277,10 @@ void db_req(const char *cmd, db_callback proc,
     q->field = field;
     q->proc = proc;
     q->data = NULL;
-    s_queue_req.push(q);
+    if (sim) {
+        idx = oid % THREAD_NUM;
+    }
+    s_queue_req[idx].push(q);
 }
 
 void response(query_t *q)
@@ -294,7 +313,11 @@ void response(query_t *q)
 
 time64_t db_pending_time(void)
 {
-    return pending_time;
+    time64_t sum = 0;
+    for (int i = 0; i < THREAD_NUM; ++i) {
+        sum += pending_time[i];
+    }
+    return sum / THREAD_NUM;
 }
 } // namespace elf
 
