@@ -33,9 +33,8 @@ struct query_t {
     time64_t stamp;     // request time stamp
 };
 
-static const int THREAD_NUM = 4;
-static const int THREAD_INDEX[THREAD_NUM] = {0, 1, 2, 3};
-static time64_t pending_time[THREAD_NUM] = {0};
+static const int THREAD_NUM = 5;
+static const int THREAD_INDEX[THREAD_NUM] = {0, 1, 2, 3, 4};
 static MYSQL *s_mysqls[THREAD_NUM] = {NULL, NULL, NULL, NULL};
 static thread_t s_threads[THREAD_NUM];
 static xqueue<query_t *> s_queue_req[THREAD_NUM];
@@ -66,25 +65,6 @@ static void query(int idx)
     try {
         s_queue_req[idx].pop(q);
         assert(m && q);
-
-        time64_t ct = time_ms();
-        time64_t delta = time_diff(ct, q->stamp);
-        static time64_t leap = 5000; // 5s
-        static time64_t times = 1;
-
-        if (delta > 1000) {
-            if (delta > leap * times) {
-                LOG_WARN("db", "%d.%03ds: %s.",
-                        delta / 1000,
-                        delta % 1000,
-                        q->cmd.c_str());
-                ++times;
-            }
-            pending_time[idx] = delta;
-        } else {
-            times = 1;
-            pending_time[idx] = 0;
-        }
 
         // query
         int status = mysql_query(m, q->cmd.c_str());
@@ -278,7 +258,7 @@ void db_req(const char *cmd, bool sim, db_callback proc,
     q->proc = proc;
     q->data = NULL;
     if (sim) {
-        idx = oid % THREAD_NUM;
+        idx = oid % (THREAD_NUM - 1) + 1;
     }
     s_queue_req[idx].push(q);
 }
@@ -311,13 +291,13 @@ void response(query_t *q)
     destroy(q);
 }
 
-time64_t db_pending_time(void)
+size_t db_pending_size(void)
 {
-    time64_t sum = 0;
+    size_t sum = 0;
     for (int i = 0; i < THREAD_NUM; ++i) {
-        sum += pending_time[i];
+        sum += s_queue_req[i].size();
     }
-    return sum / THREAD_NUM;
+    return sum;
 }
 } // namespace elf
 

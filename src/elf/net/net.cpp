@@ -185,7 +185,6 @@ static void set_nonblock(int sock)
     }
 
     // set linger
-    /*
     struct linger lg;
 
     lg.l_onoff = LINGER_ONOFF;
@@ -195,7 +194,6 @@ static void set_nonblock(int sock)
         LOG_ERROR("net", "setsockopt(LINGER) FAILED: %s.", strerror(errno));
         return;
     }
-    */
 
     // set fd status
     int opts = fcntl(sock, F_GETFL);
@@ -683,7 +681,7 @@ int net_connect(oid_t peer, const std::string &name,
     addr.sin_port = htons(port);
 
     if (0 != connect(fd, (struct sockaddr *)(&addr), sizeof(addr))) {
-        LOG_ERROR("net", "[%s] (%s:%d) connect FAILED: %s.",
+        LOG_TRACE("net", "[%s] (%s:%d) connect FAILED: %s.",
                 name.c_str(), ip.c_str(), port,
                 strerror(errno));
         close(fd);

@@ -87,10 +87,10 @@ void db_req(const char *cmd, bool sim = false, db_callback proc = NULL,
         const std::string &field = "");
 
 ///
-/// Get pending time.
-/// @return Pending time(ms).
+/// Get size of pending request queues.
+/// @return Size of pending request queues.
 ///
-time64_t db_pending_time(void);
+size_t db_pending_size(void);
 } // namespace elf
 
 #endif /* !ELF_DB_H */

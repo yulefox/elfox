@@ -31,6 +31,10 @@ public:
         pthread_cond_init(&_cond, NULL);
     }
 
+    size_t size(void) {
+        return _queue.size();
+    }
+
     int push(type &d) {
         pthread_mutex_lock(&_mutex);
         _queue.push_back(d);
@@ -73,6 +77,7 @@ public:
     }
 
 private:
+    int _size;
     int _nready;
     pthread_mutex_t _ready;
     pthread_mutex_t _mutex;

@@ -174,6 +174,7 @@ void event_emit(int evt, int arg_a, int arg_b, oid_t oid)
             E_FREE(cb);
             cl->erase(itr_c++);
         } else {
+            cb->busy = false;
             itr_c++;
         }
     }
