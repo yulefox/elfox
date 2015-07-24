@@ -82,7 +82,7 @@ int db_ping(void);
 /// @param[out] out Store query data.
 /// @param[in] field pb field.
 ///
-void db_req(const char *cmd, bool sim = false, db_callback proc = NULL,
+void db_req(const std::string &cmd, bool sim = false, db_callback proc = NULL,
         oid_t oid = OID_NIL, pb_t *out = NULL,
         const std::string &field = "");
 

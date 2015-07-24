@@ -67,7 +67,7 @@ static void query(int idx)
         assert(m && q);
 
         // query
-        int status = mysql_query(m, q->cmd.c_str());
+        int status = mysql_real_query(m, q->cmd.c_str(), q->cmd.length());
 
         if (status != 0) {
             LOG_ERROR("db", "`%s` failed: %s.",
@@ -235,7 +235,7 @@ int db_proc(void)
     return 0;
 }
 
-void db_req(const char *cmd, bool sim, db_callback proc,
+void db_req(const std::string &cmd, bool sim, db_callback proc,
         oid_t oid, pb_t *out, const std::string &field)
 {
     int idx = 0;

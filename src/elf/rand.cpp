@@ -16,6 +16,10 @@ float frand(float min, float max)
 
 int rand(int min, int max)
 {
+    if (min == max) {
+        return min;
+    }
+
     int range = abs(max - min) + 1;
 
     return (min + ::rand() % range);
