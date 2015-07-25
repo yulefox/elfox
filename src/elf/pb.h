@@ -90,6 +90,16 @@ void pb_set_field(pb_t *pb, const std::string &key,
 ///
 void pb_set_field(pb_t *pb, const ::google::protobuf::FieldDescriptor *fd,
         const char *val);
+
+///
+/// Set field of protobuf.
+/// @param[out] pb Protobuf object.
+/// @param[in] fd Field descriptor.
+/// @param[in] val Field value.
+/// @param[in] len Field length.
+///
+void pb_set_field(pb_t *pb, const ::google::protobuf::FieldDescriptor *fd,
+        const char *val, int len);
 } // namespace elf
 
 #endif /* !ELF_PB_H */

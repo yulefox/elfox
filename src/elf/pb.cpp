@@ -107,5 +107,46 @@ void pb_set_field(pb_t *pb, const FieldDescriptor *fd,
             assert(0);
     }
 }
+
+void pb_set_field(pb_t *pb, const FieldDescriptor *fd,
+        const char *val, int len)
+{
+    assert(pb && fd && val);
+
+    const Reflection *ref = pb->GetReflection();
+    FieldDescriptor::CppType type = fd->cpp_type();
+
+    switch (type) {
+        case FieldDescriptor::CPPTYPE_INT32:
+            ref->SetInt32(pb, fd, atoi(val));
+            break;
+        case FieldDescriptor::CPPTYPE_INT64:
+            ref->SetInt64(pb, fd, atoll(val));
+            break;
+        case FieldDescriptor::CPPTYPE_UINT32:
+            ref->SetUInt32(pb, fd, atoi(val));
+            break;
+        case FieldDescriptor::CPPTYPE_UINT64:
+            ref->SetUInt64(pb, fd, atoll(val));
+            break;
+        case FieldDescriptor::CPPTYPE_FLOAT:
+            ref->SetFloat(pb, fd, atof(val));
+            break;
+        case FieldDescriptor::CPPTYPE_DOUBLE:
+            ref->SetDouble(pb, fd, atof(val));
+            break;
+        case FieldDescriptor::CPPTYPE_BOOL:
+            ref->SetBool(pb, fd, (atoi(val) > 0) ? true : false);
+            break;
+        case FieldDescriptor::CPPTYPE_STRING:
+            ref->SetString(pb, fd, std::string(val, len));
+            break;
+        default:
+            LOG_ERROR("pb",
+                    "Invalid field type %d.",
+                    type);
+            assert(0);
+    }
+}
 } // namespace elf
 

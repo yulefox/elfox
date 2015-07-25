@@ -117,6 +117,7 @@ static void retrieve_pb(query_t *q)
     const Descriptor *des = q->pb->GetDescriptor();
     const int field_num = mysql_num_fields(q->data);
     const MYSQL_ROW row = mysql_fetch_row(q->data);
+    size_t *len = mysql_fetch_lengths(q->data);
 
     for (int c = 0; c < field_num; ++c) {
         const MYSQL_FIELD *ifd = mysql_fetch_field_direct(q->data, c);
@@ -128,7 +129,7 @@ static void retrieve_pb(query_t *q)
         if (row[c] == NULL || (strlen(row[c]) == 0)) {
             pb_set_field(q->pb, ofd, "");
         } else {
-            pb_set_field(q->pb, ofd, row[c]);
+            pb_set_field(q->pb, ofd, row[c], len[c]);
         }
     }
 }
@@ -147,6 +148,7 @@ static void retrieve_field(query_t *q)
     for (int r = 0; r < row_num; ++r) {
         pb_t *item = ref->AddMessage(q->pb, ctn);
         const MYSQL_ROW row = mysql_fetch_row(q->data);
+        unsigned long *len = mysql_fetch_lengths(q->data);
 
         des = item->GetDescriptor();
         for (int c = 0; c < field_num; ++c) {
@@ -160,7 +162,7 @@ static void retrieve_field(query_t *q)
             if (row[c] == NULL || (strlen(row[c]) == 0)) {
                 pb_set_field(item, ofd, "");
             } else {
-                pb_set_field(item, ofd, row[c]);
+                pb_set_field(item, ofd, row[c], len[c]);
             }
         }
     }
@@ -235,7 +237,7 @@ int db_proc(void)
     return 0;
 }
 
-void db_req(const std::string &cmd, bool sim, db_callback proc,
+void db_req(const char *cmd, bool sim, db_callback proc,
         oid_t oid, pb_t *out, const std::string &field)
 {
     int idx = 0;
