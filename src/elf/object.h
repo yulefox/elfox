@@ -129,6 +129,10 @@ public:
     ///
     template<class Type>
         static Type *Find(oid_t id) {
+            if (id == elf::OID_NIL) {
+                return NULL;
+            }
+
             obj_map_id::const_iterator itr =s_objs.find(id);
 
             if (itr != s_objs.end()) {
@@ -144,6 +148,10 @@ public:
     ///
     template<class Type>
         static Type *SafeFind(oid_t id) {
+            if (id == elf::OID_NIL) {
+                return NULL;
+            }
+
             obj_map_id::const_iterator itr =s_objs.find(id);
 
             if (itr != s_objs.end()) {
@@ -159,6 +167,10 @@ public:
     ///
     template<class Type>
         static Type *FindPB(oid_t id) {
+            if (id == elf::OID_NIL) {
+                return NULL;
+            }
+
             pbref_map_id::const_iterator itr =s_pbs.find(id);
 
             if (itr != s_pbs.end()) {
