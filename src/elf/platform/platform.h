@@ -21,7 +21,9 @@ namespace elf {
 typedef int (*auth_cb)(int plat_type, int code, cJSON *resp, void *args);
 
 enum platform_type {
-    PLAT_PP,
+    PLAT_INVALID    = -1,
+    PLAT_PP         = 1,
+    PLAT_I4         = 2,
 };
 
 enum platform_error {
@@ -31,7 +33,8 @@ enum platform_error {
     PLATFORM_PARAM_ERROR        = -3,
     PLATFORM_RESPONSE_FAILED    = -4,
     PLATFORM_USER_NOT_LOGININ   = -5,
-    PLATFORM_UNKOWN_ERROR       = -6,
+    PLATFORM_USER_NOT_EXIEST    = -6,
+    PLATFORM_UNKOWN_ERROR       = -7,
 };
 
 int platform_init();
