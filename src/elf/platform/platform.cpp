@@ -72,6 +72,7 @@ struct plat_json_req : public plat_base_req {
 static std::map<int, cJSON*> s_jsons;
 static xqueue<plat_base_resp*> s_resps;
 static void platform_pp_on_auth(const plat_base_req *req);
+static void platform_i4_on_auth(const plat_base_req *req);
 
 int platform_init()
 {
@@ -153,6 +154,9 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
         case PLAT_PP:
             platform_pp_on_auth(base_req);
             break;
+        case PLAT_I4:
+            platform_i4_on_auth(base_req);
+            break;
         }
         E_DELETE base_req;
     }
@@ -196,6 +200,46 @@ static void platform_pp_on_auth(const plat_base_req *req)
 
     // push resp
     s_resps.push(resp);
+}
+
+static void  platform_i4_on_auth(const plat_base_req *req)
+{
+    cJSON *status = cJSON_GetObjectItem(req->resp, "status");
+    cJSON *username = cJSON_GetObjectItem(req->resp, "username");
+    cJSON *userid = cJSON_GetObjectItem(req->resp, "userid");
+
+    LOG_INFO("platform", "i4 onAuth(): status(%d), username(%s), userid(%d)",
+            status->valueint, username->valuestring, userid->valueint);
+
+    int ret = PLATFORM_OK;
+    switch (status->valueint) {
+    case 0: // success
+        ret = PLATFORM_OK;
+        break;
+    case 1: // token invalid
+        ret = PLATFORM_PARAM_ERROR;
+        break;
+    case 2: // user not exist
+        ret = PLATFORM_USER_NOT_EXIEST;
+        break;
+    case 3: // timeout
+        ret = PLATFORM_RESPONSE_FAILED;
+        break;
+    default:
+        ret = PLATFORM_UNKOWN_ERROR;
+        break;
+    }
+
+    plat_base_resp *resp = E_NEW plat_base_resp;
+    resp->code = ret;
+    resp->plat_type = req->plat_type;
+    resp->resp = req->resp;
+    resp->cb = req->cb;
+    resp->args = req->args;
+
+    // push resp
+    s_resps.push(resp);
+
 }
 
 static int platform_pp_auth(const char *param, auth_cb cb, void *args)
@@ -249,7 +293,7 @@ static int platform_pp_auth(const char *param, auth_cb cb, void *args)
     // data/sid
     cJSON *data = cJSON_GetObjectItem(req, "data");
     cJSON *sid = cJSON_GetObjectItem(data, "sid");
-    sid->valuestring = strdup(cJSON_GetObjectItem(json, "sid")->valuestring);
+    sid->valuestring = strdup(cJSON_GetObjectItem(json, "token")->valuestring);
 
     // game/appId
     cJSON *game = cJSON_GetObjectItem(req, "game");
@@ -281,12 +325,51 @@ static int platform_pp_auth(const char *param, auth_cb cb, void *args)
     return PLATFORM_OK;
 }
 
+static int platform_i4_auth(const char *param, auth_cb cb, void *args)
+{
+    LOG_DEBUG("net", "platform_i4_auth: %p", args);
+
+
+    cJSON *json = cJSON_Parse(param);
+    if (json == NULL) {
+        return PLATFORM_PARAM_ERROR;
+    }
+
+    cJSON *setting = platform_get_json(PLAT_I4);
+    if (setting == NULL) {
+        return PLATFORM_SETTING_ERROR;
+    }
+    
+    cJSON *url = cJSON_GetObjectItem(setting, "URL");
+    if (url == NULL) {
+        return PLATFORM_SETTING_ERROR;
+    }
+
+    // build up params
+    cJSON *token = cJSON_GetObjectItem(json, "token");
+    std::string content;
+    content.append("token=");
+    content.append(token->valuestring);
+    cJSON_Delete(json);
+
+    // do post request
+    plat_json_req *json_req = E_NEW plat_json_req(cb, args);
+    json_req->plat_type = PLAT_I4;
+    
+    http_json(url->valuestring, content.c_str(), write_callback, json_req);
+
+    LOG_DEBUG("net", "url: %s, json: %s", url->valuestring, content.c_str());
+    return PLATFORM_OK;
+}
+
 
 int platform_auth(int plat_type, const char *data,
         auth_cb cb, void *args) {
     switch (plat_type) {
     case PLAT_PP:
         return platform_pp_auth(data, cb, args);
+    case PLAT_I4:
+        return platform_i4_auth(data, cb, args);
     default:
         return PLATFORM_TYPE_ERROR;
         break;
