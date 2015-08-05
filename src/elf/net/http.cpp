@@ -29,10 +29,12 @@ static void *http_post(void *args)
         slist = curl_slist_append(slist, "Content-type:application/json;charset=utf-8");
 
         //LOG_DEBUG("http", "prepare do post: url[%s], json[%s]", post->url.c_str(), post->json.c_str());
+        //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
         curl_easy_setopt(curl, CURLOPT_URL, post->url.c_str());
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json.c_str());
-        //curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(post->json));
+        //curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post->json.size());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post->cb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, post->args);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);

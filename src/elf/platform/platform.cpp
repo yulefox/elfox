@@ -329,7 +329,6 @@ static int platform_i4_auth(const char *param, auth_cb cb, void *args)
 {
     LOG_DEBUG("net", "platform_i4_auth: %p", args);
 
-
     cJSON *json = cJSON_Parse(param);
     if (json == NULL) {
         return PLATFORM_PARAM_ERROR;
@@ -344,19 +343,38 @@ static int platform_i4_auth(const char *param, auth_cb cb, void *args)
     if (url == NULL) {
         return PLATFORM_SETTING_ERROR;
     }
+    std::string post_url;
+    post_url.append(url->valuestring);
+    post_url.append("?token=");
+    post_url.append(cJSON_GetObjectItem(json, "token")->valuestring);
 
-    // build up params
-    cJSON *token = cJSON_GetObjectItem(json, "token");
-    std::string content;
-    content.append("token=");
-    content.append(token->valuestring);
+    cJSON *req_tpl = cJSON_GetObjectItem(setting, "AuthReq");
+    if (req_tpl == NULL) {
+        return PLATFORM_SETTING_ERROR;
+    }
+
+    // create request from template
+    cJSON *req = cJSON_Duplicate(req_tpl, 1);
+
+    // token
+    std::string token = cJSON_GetObjectItem(json, "token")->valuestring;
+    cJSON *req_token = cJSON_GetObjectItem(req, "token");
+    if (req_token == NULL) {
+        cJSON_AddStringToObject(req, "token", token.c_str());
+    }
+    req_token->valuestring = strdup(token.c_str());
+
+    char *encode = cJSON_Print(req);
+    std::string content = std::string(encode);
+    free(encode);
+    cJSON_Delete(req);
     cJSON_Delete(json);
 
     // do post request
     plat_json_req *json_req = E_NEW plat_json_req(cb, args);
     json_req->plat_type = PLAT_I4;
-    
-    http_json(url->valuestring, content.c_str(), write_callback, json_req);
+
+    http_json(post_url.c_str(), content.c_str(), write_callback, json_req);
 
     LOG_DEBUG("net", "url: %s, json: %s", url->valuestring, content.c_str());
     return PLATFORM_OK;
