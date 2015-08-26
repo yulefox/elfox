@@ -24,6 +24,7 @@ enum platform_type {
     PLAT_INVALID    = -1,
     PLAT_PP         = 1,
     PLAT_I4         = 2,
+    PLAT_LJ         = 3,
 };
 
 enum platform_error {

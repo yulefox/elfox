@@ -23,6 +23,7 @@ struct plat_base_req {
     int plat_type;
     int type;
     std::string content;
+    std::string param;
     void *args;
     cJSON *resp;
     auth_cb cb;
@@ -73,6 +74,7 @@ static std::map<int, cJSON*> s_jsons;
 static xqueue<plat_base_resp*> s_resps;
 static void platform_pp_on_auth(const plat_base_req *req);
 static void platform_i4_on_auth(const plat_base_req *req);
+static void platform_lj_on_auth(const plat_base_req *req);
 
 int platform_init()
 {
@@ -149,16 +151,26 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
         return realsize;
     }
 
-    if (base_req->push_resp(ptr, realsize)) {
-        switch (base_req->plat_type) {
-        case PLAT_PP:
-            platform_pp_on_auth(base_req);
-            break;
-        case PLAT_I4:
-            platform_i4_on_auth(base_req);
-            break;
-        }
+    if (base_req->plat_type == PLAT_LJ) {
+        cJSON *resp = cJSON_Parse(base_req->param.c_str());
+        std::string st((char*)ptr, realsize);
+        cJSON_AddStringToObject(resp, "status", st.c_str());
+
+        base_req->resp = resp;
+        platform_lj_on_auth(base_req);
         E_DELETE base_req;
+    } else {
+        if (base_req->push_resp(ptr, realsize)) {
+            switch (base_req->plat_type) {
+            case PLAT_PP:
+                platform_pp_on_auth(base_req);
+                break;
+            case PLAT_I4:
+                platform_i4_on_auth(base_req);
+                break;
+            }
+            E_DELETE base_req;
+        }
     }
     return realsize;
 }
@@ -240,6 +252,30 @@ static void  platform_i4_on_auth(const plat_base_req *req)
     // push resp
     s_resps.push(resp);
 
+}
+
+static void  platform_lj_on_auth(const plat_base_req *req)
+{
+    cJSON *status = cJSON_GetObjectItem(req->resp, "status");
+    cJSON *userid = cJSON_GetObjectItem(req->resp, "userId");
+
+    LOG_INFO("platform", "lj onAuth(): status(%d), userid(%d)",
+            status->valueint, userid->valueint);
+
+    int ret = PLATFORM_OK;
+    if (strcmp(status->valuestring, "true") != 0) {
+        ret = PLATFORM_PARAM_ERROR;
+    }
+
+    plat_base_resp *resp = E_NEW plat_base_resp;
+    resp->code = ret;
+    resp->plat_type = req->plat_type;
+    resp->resp = req->resp;
+    resp->cb = req->cb;
+    resp->args = req->args;
+
+    // push resp
+    s_resps.push(resp);
 }
 
 static int platform_pp_auth(const char *param, auth_cb cb, void *args)
@@ -380,6 +416,72 @@ static int platform_i4_auth(const char *param, auth_cb cb, void *args)
     return PLATFORM_OK;
 }
 
+static int platform_lj_auth(const char *param, auth_cb cb, void *args)
+{
+    LOG_DEBUG("net", "platform_lj_auth: %s", param);
+
+    cJSON *json = cJSON_Parse(param);
+    if (json == NULL) {
+        return PLATFORM_PARAM_ERROR;
+    }
+
+    cJSON *setting = platform_get_json(PLAT_LJ);
+    if (setting == NULL) {
+        return PLATFORM_SETTING_ERROR;
+    }
+    
+    cJSON *url = cJSON_GetObjectItem(setting, "URL");
+    if (url == NULL) {
+        return PLATFORM_SETTING_ERROR;
+    }
+
+    cJSON *productCode = cJSON_GetObjectItem(setting, "productCode");
+    if (productCode == NULL) {
+        return PLATFORM_SETTING_ERROR;
+    }
+
+    cJSON *userId = cJSON_GetObjectItem(json, "userId");
+    if (userId == NULL) {
+        return PLATFORM_PARAM_ERROR;
+    }
+
+    cJSON *channelCode = cJSON_GetObjectItem(json, "channelCode");
+    if (channelCode == NULL) {
+        return PLATFORM_PARAM_ERROR;
+    }
+
+    cJSON *token = cJSON_GetObjectItem(json, "token");
+    if (token == NULL) {
+        return PLATFORM_PARAM_ERROR;
+    }
+
+    std::string post_url;
+    post_url.append(url->valuestring);
+    post_url.append("?productCode=");
+    post_url.append(productCode->valuestring);
+
+    post_url.append("&token=");
+    post_url.append(token->valuestring);
+
+    post_url.append("&channel=");
+    post_url.append(channelCode->valuestring);
+
+    post_url.append("&userId=");
+    post_url.append(userId->valuestring);
+
+    cJSON_Delete(json);
+
+    // do post request
+    plat_json_req *json_req = E_NEW plat_json_req(cb, args);
+    json_req->plat_type = PLAT_LJ;
+    json_req->param = std::string(param);
+
+    http_json(post_url.c_str(), "", write_callback, json_req);
+
+    LOG_DEBUG("net", "url: %s", post_url.c_str());
+    return PLATFORM_OK;
+}
+
 
 int platform_auth(int plat_type, const char *data,
         auth_cb cb, void *args) {
@@ -388,6 +490,8 @@ int platform_auth(int plat_type, const char *data,
         return platform_pp_auth(data, cb, args);
     case PLAT_I4:
         return platform_i4_auth(data, cb, args);
+    case PLAT_LJ:
+        return platform_lj_auth(data, cb, args);
     default:
         return PLATFORM_TYPE_ERROR;
         break;
