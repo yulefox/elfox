@@ -31,6 +31,7 @@
 #   define ELF_USE_RAND
 #   define ELF_USE_SCRIPT
 #   define ELF_USE_SINGLETON
+#   define ELF_USE_SKIPLIST
 #   define ELF_USE_THREAD
 #   define ELF_USE_TIME
 #   define ELF_USE_TIMER
@@ -118,6 +119,10 @@
 #if defined(ELF_USE_SINGLETON)
 #   include <elf/singleton.h>
 #endif /* ELF_USE_SINGLETON */
+
+#if defined(ELF_USE_SKIPLIST)
+#   include <elf/skiplist.h>
+#endif /* ELF_USE_SKIPLIST */
 
 #if defined(ELF_USE_THREAD)
 #   include <elf/thread.h>
