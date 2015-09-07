@@ -7,7 +7,7 @@
 
 namespace elf {
 
-static zskiplistNode *zslCreateNode(int level, double score, void *obj) 
+static zskiplistNode *zslCreateNode(int level, int score, void *obj) 
 {
     size_t size = sizeof(zskiplistNode) + level * sizeof(struct zskiplistNode::zskiplistLevel);
     zskiplistNode *zn = (zskiplistNode*)malloc(size);
@@ -16,7 +16,7 @@ static zskiplistNode *zslCreateNode(int level, double score, void *obj)
     return zn;
 }
 
-zskiplist *zslCreate(comparator cmp) 
+zskiplist *zslCreate(int order, comparator cmp) 
 {
     int j;
     zskiplist *zsl;
@@ -31,8 +31,17 @@ zskiplist *zslCreate(comparator cmp)
     }
     zsl->header->backward = NULL;
     zsl->tail = NULL;
+    zsl->order = order;
     zsl->cmp = cmp;
     return zsl;
+}
+
+static int keyCmp(zskiplist *zsl, int score1, int score2)
+{
+    if (zsl->order == ORDER_DESC) {
+        return score2 - score1;
+    }
+    return score1 - score2;
 }
 
 static void zslFreeNode(zskiplistNode *node) 
@@ -65,7 +74,7 @@ static int zslRandomLevel(void)
     return (level<ZSKIPLIST_MAXLEVEL) ? level : ZSKIPLIST_MAXLEVEL;
 }
 
-zskiplistNode *zslInsert(zskiplist *zsl, double score, void *obj) 
+zskiplistNode *zslInsert(zskiplist *zsl, int score, void *obj) 
 {
     zskiplistNode *update[ZSKIPLIST_MAXLEVEL], *x;
     unsigned int rank[ZSKIPLIST_MAXLEVEL];
@@ -76,7 +85,7 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, void *obj)
         /* store rank that is crossed to reach the insert position */
         rank[i] = i == (zsl->level-1) ? 0 : rank[i+1];
         while (x->level[i].forward &&
-            (x->level[i].forward->score < score ||
+            (keyCmp(zsl, x->level[i].forward->score, score) < 0 ||
                 (x->level[i].forward->score == score &&
                 zsl->cmp(x->level[i].forward->obj,obj) < 0))) {
             rank[i] += x->level[i].span;
@@ -144,7 +153,7 @@ static void zslDeleteNode(zskiplist *zsl, zskiplistNode *x, zskiplistNode **upda
 }
 
 /* Delete an element with matching score/object from the skiplist. */
-int zslDelete(zskiplist *zsl, double score, void *obj) 
+int zslDelete(zskiplist *zsl, int score, void *obj) 
 {
     zskiplistNode *update[ZSKIPLIST_MAXLEVEL], *x;
     int i;
@@ -152,7 +161,7 @@ int zslDelete(zskiplist *zsl, double score, void *obj)
     x = zsl->header;
     for (i = zsl->level-1; i >= 0; i--) {
         while (x->level[i].forward &&
-            (x->level[i].forward->score < score ||
+            (keyCmp(zsl, x->level[i].forward->score, score) < 0 ||
                 (x->level[i].forward->score == score &&
                 zsl->cmp(x->level[i].forward->obj, obj) < 0)))
             x = x->level[i].forward;
@@ -161,7 +170,7 @@ int zslDelete(zskiplist *zsl, double score, void *obj)
     /* We may have multiple elements with the same score, what we need
      * is to find the element with both the right score and object. */
     x = x->level[0].forward;
-    if (x && score == x->score && x->obj == obj) {
+    if (x && score == x->score && zsl->cmp(x->obj, obj) == 0) {
         zslDeleteNode(zsl, x, update);
         zslFreeNode(x);
         return 1;
@@ -181,8 +190,8 @@ unsigned long zslDeleteRangeByScore(zskiplist *zsl, zrangespec *range) {
     x = zsl->header;
     for (i = zsl->level-1; i >= 0; i--) {
         while (x->level[i].forward && (range->minex ?
-            x->level[i].forward->score <= range->min :
-            x->level[i].forward->score < range->min))
+            keyCmp(zsl, x->level[i].forward->score, range->min) <= 0 :
+            keyCmp(zsl, x->level[i].forward->score, range->min) < 0))
                 x = x->level[i].forward;
         update[i] = x;
     }
@@ -192,7 +201,7 @@ unsigned long zslDeleteRangeByScore(zskiplist *zsl, zrangespec *range) {
 
     /* Delete nodes while in range. */
     while (x &&
-           (range->maxex ? x->score < range->max : x->score <= range->max))
+           (range->maxex ? keyCmp(zsl, x->score, range->max) < 0 : keyCmp(zsl, x->score ,range->max) <= 0))
     {
         zskiplistNode *next = x->level[0].forward;
         zslDeleteNode(zsl,x,update);
@@ -236,7 +245,7 @@ unsigned long zslDeleteRangeByRank(zskiplist *zsl, unsigned int start, unsigned 
  * Returns 0 when the element cannot be found, rank otherwise.
  * Note that the rank is 1-based due to the span of zsl->header to the
  * first element. */
-unsigned long zslGetRank(zskiplist *zsl, double score, void *o) {
+unsigned long zslGetRank(zskiplist *zsl, int score, void *o) {
     zskiplistNode *x;
     unsigned long rank = 0;
     int i;
@@ -244,7 +253,7 @@ unsigned long zslGetRank(zskiplist *zsl, double score, void *o) {
     x = zsl->header;
     for (i = zsl->level-1; i >= 0; i--) {
         while (x->level[i].forward &&
-            (x->level[i].forward->score < score ||
+            (keyCmp(zsl, x->level[i].forward->score, score) < 0 ||
                 (x->level[i].forward->score == score &&
                 zsl->cmp(x->level[i].forward->obj, o) <= 0))) {
             rank += x->level[i].span;
@@ -280,11 +289,11 @@ zskiplistNode* zslGetElementByRank(zskiplist *zsl, unsigned long rank) {
 }
 
 
-static int zslValueGteMin(double value, zrangespec *spec) {
+static int zslValueGteMin(int value, zrangespec *spec) {
     return spec->minex ? (value > spec->min) : (value >= spec->min);
 }
 
-static int zslValueLteMax(double value, zrangespec *spec) {
+static int zslValueLteMax(int value, zrangespec *spec) {
     return spec->maxex ? (value < spec->max) : (value <= spec->max);
 }
 
@@ -363,6 +372,5 @@ zskiplistNode *zslLastInRange(zskiplist *zsl, zrangespec *range)
     if (!zslValueGteMin(x->score,range)) return NULL;
     return x;
 }
-
 
 } // namespace elf
