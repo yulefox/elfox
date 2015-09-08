@@ -93,7 +93,7 @@ public:
             } else {
                 dst = static_cast<Type *>(pr->pb);
                 if (dst != &pb) {
-                    dst->MergeFrom(pb);
+                    dst->CopyFrom(pb);
                 }
             }
             return dst;
