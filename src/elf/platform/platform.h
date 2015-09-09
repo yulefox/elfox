@@ -26,6 +26,7 @@ enum platform_type {
     PLAT_I4         = 2,
     PLAT_LJ         = 3,
     PLAT_1SDK       = 4,
+    PLAT_UC         = 5,
 };
 
 enum platform_error {
