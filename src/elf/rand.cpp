@@ -177,5 +177,27 @@ void rand_str(char *rnds, int len)
     }
     rnds[len] = '\0';
 }
+
+void shuffle_cards(unsigned int seed, int num, roll_res &res)
+{
+    unsigned int sp = seed;
+
+    for (int i = 0; i < num; ++i) {
+        int r = int(rand_r(&sp) % num);
+        roll_res::iterator itr_i = res.find(i);
+        roll_res::iterator itr_r = res.find(r);
+        int t = 0;
+
+        if (itr_i == res.end()) {
+            itr_i = res.insert(std::make_pair(i, i)).first;
+        }
+        if (itr_r == res.end()) {
+            itr_r = res.insert(std::make_pair(r, r)).first;
+        }
+        t = itr_i->second;
+        itr_i->second = itr_r->second;
+        itr_r->second = t;
+    }
+}
 } // namespace elf
 
