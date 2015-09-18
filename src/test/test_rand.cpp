@@ -67,6 +67,15 @@ void object::test<3>() {
 template<>
 template<>
 void object::test<4>() {
-    set_test_name("roll n");
+    set_test_name("perfect shuffle");
+
+    elf::roll_res res;
+    elf::shuffle_cards(1, 54, res);
+
+    printf("\n");
+    elf::roll_res::iterator itr = res.begin();
+    for (; itr != res.end(); ++itr) {
+        printf("%3d:%3d\n", itr->first, itr->second);
+    }
 }
 }

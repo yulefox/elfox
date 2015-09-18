@@ -95,13 +95,20 @@ void roll_pb(const roll_req &req, roll_res &res, int times,
 void roll_rm(const roll_req &req, roll_res &res, int times,
         bool weight = false);
 
-
 ///
 /// Generate random string.
 /// @param rnds Generated random string.
 /// @param len String length.
 ///
 void rand_str(char *rnds, int len);
+
+///
+/// Shuffle cards.
+/// @param seed Random seed.
+/// @param num Card num.
+/// @param res Roll response group.
+///
+void shuffle_cards(unsigned int seed, int num, roll_res &res);
 } // namespace elf
 
 #endif /* !ELF_RAND_H */
