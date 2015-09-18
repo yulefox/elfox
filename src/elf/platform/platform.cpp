@@ -311,8 +311,8 @@ static void  platform_lj_on_auth(const plat_base_req *req)
     cJSON *status = cJSON_GetObjectItem(req->resp, "status");
     cJSON *userid = cJSON_GetObjectItem(req->resp, "userId");
 
-    LOG_INFO("platform", "lj onAuth(): status(%d), userid(%s)",
-            status->valueint, userid->valuestring);
+    LOG_INFO("platform", "lj onAuth(): status(%s), userid(%s)",
+            status->valuestring, userid->valuestring);
 
     int ret = PLATFORM_OK;
     if (strcmp(status->valuestring, "true") != 0) {
@@ -335,8 +335,8 @@ static void platform_1sdk_on_auth(const plat_base_req *req)
     cJSON *status = cJSON_GetObjectItem(req->resp, "status");
     cJSON *userid = cJSON_GetObjectItem(req->resp, "userId");
 
-    LOG_INFO("platform", "1sdk onAuth(): status(%d), userid(%s)",
-            status->valueint, userid->valuestring);
+    LOG_INFO("platform", "1sdk onAuth(): status(%s), userid(%s)",
+            status->valuestring, userid->valuestring);
 
     int ret = PLATFORM_OK;
     if (strcmp(status->valuestring, "0") != 0) {
@@ -687,6 +687,7 @@ static int platform_uc_auth(const char *param, auth_cb cb, void *args)
 
     // sign data
     std::string signtx;
+    signtx.append("sid=");
     signtx.append(sid->valuestring);
     signtx.append(appKey->valuestring);
     std::string md5sum = md5((unsigned char*)signtx.c_str(), signtx.length());
