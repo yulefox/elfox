@@ -18,7 +18,8 @@
 
 namespace elf {
 
-typedef int (*auth_cb)(int plat_type, int code, cJSON *resp, void *args);
+typedef int (*auth_cb)(int plat_type, const std::string &channel,
+        int code, cJSON *resp, void *args);
 
 enum platform_type {
     PLAT_INVALID    = -1,
