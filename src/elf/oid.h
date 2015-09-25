@@ -30,10 +30,10 @@ typedef std::set<oid_t> id_set;
 typedef std::map<oid_t, int> id_limap;
 typedef std::map<int, oid_t> id_ilmap;
 typedef std::map<oid_t, oid_t> id_llmap;
-typedef std::map<int, id_set *> id_ismap;
-typedef std::map<oid_t, id_set *> id_lsmap;
-typedef std::map<int, id_llmap *> id_illmap;
-typedef std::map<oid_t, id_llmap *> id_lllmap;
+typedef std::map<int, id_set * > id_ismap;
+typedef std::map<oid_t, id_set * > id_lsmap;
+typedef std::map<int, id_llmap * > id_illmap;
+typedef std::map<oid_t, id_llmap * > id_lllmap;
 typedef bool (*callback)(void *args);
 
 const oid_t OID_NIL = 0;

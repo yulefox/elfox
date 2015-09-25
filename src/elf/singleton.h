@@ -23,13 +23,12 @@
 #include <elf/config.h>
 
 #define get_inst(CLASS_NAME) \
-    Elf::singleton<CLASS_NAME>::inst()
+    elf::singleton<CLASS_NAME>::inst()
 
 #define get_inst_mt(CLASS_NAME) \
-    Elf::singleton_mt<CLASS_NAME>::inst()
+    elf::singleton_mt<CLASS_NAME>::inst()
 
 namespace elf {
-namespace utils {
 template<typename T>
 class singleton
 {
@@ -76,7 +75,6 @@ private:
 
 template<typename T>
 typename singleton_mt<T>::creator singleton_mt<T>::creator;
-} // namespace utils
 } // namespace elf
 
 #endif /* !ELF_SINGLETON_H */
