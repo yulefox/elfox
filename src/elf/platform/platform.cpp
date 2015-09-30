@@ -392,19 +392,26 @@ static void platform_1sdk_on_auth(const plat_base_req *req)
 
 static void  platform_huawei_on_auth(const plat_base_req *req)
 {
+    cJSON *error = cJSON_GetObjectItem(req->resp, "error");
     cJSON *userID = cJSON_GetObjectItem(req->resp, "userID");
     cJSON *username = cJSON_GetObjectItem(req->resp, "userName");
     cJSON *userState = cJSON_GetObjectItem(req->resp, "userState");
     cJSON *userValidStatus = cJSON_GetObjectItem(req->resp, "userValidStatus");
 
-    LOG_INFO("platform", "huawei onAuth(): userId(%s), username(%s), userState(%d), userValidStatus(%d)",
-            userID->valuestring, username->valuestring,
-            userState->valueint, userValidStatus->valueint);
-
     int ret = PLATFORM_OK;
-
-    if (strcmp(userID->valuestring, "") == 0) {
+    if (userID == NULL) {
         ret = PLATFORM_PARAM_ERROR;
+        if (error != NULL) {
+            LOG_ERROR("platform", "huawei onAuth() falied: %s", error->valuestring);
+        }
+    } else {
+        LOG_INFO("platform", "huawei onAuth(): userId(%s), username(%s), userState(%d), userValidStatus(%d)",
+                userID->valuestring, username->valuestring,
+                userState->valueint, userValidStatus->valueint);
+
+        if (strcmp(userID->valuestring, "") == 0) {
+            ret = PLATFORM_PARAM_ERROR;
+        }
     }
 
     plat_base_resp *resp = E_NEW plat_base_resp;
@@ -817,18 +824,21 @@ static int platform_huawei_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_PARAM_ERROR;
     }
 
-    std::string post_url;
-    post_url.append(url->valuestring);
-    post_url.append("?nsp_svc=OpenUP.User.getInfo");
+    std::string encoded_token;
+    if (urlencode(token->valuestring, strlen(token->valuestring), encoded_token) < 0) {
+        return PLATFORM_UNKOWN_ERROR;
+    }
 
     char now[128] = {0};
     sprintf(now, "%ld", elf::time_s());
 
+    std::string post_url;
+    post_url.append(url->valuestring);
+    post_url.append("?nsp_svc=OpenUP.User.getInfo");
     post_url.append("&nsp_ts=");
     post_url.append(now);
-
     post_url.append("&access_token=");
-    post_url.append(token->valuestring);
+    post_url.append(encoded_token);
 
     cJSON_Delete(json);
 
