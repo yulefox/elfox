@@ -44,6 +44,9 @@ int http_fini(void);
 ///
 int http_json(const char *url, const char *json,
         http_response func, void *args);
+
+int urlencode(const char *in, ssize_t size, std::string &out);
+
 } // namespace elf
 
 #endif /* !ELF_NET_HTTP_H */

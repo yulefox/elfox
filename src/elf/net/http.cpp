@@ -93,5 +93,20 @@ int http_json(const char *url, const char *json,
     thread_init(http_post, post);
     return 0;
 }
+
+int urlencode(const char *in, ssize_t size, std::string &out)
+{
+    CURL *curl = curl_easy_init();
+    if(curl) {
+        char *buf = curl_easy_escape(curl, in, size);
+        if(buf) {
+            out = std::string(buf);
+            curl_free(buf);
+            return 0;
+        }
+    }
+    return -1;
+}
+
 } // namespace elf
 
