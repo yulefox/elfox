@@ -11,8 +11,9 @@ namespace elf {
 obj_map_id Object::s_objs;
 Object::pbref_map_id Object::s_pbs;
 
-Object::Object()
-    : m_id(OID_NIL),
+Object::Object() :
+    m_id(OID_NIL),
+    m_sid(0),
     m_pb(NULL)
 {
 }

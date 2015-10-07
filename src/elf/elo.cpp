@@ -14,17 +14,17 @@
 #define ZOOM_RANK               50
 #define Q(R) pow(10.0f, R / 400.0f)
 
-ELF_INL static void calc_K(rank_t *e, int trank);
+ELF_INL static void calc_K(elo_t *e, int trank);
 ELF_INL static float calc_E(int ltrank, int rtrank);
-ELF_INL static int calc_R(rank_t **lt, int no);
+ELF_INL static int calc_R(elo_t **lt, int no);
 
 static float SCORE[] = {1.0f, 0.5f, 0.0f};
 static int K[] = {50, 30, 20, 10};
 
-void elo_rating(rank_t **lt, int lres, rank_t **rt,
+void elo_rating(elo_t **lt, int lres, elo_t **rt,
     int rres, int no)
 {
-    ELF_ASSERT(lt && rt);
+    assert(lt && rt);
     int ltrank, rtrank; /* team rank */
     float ltexp, rtexp; /* expectation */
 
@@ -33,7 +33,7 @@ void elo_rating(rank_t **lt, int lres, rank_t **rt,
     ltexp = calc_E(ltrank, rtrank);
     rtexp = 1 - ltexp;
     for (int i = 0; i < no; ++i) {
-        ELF_ASSERT(lt[i] && rt[i]);
+        assert(lt[i] && rt[i]);
         calc_K(lt[i], ltrank);
         calc_K(rt[i], rtrank);
         lt[i]->R += (int)(lt[i]->K * (SCORE[lres] - ltexp))/* + BONUS_POINT*/;
@@ -42,7 +42,7 @@ void elo_rating(rank_t **lt, int lres, rank_t **rt,
             lt[i]->R = 0;
         if (rt[i]->R < 0)
             rt[i]->R = 0;
-        ELF_ASSERT(lt[i]->R < 10000);
+        assert(lt[i]->R < 10000);
         switch (lres) {
         case GAME_RESULT_WIN:
             ++lt[i]->W;
@@ -79,7 +79,7 @@ void elo_set(int *k)
     memcpy(K, k, sizeof(K));
 }
 
-static void calc_K(rank_t *e, int trank)
+static void calc_K(elo_t *e, int trank)
 {
     if (e->W + e->L < NOVICE_ROUND_NUM) {
         e->K = K[0];
@@ -91,7 +91,7 @@ static void calc_K(rank_t *e, int trank)
         e->K = K[2];
     }
     e->K += std::min((e->R - trank) / ZOOM_RANK, MAX_BONUS_POINT);
-    ELF_ASSERT(e->K < 100);
+    assert(e->K < 100);
 }
 
 static float calc_E(int ltrank, int rtrank)
@@ -101,7 +101,7 @@ static float calc_E(int ltrank, int rtrank)
     return lq / (lq + rq);
 }
 
-static int calc_R(rank_t **t, int no)
+static int calc_R(elo_t **t, int no)
 {
     int sum = 0;
 

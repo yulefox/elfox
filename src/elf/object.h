@@ -21,11 +21,13 @@
 #include <elf/pb.h>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace elf {
 class Object;
 class PBRef;
 
+typedef std::list<Object *> obj_list;
 typedef std::map<oid_t, Object *> obj_map_id;
 typedef std::map<int, Object *> obj_map_int;
 typedef std::map<std::string, Object *> obj_map_str;
@@ -213,6 +215,9 @@ protected:
 
     /// object id
     oid_t m_id;
+
+    /// short id
+    int m_sid;
 
     /// object id
     std::string m_name;
