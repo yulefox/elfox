@@ -29,6 +29,7 @@ enum platform_type {
     PLAT_1SDK       = 4,
     PLAT_UC         = 5,
     PLAT_HUAWEI     = 6,
+    PLAT_VIVO       = 7,
 };
 
 enum platform_error {

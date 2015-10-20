@@ -80,6 +80,7 @@ static void platform_i4_on_auth(const plat_base_req *req);
 static void platform_lj_on_auth(const plat_base_req *req);
 static void platform_1sdk_on_auth(const plat_base_req *req);
 static void platform_huawei_on_auth(const plat_base_req *req);
+static void platform_vivo_on_auth(const plat_base_req *req);
 
 int platform_init()
 {
@@ -211,6 +212,9 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
                 break;
             case PLAT_HUAWEI:
                 platform_huawei_on_auth(base_req);
+                break;
+            case PLAT_VIVO:
+                platform_vivo_on_auth(base_req);
                 break;
             }
             E_DELETE base_req;
@@ -424,9 +428,42 @@ static void  platform_huawei_on_auth(const plat_base_req *req)
 
     // push resp
     s_resps.push(resp);
-
 }
 
+static void  platform_vivo_on_auth(const plat_base_req *req)
+{
+    cJSON *msg = cJSON_GetObjectItem(req->resp, "msg");
+    cJSON *stat = cJSON_GetObjectItem(req->resp, "stat");
+    cJSON *userID = cJSON_GetObjectItem(req->resp, "uid");
+    cJSON *email = cJSON_GetObjectItem(req->resp, "email");
+
+    int ret = PLATFORM_OK;
+    if (stat != NULL && stat->valueint != 200) {
+        ret = PLATFORM_PARAM_ERROR;
+        if (msg != NULL) {
+            LOG_ERROR("platform", "vivo onAuth() falied: %s", msg->valuestring);
+        } else {
+            LOG_ERROR("platform", "vivo onAuth() falied: stat(%d)", stat->valueint);
+        }
+    } else {
+        LOG_INFO("platform", "vivo onAuth(): userId(%s), email(%s)",
+                userID->valuestring, email->valuestring);
+        if (strcmp(userID->valuestring, "") == 0) {
+            ret = PLATFORM_PARAM_ERROR;
+        }
+    }
+
+    plat_base_resp *resp = E_NEW plat_base_resp;
+    resp->code = ret;
+    resp->plat_type = req->plat_type;
+    resp->channel = req->channel;
+    resp->resp = req->resp;
+    resp->cb = req->cb;
+    resp->args = req->args;
+
+    // push resp
+    s_resps.push(resp);
+}
 
 static int platform_pp_auth(const char *param, auth_cb cb, void *args)
 {
@@ -855,6 +892,59 @@ static int platform_huawei_auth(const char *param, auth_cb cb, void *args)
 
 }
 
+static int platform_vivo_auth(const char *param, auth_cb cb, void *args)
+{
+    LOG_DEBUG("net", "platform_vivo_auth: %p", args);
+
+    cJSON *json = cJSON_Parse(param);
+    if (json == NULL) {
+        return PLATFORM_PARAM_ERROR;
+    }
+
+    cJSON *setting = platform_get_json(PLAT_VIVO);
+    if (setting == NULL) {
+        return PLATFORM_SETTING_ERROR;
+    }
+    
+    cJSON *url = cJSON_GetObjectItem(setting, "URL");
+    if (url == NULL) {
+        return PLATFORM_SETTING_ERROR;
+    }
+
+    cJSON *token = cJSON_GetObjectItem(json, "token");
+    if (token == NULL) {
+        return PLATFORM_PARAM_ERROR;
+    }
+
+    //std::string encoded_token;
+    //if (urlencode(token->valuestring, strlen(token->valuestring), encoded_token) < 0) {
+    //    return PLATFORM_UNKOWN_ERROR;
+    //}
+
+    //char now[128] = {0};
+    //sprintf(now, "%ld", elf::time_s());
+
+    std::string post_url;
+    post_url.append(url->valuestring);
+    post_url.append("&access_token=");
+    post_url.append(token->valuestring);
+
+    cJSON_Delete(json);
+
+    // do post request
+    plat_json_req *json_req = E_NEW plat_json_req(cb, args);
+    json_req->plat_type = PLAT_VIVO;
+    json_req->channel = "vivo";
+    json_req->param = std::string(param);
+
+    http_json(post_url.c_str(), "", write_callback, json_req);
+
+    LOG_DEBUG("net", "url: %s", post_url.c_str());
+    return PLATFORM_OK;
+}
+
+
+
 
 int platform_auth(int plat_type, const char *data,
         auth_cb cb, void *args) {
@@ -871,6 +961,8 @@ int platform_auth(int plat_type, const char *data,
         return platform_uc_auth(data, cb, args);
     case PLAT_HUAWEI:
         return platform_huawei_auth(data, cb, args);
+    case PLAT_VIVO:
+        return platform_vivo_auth(data, cb, args);
     default:
         return PLATFORM_TYPE_ERROR;
         break;
