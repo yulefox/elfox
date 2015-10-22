@@ -350,7 +350,7 @@ static bool message_splice(context_t *ctx)
     if (msg_size == 0) {
         message_get(ctx->recv_data->chunks, &msg_size, SIZE_INT);
     }
-    
+
     if (msg_size < 0 || msg_size > MESSAGE_MAX_VALID_SIZE) {
         LOG_WARN("net", "%s INVALID message size: %d.",
                 ctx->peer.info,
@@ -388,6 +388,15 @@ static bool message_splice(context_t *ctx)
     message_get(ctx->recv_data->chunks, msg->body, body_len);
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
+
+    /*
+    // DO FUCK LIUTAN
+    if (msg->name == "BS.Req") {
+        recv_message_fini(msg);
+    } else {
+        s_recv_msgs.push(msg);
+    }
+    */
     ctx->recv_data->pending_size -= msg_size;
     ctx->recv_data->total_size += msg_size;
     msg_size = 0;

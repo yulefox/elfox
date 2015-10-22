@@ -198,10 +198,9 @@ int db_connect(const std::string &host, const std::string &user,
             m = mysql_init(NULL);
             mysql_options(m, MYSQL_OPT_RECONNECT, (char *)&value);
             mysql_options(m, MYSQL_SET_CHARSET_NAME, "utf8");
-            m = mysql_real_connect(m, host.c_str(), user.c_str(),
+            if (!mysql_real_connect(m, host.c_str(), user.c_str(),
                     passwd.c_str(), db.c_str(), port,
-                    NULL, CLIENT_MULTI_STATEMENTS);
-            if (!m) {
+                    NULL, CLIENT_MULTI_STATEMENTS)) {
                 LOG_ERROR("db", "Connect DB failed: %s.",
                         mysql_error(m));
                 return ELF_RC_DB_INIT_FAILED;
