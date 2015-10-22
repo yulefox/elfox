@@ -27,6 +27,7 @@
 #   define ELF_USE_JSON
 #   define ELF_USE_NET
 #   define ELF_USE_PC
+#   define ELF_USE_PIKE
 #   define ELF_USE_PLATFORM
 #   define ELF_USE_RAND
 #   define ELF_USE_SCRIPT
@@ -91,6 +92,10 @@
 #if defined(ELF_USE_PC)
 #   include <elf/pc.h>
 #endif /* ELF_USE_PC */
+
+#if defined(ELF_USE_PIKE)
+#   include <elf/pike.h>
+#endif /* ELF_USE_PIKE */
 
 #if defined(ELF_USE_PLATFORM)
 #   include <elf/platform/platform.h>

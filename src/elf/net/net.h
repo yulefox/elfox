@@ -17,6 +17,7 @@
 #ifndef ELF_NET_NET_H
 #define ELF_NET_NET_H
 
+#include <elf/cipher.h>
 #include <elf/config.h>
 #include <elf/mutex.h>
 #include <elf/oid.h>
@@ -187,6 +188,9 @@ void net_send(const id_ilmap &peers, const pb_t &pb);
 /// @param[in] pb Message.
 ///
 void net_send(const obj_map_id &peers, const pb_t &pb);
+
+void net_cipher_set(oid_t peer, cipher_t *encipher, cipher_t *decipher);
+
 } // namespace elf
 
 #endif /* !ELF_NET_NET_H */

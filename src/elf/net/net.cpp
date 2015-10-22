@@ -71,6 +71,8 @@ struct context_t {
     mutex_t lock;
     blob_t *recv_data;
     blob_t *send_data;
+    cipher_t *encipher;
+    cipher_t *decipher;
     epoll_event evt;
     int start_time;
     int close_time;
@@ -446,6 +448,8 @@ static context_t *context_init(oid_t peer, int fd,
     ctx->error_times = 0;
     ctx->recv_data = E_NEW blob_t;
     ctx->send_data = E_NEW blob_t;
+    ctx->encipher = NULL;
+    ctx->decipher = NULL;
     blob_init(ctx->recv_data);
     blob_init(ctx->send_data);
     event_init(ctx);
@@ -502,6 +506,8 @@ static void context_fini(context_t *ctx)
             ctx->recv_data->total_size);
     blob_fini(ctx->send_data);
     blob_fini(ctx->recv_data);
+    cipher_fini(ctx->encipher);
+    cipher_fini(ctx->decipher);
     E_DELETE(ctx);
 }
 
@@ -801,7 +807,9 @@ bool net_decode(recv_message_t *msg)
     if (ctx == NULL) {
         return false;
     }
-    if (s_decry) { // decrypt
+        
+    cipher_t *decipher = ctx->decipher;
+    if (decipher != NULL) { // decrypt
         int name_len = msg->name.size();
         int body_len = msg->body.size();
         char *name = (char *)E_ALLOC(name_len);
@@ -809,8 +817,10 @@ bool net_decode(recv_message_t *msg)
 
         memcpy(name, msg->name.data(), name_len);
         memcpy(body, msg->body.data(), body_len);
-        s_decry(name, name_len);
-        s_decry(body, body_len);
+
+        decipher->codec(decipher->ctx, (uint8_t*)name, (size_t)name_len);
+        decipher->codec(decipher->ctx, (uint8_t*)body, (size_t)body_len);
+
         msg->name = name;
         msg->pb->ParseFromString(body);
         E_FREE(name);
@@ -839,6 +849,15 @@ int net_send(oid_t peer, blob_t *msg)
     context_t *ctx = context_find(peer);
     if (ctx == NULL) {
         return -1;
+    }
+
+    cipher_t *encipher = ctx->encipher;
+    if (encipher != NULL) {
+        chunk_queue::iterator itr = msg->chunks.begin();
+        for (;itr != msg->chunks.end(); ++itr) {
+            chunk_t *chunk = *itr;
+            encipher->codec(encipher->ctx, (uint8_t*)(chunk->data), (size_t)chunk->size);
+        }
     }
 
     push_send(ctx, msg);
@@ -1065,4 +1084,14 @@ static void on_error(const epoll_event &evt)
             ctx->peer.info);
     net_close(ctx->peer.id);
 }
+
+void net_cipher_set(oid_t peer, cipher_t *encipher, cipher_t *decipher)
+{
+    context_t *ctx = context_find(peer);
+    if (ctx != NULL) {
+        ctx->encipher = encipher;
+        ctx->decipher = decipher;
+    }
+}
+
 } // namespace elf
