@@ -33,6 +33,7 @@ static const int MESSAGE_MAX_NAME_LENGTH = 100;
 static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_DEFAULT_SIZE;
 static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
+static const int ENCRYPT_FLAG = 0x40000000;
 
 struct blob_t;
 struct chunk_t;
@@ -364,8 +365,13 @@ static bool message_splice(context_t *ctx)
     if (ctx->recv_data->pending_size < msg_size) return false;
 
     int name_len = 0;
+    int flag = 0;
     message_get(ctx->recv_data->chunks, &name_len, SIZE_INT);
-
+    flag = ((name_len & ENCRYPT_FLAG) >> 30) & 0x1;
+    if (flag == 1) {
+        name_len ^= ENCRYPT_FLAG;
+    }
+    LOG_ERROR("net", "name_len[%d], encrypt_flag[%d]", name_len, flag);
     if (name_len < 0 || name_len > msg_size) {
         LOG_WARN("net", "%s INVALID name length: %d:%d.",
                 ctx->peer.info,
@@ -386,8 +392,27 @@ static bool message_splice(context_t *ctx)
 
     recv_message_t *msg = recv_message_init(ctx);
 
-    message_get(ctx->recv_data->chunks, msg->name, name_len);
-    message_get(ctx->recv_data->chunks, msg->body, body_len);
+    if (flag == 1)  {// encrypt
+        char *name = (char *)E_ALLOC(name_len);
+        char *body = (char *)E_ALLOC(body_len);
+        message_get(ctx->recv_data->chunks, name, name_len);
+        message_get(ctx->recv_data->chunks, body, body_len);
+        cipher_t *decipher = ctx->decipher;
+        if (decipher == NULL) {
+            LOG_ERROR("net", "%s", "get encrypted message, but can't get decipher");
+        } else {
+            decipher->codec(decipher->ctx, (uint8_t*)name, (size_t)name_len);
+            decipher->codec(decipher->ctx, (uint8_t*)body, (size_t)body_len);
+            msg->name = std::string(name);
+            msg->body = std::string(body);
+        }
+        E_FREE(name);
+        E_FREE(body);
+    } else {
+        message_get(ctx->recv_data->chunks, msg->name, name_len);
+        message_get(ctx->recv_data->chunks, msg->body, body_len);
+    }
+
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
 
@@ -785,14 +810,48 @@ blob_t *net_encode(const pb_t &pb)
     message_set(msg->chunks, &(msg->total_size), SIZE_INT);
     message_set(msg->chunks, &name_len, SIZE_INT);
 
-    if (s_encry) { // encrypt
+    const char *name = pb.GetTypeName().data();
+    message_set(msg->chunks, name, name_len);
+    message_set(msg->chunks, buf.data(), body_len);
+    LOG_TRACE("net", "<- %s.",
+            name);
+    return msg;
+}
+
+
+blob_t *net_encode_(oid_t peer, const pb_t &pb)
+{
+    context_t *ctx = context_find(peer);
+    std::string buf;
+    blob_t *msg = E_NEW blob_t;
+
+    cipher_t *encipher = NULL;
+    if (ctx != NULL) {
+        encipher = ctx->encipher;
+    }
+
+    blob_init(msg);
+    pb.SerializeToString(&buf);
+
+    int name_len = pb.GetTypeName().size();
+    int body_len = buf.size();
+
+    msg->total_size = name_len + body_len + SIZE_INTX2;
+    message_set(msg->chunks, &(msg->total_size), SIZE_INT);
+    if (encipher != NULL) {
+        int len = name_len | ENCRYPT_FLAG;
+        message_set(msg->chunks, &len, SIZE_INT);
+    } else {
+        message_set(msg->chunks, &name_len, SIZE_INT);
+    }
+    if (encipher != NULL) { // encrypt
         char *name = (char *)E_ALLOC(name_len);
         char *body = (char *)E_ALLOC(body_len);
 
         memcpy(name, pb.GetTypeName().data(), name_len);
         memcpy(body, buf.data(), body_len);
-        s_encry(name, name_len);
-        s_encry(body, body_len);
+        encipher->codec(encipher->ctx, (uint8_t*)name, (size_t)name_len);
+        encipher->codec(encipher->ctx, (uint8_t*)body, (size_t)body_len);
         message_set(msg->chunks, name, name_len);
         message_set(msg->chunks, body, body_len);
         E_FREE(name);
@@ -816,36 +875,17 @@ bool net_decode(recv_message_t *msg)
     if (ctx == NULL) {
         return false;
     }
-        
-    cipher_t *decipher = ctx->decipher;
-    if (decipher != NULL) { // decrypt
-        int name_len = msg->name.size();
-        int body_len = msg->body.size();
-        char *name = (char *)E_ALLOC(name_len);
-        char *body = (char *)E_ALLOC(body_len);
 
-        memcpy(name, msg->name.data(), name_len);
-        memcpy(body, msg->body.data(), body_len);
-
-        decipher->codec(decipher->ctx, (uint8_t*)name, (size_t)name_len);
-        decipher->codec(decipher->ctx, (uint8_t*)body, (size_t)body_len);
-
-        msg->name = name;
-        msg->pb->ParseFromString(body);
-        E_FREE(name);
-        E_FREE(body);
-    } else {
-        msg->pb->ParseFromString(msg->body);
-        if (!(msg->pb->IsInitialized())) {
-            LOG_WARN("net", "INVALID request: %s %s.",
-                    net_peer_info(ctx),
-                    msg->name.c_str());
-            return false;
-        }
-        LOG_TRACE("net", "-> %s %s.",
+    msg->pb->ParseFromString(msg->body);
+    if (!(msg->pb->IsInitialized())) {
+        LOG_WARN("net", "INVALID request: %s %s.",
                 net_peer_info(ctx),
                 msg->name.c_str());
+        return false;
     }
+    LOG_TRACE("net", "-> %s %s.",
+            net_peer_info(ctx),
+            msg->name.c_str());
 
     ctx->last_time = time_s();
     return true;
@@ -859,22 +899,13 @@ int net_send(oid_t peer, blob_t *msg)
     if (ctx == NULL) {
         return -1;
     }
-
-    cipher_t *encipher = ctx->encipher;
-    if (encipher != NULL) {
-        chunk_queue::iterator itr = msg->chunks.begin();
-        for (;itr != msg->chunks.end(); ++itr) {
-            chunk_t *chunk = *itr;
-            encipher->codec(encipher->ctx, (uint8_t*)(chunk->data), (size_t)chunk->size);
-        }
-    }
-
     push_send(ctx, msg);
     return 0;
 }
 
 void net_send(oid_t peer, const pb_t &pb)
 {
+    //blob_t *msg = net_encode(peer, pb);
     blob_t *msg = net_encode(pb);
 
     net_send(peer, msg);
@@ -885,11 +916,13 @@ void net_send(const id_set &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
-    blob_t *msg = net_encode(pb);
     id_set::const_iterator itr = peers.begin();
+    blob_t *msg = net_encode(pb);
 
     for (; itr != peers.end(); ++itr) {
+        //blob_t *msg = net_encode(*itr, pb);
         net_send(*itr, msg);
+        //blob_fini(msg);
     }
     blob_fini(msg);
 }
@@ -898,11 +931,13 @@ void net_send(const obj_map_id &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
-    blob_t *msg = net_encode(pb);
     obj_map_id::const_iterator itr = peers.begin();
 
+    blob_t *msg = net_encode(pb);
     for (; itr != peers.end(); ++itr) {
+        //blob_t *msg = net_encode(itr->first, pb);
         net_send(itr->first, msg);
+        //blob_fini(msg);
     }
     blob_fini(msg);
 }
@@ -911,11 +946,13 @@ void net_send(const pb_map_id &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
-    blob_t *msg = net_encode(pb);
     pb_map_id::const_iterator itr = peers.begin();
 
+    blob_t *msg = net_encode(pb);
     for (; itr != peers.end(); ++itr) {
+        //blob_t *msg = net_encode(itr->first, pb);
         net_send(itr->first, msg);
+        //blob_fini(msg);
     }
     blob_fini(msg);
 }
@@ -924,11 +961,13 @@ void net_send(const id_limap &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
-    blob_t *msg = net_encode(pb);
     id_limap::const_iterator itr = peers.begin();
 
+    blob_t *msg = net_encode(pb);
     for (; itr != peers.end(); ++itr) {
+        //blob_t *msg = net_encode(itr->first, pb);
         net_send(itr->first, msg);
+        //blob_fini(msg);
     }
     blob_fini(msg);
 }
@@ -937,11 +976,13 @@ void net_send(const id_ilmap &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
-    blob_t *msg = net_encode(pb);
     id_ilmap::const_iterator itr = peers.begin();
 
+    blob_t *msg = net_encode(pb);
     for (; itr != peers.end(); ++itr) {
+        //blob_t *msg = net_encode(itr->second, pb);
         net_send(itr->second, msg);
+        //blob_fini(msg);
     }
     blob_fini(msg);
 }

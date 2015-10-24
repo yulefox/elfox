@@ -124,6 +124,7 @@ int net_error(context_t *ctx);
 /// @return Encoded message.
 ///
 blob_t *net_encode(const pb_t &pb);
+//blob_t *net_encode(oid_t peer, const pb_t &pb);
 
 ///
 /// Decode and release received message.
