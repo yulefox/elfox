@@ -147,7 +147,7 @@ uint8_t *pike_codec(pike_t *ctx, uint8_t *data, size_t size) {
 			continue;
 		}
 
-		if (remnant > size) {
+		if ((size_t)remnant > size) {
 			remnant = size;
 		}
         size -= remnant;
