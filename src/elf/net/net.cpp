@@ -93,8 +93,6 @@ static recv_message_xqueue s_recv_msgs;
 static context_map s_contexts;
 static context_set s_pre_contexts;
 static free_context_queue s_free_contexts;
-static encrypt_func s_encry = NULL;
-static encrypt_func s_decry = NULL;
 
 ///
 /// Running.
@@ -381,7 +379,6 @@ static bool message_splice(context_t *ctx)
     }
 
     int body_len = msg_size - SIZE_INTX2 - name_len;
-
     if (body_len < 0) {
         LOG_WARN("net", "%s INVALID message size %d:%d:%d.",
                 ctx->peer.info,
@@ -391,10 +388,11 @@ static bool message_splice(context_t *ctx)
     }
 
     recv_message_t *msg = recv_message_init(ctx);
-
     if (flag == 1)  {// encrypt
-        char *name = (char *)E_ALLOC(name_len);
-        char *body = (char *)E_ALLOC(body_len);
+        char *name = (char *)E_ALLOC(name_len + 1);
+        char *body = (char *)E_ALLOC(body_len + 1);
+        memset(name, 0, name_len + 1);
+        memset(body, 0, body_len + 1);
         message_get(ctx->recv_data->chunks, name, name_len);
         message_get(ctx->recv_data->chunks, body, body_len);
         cipher_t *decipher = ctx->decipher;
@@ -657,8 +655,6 @@ int net_fini(void)
 
 void net_encrypt(encrypt_func encry, encrypt_func decry)
 {
-    s_encry = encry;
-    s_decry = decry;
 }
 
 int net_listen(oid_t peer, const std::string &name,
@@ -795,7 +791,7 @@ int net_error(context_t *ctx)
     return 0;
 }
 
-blob_t *net_encode(const pb_t &pb)
+blob_t *net_encode_(const pb_t &pb)
 {
     std::string buf;
     blob_t *msg = E_NEW blob_t;
@@ -819,7 +815,7 @@ blob_t *net_encode(const pb_t &pb)
 }
 
 
-blob_t *net_encode_(oid_t peer, const pb_t &pb)
+blob_t *net_encode(oid_t peer, const pb_t &pb)
 {
     context_t *ctx = context_find(peer);
     std::string buf;
@@ -905,8 +901,7 @@ int net_send(oid_t peer, blob_t *msg)
 
 void net_send(oid_t peer, const pb_t &pb)
 {
-    //blob_t *msg = net_encode(peer, pb);
-    blob_t *msg = net_encode(pb);
+    blob_t *msg = net_encode(peer, pb);
 
     net_send(peer, msg);
     blob_fini(msg);
@@ -917,14 +912,11 @@ void net_send(const id_set &peers, const pb_t &pb)
     if (peers.empty()) return;
 
     id_set::const_iterator itr = peers.begin();
-    blob_t *msg = net_encode(pb);
-
     for (; itr != peers.end(); ++itr) {
-        //blob_t *msg = net_encode(*itr, pb);
+        blob_t *msg = net_encode(*itr, pb);
         net_send(*itr, msg);
-        //blob_fini(msg);
+        blob_fini(msg);
     }
-    blob_fini(msg);
 }
 
 void net_send(const obj_map_id &peers, const pb_t &pb)
@@ -932,14 +924,11 @@ void net_send(const obj_map_id &peers, const pb_t &pb)
     if (peers.empty()) return;
 
     obj_map_id::const_iterator itr = peers.begin();
-
-    blob_t *msg = net_encode(pb);
     for (; itr != peers.end(); ++itr) {
-        //blob_t *msg = net_encode(itr->first, pb);
+        blob_t *msg = net_encode(itr->first, pb);
         net_send(itr->first, msg);
-        //blob_fini(msg);
+        blob_fini(msg);
     }
-    blob_fini(msg);
 }
 
 void net_send(const pb_map_id &peers, const pb_t &pb)
@@ -948,13 +937,11 @@ void net_send(const pb_map_id &peers, const pb_t &pb)
 
     pb_map_id::const_iterator itr = peers.begin();
 
-    blob_t *msg = net_encode(pb);
     for (; itr != peers.end(); ++itr) {
-        //blob_t *msg = net_encode(itr->first, pb);
+        blob_t *msg = net_encode(itr->first, pb);
         net_send(itr->first, msg);
-        //blob_fini(msg);
+        blob_fini(msg);
     }
-    blob_fini(msg);
 }
 
 void net_send(const id_limap &peers, const pb_t &pb)
@@ -962,14 +949,12 @@ void net_send(const id_limap &peers, const pb_t &pb)
     if (peers.empty()) return;
 
     id_limap::const_iterator itr = peers.begin();
-
-    blob_t *msg = net_encode(pb);
     for (; itr != peers.end(); ++itr) {
-        //blob_t *msg = net_encode(itr->first, pb);
+        blob_t *msg = net_encode(itr->first, pb);
         net_send(itr->first, msg);
-        //blob_fini(msg);
+        blob_fini(msg);
     }
-    blob_fini(msg);
+    //blob_fini(msg);
 }
 
 void net_send(const id_ilmap &peers, const pb_t &pb)
@@ -977,14 +962,11 @@ void net_send(const id_ilmap &peers, const pb_t &pb)
     if (peers.empty()) return;
 
     id_ilmap::const_iterator itr = peers.begin();
-
-    blob_t *msg = net_encode(pb);
     for (; itr != peers.end(); ++itr) {
-        //blob_t *msg = net_encode(itr->second, pb);
+        blob_t *msg = net_encode(itr->second, pb);
         net_send(itr->second, msg);
-        //blob_fini(msg);
+        blob_fini(msg);
     }
-    blob_fini(msg);
 }
 
 static void on_accept(const epoll_event &evt)
