@@ -30,6 +30,7 @@ enum platform_type {
     PLAT_UC         = 5,
     PLAT_HUAWEI     = 6,
     PLAT_VIVO       = 7,
+    PLAT_ANZHI      = 8,
 };
 
 enum platform_error {
