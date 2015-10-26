@@ -1,6 +1,6 @@
 #!/bin/bash
 
-while getopts "a:i:r:d:" opt ; do
+while getopts "a:c:i:r:d:" opt ; do
     case $opt in
         a)
             make -f $OPTARG -j8 DEBUG=NO
@@ -8,9 +8,12 @@ while getopts "a:i:r:d:" opt ; do
             ;;
         i)
             make -f $OPTARG -j8 DEBUG=NO
+            sudo make -f $OPTARG -j8 install DEBUG=NO
             make -f $OPTARG -j8 DEBUG=YES
-            sudo make -f $OPTARG install DEBUG=NO
-            sudo make -f $OPTARG install DEBUG=YES
+            sudo make -f $OPTARG -j8 install DEBUG=YES
+            ;;
+        c)
+            make -f $OPTARG clean
             ;;
         r)
             make -f $OPTARG -j8 DEBUG=NO

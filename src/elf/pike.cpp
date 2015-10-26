@@ -132,15 +132,15 @@ static void _generate(pike_t *ctx) {
 
 
 uint8_t *pike_codec(pike_t *ctx, uint8_t *data, size_t size) {
-    int32_t remnant;
-    int32_t off;
+    size_t remnant;
+    size_t off;
     if (size == 0) {
         return data;
     }
 
     off = 0;
     for (;;) {
-        int32_t i;
+        size_t i;
 		remnant = 4096 - ctx->index;
 		if (remnant <= 0) {
 			_generate(ctx);

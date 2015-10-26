@@ -15,8 +15,8 @@ DOCDIR		:= $(ROOTDIR)/docs
 INSTLIBDIR	:= /usr/local/lib
 INSTINCDIR	:= /usr/local/include
 INSTALLDIR	:=
-DEBUG		:= YES
 LIBRARY		:= YES
+SHARED		:= NO
 PROFILE		:= NO
 CFLAGS		:= \
 	-I/opt/local/include \

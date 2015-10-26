@@ -6,7 +6,7 @@
 
 CC			:= gcc
 CXX			:= g++
-LD			:= g++
+LD			:= g++ -o
 AR			:= ar rc
 RANLIB		:= ranlib
 DEPDIR		:= .dep/$(PROJECT)
@@ -20,16 +20,23 @@ else
 endif
 
 ifeq (YES, $(LIBRARY))
+ifeq (YES, $(SHARED)) # shared library
 	CPPFLAGS	+= -fPIC
-	LDFLAGS		+= -shared -Wl,-soname,lib$(TARGET).so.$(VER_MAJOR)
+	LDFLAGS		+= $(CPPFLAGS) -shared -Wl,-soname,lib$(TARGET).so.$(VER_MAJOR)
 	TARGET		:= $(OUTDIR)/lib$(TARGET).so.$(VERSION)
-else
+else # static library
+	LD			:= $(AR)
+	LDFLAGS		:=
+	TARGET		:= $(OUTDIR)/lib$(TARGET).a
+endif
+else # binary output
+	LDFLAGS		+= $(CPPFLAGS) $(LIBS)
 	TARGET		:= $(OUTDIR)/$(TARGET)
 endif
 
 ifeq (YES, $(PROFILE))
 	CPPFLAGS	+= -pg -O3
-	LDFLAGS		+= -pg -O3 $(LIBS)
+	LDFLAGS		+= -pg -O3
 endif
 
 #
@@ -88,7 +95,7 @@ endif
 rebuild: clean all tags
 
 $(TARGET): $(OBJS_C) $(OBJS_CPP)
-	$(LD) -o $@ $(OBJS_C) $(OBJS_CPP) $(CPPFLAGS) $(LDFLAGS)
+	$(LD) $@ $^ $(LDFLAGS)
 	@echo
 	@echo Compile/Link '$(TARGET)' ... OK
 	@echo
