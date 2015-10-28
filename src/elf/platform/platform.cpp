@@ -37,7 +37,7 @@ struct plat_base_req {
     : type(_type)
     , args(_args)
     , cb(_cb) {}
-    virtual bool push_resp(void *ptr, size_t size) = 0;
+    virtual bool push_resp(void *ptr, size_t size, bool unquote) = 0;
 };
 
 struct plat_base_resp {
@@ -63,9 +63,23 @@ struct plat_json_req : public plat_base_req {
     plat_json_req(auth_cb cb, void *args) : plat_base_req(PLAT_REQ_JSON, cb, args) {}
     virtual ~plat_json_req() {}
 
-    bool push_resp(void *ptr, size_t size) {
+    bool push_resp(void *ptr, size_t size, bool unquote) {
         content.append((char*)ptr, size);
-        resp = cJSON_Parse(content.c_str());
+        if (unquote) {
+            int size = sizeof(char) * (content.size() + 1);
+            char *buf = (char*)E_ALLOC(size);
+            memset(buf, 0, size);
+            strcpy(buf, content.c_str());
+            for (int i = 0;i < size; i++) {
+                if (buf[i] == '\'') {
+                    buf[i] = '\"';
+                }
+            }
+            resp = cJSON_Parse(buf);
+            E_FREE(buf);
+        } else {
+            resp = cJSON_Parse(content.c_str());
+        }
         if (resp == NULL) {
             return false;
         }
@@ -201,7 +215,11 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
         platform_1sdk_on_auth(base_req);
         E_DELETE base_req;
     } else {
-        if (base_req->push_resp(ptr, realsize)) {
+        bool unquote = false;
+        if (base_req->plat_type == PLAT_ANZHI) {
+            unquote = true;
+        }
+        if (base_req->push_resp(ptr, realsize, unquote)) {
             switch (base_req->plat_type) {
             case PLAT_PP:
                 platform_pp_on_auth(base_req);
