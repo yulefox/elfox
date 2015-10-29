@@ -402,7 +402,7 @@ static bool message_splice(context_t *ctx)
             decipher->codec(decipher->ctx, (uint8_t*)name, (size_t)name_len);
             decipher->codec(decipher->ctx, (uint8_t*)body, (size_t)body_len);
             msg->name = std::string(name);
-            msg->body = std::string(body);
+            msg->body = std::string(body, body_len);
         }
         E_FREE(name);
         E_FREE(body);
