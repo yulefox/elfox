@@ -954,7 +954,6 @@ void net_send(const id_limap &peers, const pb_t &pb)
         net_send(itr->first, msg);
         blob_fini(msg);
     }
-    //blob_fini(msg);
 }
 
 void net_send(const id_ilmap &peers, const pb_t &pb)
