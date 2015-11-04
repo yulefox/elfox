@@ -5,6 +5,21 @@
 
 namespace elf {
 
+    enum MatchRank {
+        ROOKIE_RANK = 800,
+        MASTER_RANK = 2500,
+        RANK_OFFSET = 100,
+    };
+
+    int get_rank_level(int rank) {
+        if (rank <= ROOKIE_RANK) {
+            return ROOKIE_RANK;
+        } else if (rank > MASTER_RANK) {
+            return MASTER_RANK;
+        }
+        return rank - rank % RANK_OFFSET;
+    }
+
     struct MatchEntity {
         oid_t id;
         int elo;
@@ -22,7 +37,7 @@ namespace elf {
             int total = 0;
             std::list<MatchEntity*>::iterator itr;
             for (itr = children.begin(); itr != children.end(); ++itr) {
-                total += itr->second->size;
+                total += (*itr)->get_size();
             }
             return total;
         }
@@ -33,9 +48,11 @@ namespace elf {
         std::vector<TeamSet> teams;
     };
 
+    typedef std::map<int, TeamSet> rank_map_t;
     struct MatchQueue {
         int size_type;
         std::queue<MatchEntity*> candidates;
+        rank_map_t ranks;
     };
 
     std::map<int, MatchPool*> MatchPool::s_pools;
@@ -95,11 +112,18 @@ namespace elf {
             que = itr->second;
         }
         que->candidates.push(ent);
+
+        int lvl = get_rank_level(ent->elo);
+        rank_map_t::iterator itr_rank = que->ranks.find(lvl);
+        if (itr_rank == que->ranks.end()) {
+            que->ranks.insert(std::make_pair(lvl, TeamSet()));
+        }
+        que->ranks[lvl].insert(ent->id);
     }
 
 
     MatchEntity *MatchPool::top(int size_type) {
-        std::map<int, MatchQueue*>::iterator itr = _queues[size_type];
+        std::map<int, MatchQueue*>::iterator itr = _queues.find(size_type);
         if (itr == _queues.end()) {
             return NULL;
         }
@@ -107,13 +131,30 @@ namespace elf {
         if (que->candidates.empty()) {
             return NULL;
         }
-        MatchEntity *ent = que->front();
-        que->pop();
+        MatchEntity *ent = que->candidates.front();
+        que->candidates.pop();
         return ent;
     }
 
     /// find skill proper opponent
-    MatchEntity *MatchEntity::get_opponent(MatchEntity *ent) {
+    MatchEntity *MatchPool::get_opponent(MatchEntity *ent) {
+        int lvl = get_rank_level(ent->elo);
+        std::map<int, MatchQueue*>::iterator itr = _queues.find(ent->get_size());
+        if (itr == _queues.end()) {
+            return NULL;
+        }
+        MatchQueue *que = itr->second;
+
+        rank_map_t::iterator itr_rank = que->ranks.find(lvl);
+        if (itr_rank == que->ranks.end()) {
+            return NULL;
+        }
+        TeamSet::iterator itr_t = itr_rank->second.begin();
+        for (;itr_t != itr_rank->second.end(); ++itr_t) {
+            if (*itr_t != ent->id) {
+                return _entities[*itr_t];
+            }
+        }
         return NULL;
     }
 
@@ -136,7 +177,7 @@ namespace elf {
 
         int size = ent->get_size();
         while (size < _camp_size) {
-            MatchEntity *buddy = get_buddy(_camp_size - size);
+            MatchEntity *buddy = NULL; //get_buddy(_camp_size - size);
             if (buddy == NULL) {
                 return false;
             }
@@ -151,6 +192,7 @@ namespace elf {
             size += buddy->get_size();
             return true;
         }
+        return false;
     }
 
     /// pop matched team(s)
@@ -161,6 +203,7 @@ namespace elf {
             pop(i);
         }
 
+        /*
         MatchEntity *ent = top();
         if (ent == NULL) {
             return false;
@@ -172,8 +215,7 @@ namespace elf {
         if (opt == NULL) {
             return false;
         }
-
-
+        */
 
         return false;
     }

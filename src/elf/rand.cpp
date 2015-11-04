@@ -142,6 +142,8 @@ void roll_rm(const roll_req &req, roll_res &res, int times, bool weight)
     roll_res::iterator itr_d;
     int weight_sum = 0;
 
+    assert(req.size() >= times);
+
     if (weight) {
         for (; itr_c != req.end(); ++itr_c) {
             weight_sum += itr_c->second;

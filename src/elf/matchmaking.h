@@ -38,8 +38,10 @@ private:
     MatchPool();
     MatchPool(int type, int team_size, int camp_size);
     void push(MatchEntity *ent);
+    bool pop(int size_type);
     bool pop(MatchRes &res);
-    MatchEntity *top();
+    MatchEntity *top(int size_type);
+    MatchEntity *get_opponent(MatchEntity *ent); 
 
 private:
     int _type;
