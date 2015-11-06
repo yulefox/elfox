@@ -44,7 +44,18 @@ void oid_ismap_add(id_ismap &ism, int idx, oid_t id)
     s->insert(id);
 }
 
-void oid_illmap_add(id_illmap &illm, int idx, oid_t id_1, oid_t id_2)
+void oid_ismap_del(id_ismap &ism, int idx, oid_t id)
+{
+    id_set *s = NULL;
+    id_ismap::iterator itr = ism.find(idx);
+
+    if (itr != ism.end()) {
+        s = itr->second;
+        s->erase(id);
+    }
+}
+
+void oid_illmap_add(id_illmap &illm, int idx, oid_t k, oid_t v)
 {
     id_llmap *m = NULL;
     id_illmap::iterator itr = illm.find(idx);
@@ -56,7 +67,18 @@ void oid_illmap_add(id_illmap &illm, int idx, oid_t id_1, oid_t id_2)
         m = itr->second;
     }
     assert(m);
-    (*m)[id_1] = id_2;
+    (*m)[k] = v;
+}
+
+void oid_illmap_del(id_illmap &illm, int idx, oid_t k)
+{
+    id_llmap *m = NULL;
+    id_illmap::iterator itr = illm.find(idx);
+
+    if (itr != illm.end()) {
+        m = itr->second;
+        m->erase(k);
+    }
 }
 } // namespace elf
 

@@ -66,13 +66,29 @@ oid_t oid_gen(void);
 void oid_ismap_add(id_ismap &ism, int idx, oid_t id);
 
 ///
+/// Remove from `id_ismap`.
+/// @param[in out] mm `id_ismap`.
+/// @param[in] idx `id_ismap:key`.
+/// @param[in] id `id_ismap:element`.
+///
+void oid_ismap_del(id_ismap &ism, int idx, oid_t id);
+
+///
 /// Insert into `id_illmap`.
 /// @param[in out] mm `id_illmap`.
 /// @param[in] idx `id_illmap:key`.
-/// @param[in] id_1 `id_llmap:key`.
-/// @param[in] id_2 `id_llmap:value`.
+/// @param[in] k `id_llmap:key`.
+/// @param[in] v `id_llmap:value`.
 ///
-void oid_illmap_add(id_illmap &illm, int idx, oid_t id_1, oid_t id_2);
+void oid_illmap_add(id_illmap &illm, int idx, oid_t k, oid_t v);
+
+///
+/// Remove from `id_illmap`.
+/// @param[in out] mm `id_illmap`.
+/// @param[in] idx `id_illmap:key`.
+/// @param[in] k `id_llmap:key`.
+///
+void oid_illmap_del(id_illmap &illm, int idx, oid_t k);
 } // namespace elf
 
 #endif /* !ELF_OID_H */
