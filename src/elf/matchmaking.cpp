@@ -255,6 +255,8 @@ namespace elf {
                 resList.push_back(res);
             }
         }
+
+        // adjust ranklevel for entities.
     }
 
     void MatchPool::Release() {
