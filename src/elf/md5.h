@@ -16,7 +16,7 @@
 #include <string>
 
 namespace elf {
-    std::string md5(const unsigned char *d, unsigned long n);
+std::string md5(const unsigned char *d, unsigned long n);
 } // namespace elf
 
 #endif /* !ELF_MD5_H */
