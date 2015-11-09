@@ -26,6 +26,7 @@
 #   define ELF_USE_INPUT
 #   define ELF_USE_JSON
 #   define ELF_USE_MATCHMAKING
+#   define ELF_USE_MD5
 #   define ELF_USE_NET
 #   define ELF_USE_PC
 #   define ELF_USE_PIKE
@@ -80,6 +81,10 @@
 #if defined(ELF_USE_LOG)
 #   include <elf/log.h>
 #endif /* ELF_USE_LOG */
+
+#if defined(ELF_USE_MD5)
+#   include <elf/md5.h>
+#endif /* ELF_USE_MD5 */
 
 #if defined(ELF_USE_MEMORY)
 #   include <elf/memory.h>
