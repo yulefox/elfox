@@ -369,7 +369,7 @@ static bool message_splice(context_t *ctx)
     if (flag == 1) {
         name_len ^= ENCRYPT_FLAG;
     }
-    LOG_ERROR("net", "name_len[%d], encrypt_flag[%d]", name_len, flag);
+
     if (name_len < 0 || name_len > msg_size) {
         LOG_WARN("net", "%s INVALID name length: %d:%d.",
                 ctx->peer.info,
