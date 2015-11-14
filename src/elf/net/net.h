@@ -190,7 +190,12 @@ void net_send(const id_ilmap &peers, const pb_t &pb);
 ///
 void net_send(const obj_map_id &peers, const pb_t &pb);
 
+void net_rawsend(oid_t peer, const std::string &name, const std::string &body);
+
 void net_cipher_set(oid_t peer, cipher_t *encipher, cipher_t *decipher);
+
+void net_register_raw(const std::string &name);
+
 
 } // namespace elf
 
