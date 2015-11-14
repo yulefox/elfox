@@ -86,7 +86,8 @@ typedef std::set<oid_t> context_set;
 
 static thread_t s_tid; // io thread
 static thread_t s_cid; // context thread
-static mutex_t s_context_lock;
+static pthread_rwlock_t s_context_lock;
+static pthread_rwlock_t s_pre_context_lock;
 static int s_epoll;
 static int s_sock;
 static recv_message_xqueue s_recv_msgs;
@@ -130,10 +131,10 @@ static void *context_thread(void *args)
         context_set pre_peers;
         context_set::iterator itr;
 
-        mutex_lock(&s_context_lock);
+        pthread_rwlock_wrlock(&s_pre_context_lock);
         pre_peers = s_pre_contexts;
         s_pre_contexts.clear();
-        mutex_unlock(&s_context_lock);
+        pthread_rwlock_unlock(&s_pre_context_lock);
 
         for (itr = pre_peers.begin(); itr != pre_peers.end(); ++itr) {
             context_close(*itr);
@@ -492,9 +493,9 @@ static context_t *context_init(oid_t peer, int fd,
     blob_init(ctx->send_data);
     event_init(ctx);
     mutex_init(&ctx->lock);
-    mutex_lock(&s_context_lock);
+    pthread_rwlock_wrlock(&s_context_lock);
     s_contexts[ctx->peer.id] = ctx;
-    mutex_unlock(&s_context_lock);
+    pthread_rwlock_unlock(&s_context_lock);
 
     recv_message_t *msg = recv_message_init(ctx);
 
@@ -508,14 +509,14 @@ static void context_close(oid_t peer)
 {
     context_t *ctx = NULL;
 
-    mutex_lock(&s_context_lock);
+    pthread_rwlock_wrlock(&s_context_lock);
     context_map::iterator itr = s_contexts.find(peer);
 
     if (itr != s_contexts.end()) {
         ctx = itr->second;
         s_contexts.erase(itr);
     }
-    mutex_unlock(&s_context_lock);
+    pthread_rwlock_unlock(&s_context_lock);
 
     if (ctx == NULL) {
         return;
@@ -554,12 +555,12 @@ static context_t *context_find(oid_t peer)
     context_t *ctx = NULL;
     context_map::const_iterator itr;
 
-    mutex_lock(&s_context_lock);
+    pthread_rwlock_rdlock(&s_context_lock);
     itr = s_contexts.find(peer);
     if (itr != s_contexts.end()) {
         ctx = itr->second;
     }
-    mutex_unlock(&s_context_lock);
+    pthread_rwlock_unlock(&s_context_lock);
     return ctx;
 }
 
@@ -645,7 +646,8 @@ int net_init(void)
         LOG_ERROR("net", "epoll_create FAILED: %s.", strerror(errno));
         return -1;
     }
-    mutex_init(&s_context_lock);
+    pthread_rwlock_init(&s_context_lock, NULL);
+    pthread_rwlock_init(&s_pre_context_lock, NULL);
     s_tid = thread_init(net_thread, NULL);
     s_cid = thread_init(context_thread, NULL);
     return 0;
@@ -654,7 +656,8 @@ int net_init(void)
 int net_fini(void)
 {
     MODULE_IMPORT_SWITCH;
-    mutex_fini(&s_context_lock);
+    pthread_rwlock_destroy(&s_pre_context_lock);
+    pthread_rwlock_destroy(&s_context_lock);
     close(s_epoll);
     return 0;
 }
@@ -750,9 +753,9 @@ void net_close(oid_t peer)
     if (peer <= 0) {
         return;
     }
-    mutex_lock(&s_context_lock);
+    pthread_rwlock_wrlock(&s_pre_context_lock);
     s_pre_contexts.insert(peer);
-    mutex_unlock(&s_context_lock);
+    pthread_rwlock_unlock(&s_pre_context_lock);
 }
 
 int net_proc(void)
