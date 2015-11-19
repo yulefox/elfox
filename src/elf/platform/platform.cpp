@@ -1025,7 +1025,7 @@ static int platform_vivo_auth(const char *param, auth_cb cb, void *args)
 
     std::string post_url;
     post_url.append(url->valuestring);
-    post_url.append("&access_token=");
+    post_url.append("?access_token=");
     post_url.append(token->valuestring);
 
     cJSON_Delete(json);

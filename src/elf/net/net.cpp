@@ -824,6 +824,12 @@ blob_t *net_encode_(const pb_t &pb)
 }
 
 
+void net_encode(const pb_t &pb, std::string &name, std::string &body)
+{
+    name = pb.GetTypeName();
+    pb.SerializeToString(&body);
+}
+
 blob_t *net_encode(oid_t peer, const pb_t &pb)
 {
     context_t *ctx = context_find(peer);
@@ -970,9 +976,13 @@ void net_send(const id_set &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
+    std::string name;
+    std::string body;
+    net_encode(pb, name, body);
+
     id_set::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(*itr, pb);
+        blob_t *msg = net_encode(*itr, name, body);
         net_send(*itr, msg);
         blob_fini(msg);
     }
@@ -982,9 +992,13 @@ void net_send(const obj_map_id &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
+    std::string name;
+    std::string body;
+    net_encode(pb, name, body);
+
     obj_map_id::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(itr->first, pb);
+        blob_t *msg = net_encode(itr->first, name, body);
         net_send(itr->first, msg);
         blob_fini(msg);
     }
@@ -994,10 +1008,13 @@ void net_send(const pb_map_id &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
-    pb_map_id::const_iterator itr = peers.begin();
+    std::string name;
+    std::string body;
+    net_encode(pb, name, body);
 
+    pb_map_id::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(itr->first, pb);
+        blob_t *msg = net_encode(itr->first, name, body);
         net_send(itr->first, msg);
         blob_fini(msg);
     }
@@ -1007,9 +1024,13 @@ void net_send(const id_limap &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
+    std::string name;
+    std::string body;
+    net_encode(pb, name, body);
+
     id_limap::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(itr->first, pb);
+        blob_t *msg = net_encode(itr->first, name, body);
         net_send(itr->first, msg);
         blob_fini(msg);
     }
@@ -1019,9 +1040,13 @@ void net_send(const id_ilmap &peers, const pb_t &pb)
 {
     if (peers.empty()) return;
 
+    std::string name;
+    std::string body;
+    net_encode(pb, name, body);
+
     id_ilmap::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(itr->second, pb);
+        blob_t *msg = net_encode(itr->second, name, body);
         net_send(itr->second, msg);
         blob_fini(msg);
     }
