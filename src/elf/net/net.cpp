@@ -578,6 +578,7 @@ static void push_send(context_t *ctx, blob_t *msg)
 
     for (; itr != msg->chunks.end(); ++itr) {
         chunk_t *c = *itr;
+        c->offset = 0;
         ctx->send_data->chunks.push_back(c);
     }
     msg->chunks.clear();
