@@ -792,81 +792,10 @@ int net_error(context_t *ctx)
     return 0;
 }
 
-blob_t *net_encode_(const pb_t &pb)
-{
-    std::string buf;
-    blob_t *msg = E_NEW blob_t;
-
-    blob_init(msg);
-    pb.SerializeToString(&buf);
-
-    int name_len = pb.GetTypeName().size();
-    int body_len = buf.size();
-
-    msg->total_size = name_len + body_len + SIZE_INTX2;
-    message_set(msg->chunks, &(msg->total_size), SIZE_INT);
-    message_set(msg->chunks, &name_len, SIZE_INT);
-
-    const char *name = pb.GetTypeName().data();
-    message_set(msg->chunks, name, name_len);
-    message_set(msg->chunks, buf.data(), body_len);
-    LOG_TRACE("net", "<- %s.",
-            name);
-    return msg;
-}
-
-
 void net_encode(const pb_t &pb, std::string &name, std::string &body)
 {
     name = pb.GetTypeName();
     pb.SerializeToString(&body);
-}
-
-blob_t *net_encode(oid_t peer, const pb_t &pb)
-{
-    context_t *ctx = context_find(peer);
-    std::string buf;
-    blob_t *msg = E_NEW blob_t;
-
-    cipher_t *encipher = NULL;
-    if (ctx != NULL) {
-        encipher = ctx->encipher;
-    }
-
-    blob_init(msg);
-    pb.SerializeToString(&buf);
-
-    int name_len = pb.GetTypeName().size();
-    int body_len = buf.size();
-
-    msg->total_size = name_len + body_len + SIZE_INTX2;
-    message_set(msg->chunks, &(msg->total_size), SIZE_INT);
-    if (encipher != NULL) {
-        int len = name_len | ENCRYPT_FLAG;
-        message_set(msg->chunks, &len, SIZE_INT);
-    } else {
-        message_set(msg->chunks, &name_len, SIZE_INT);
-    }
-    if (encipher != NULL) { // encrypt
-        char *name = (char *)E_ALLOC(name_len);
-        char *body = (char *)E_ALLOC(body_len);
-
-        memcpy(name, pb.GetTypeName().data(), name_len);
-        memcpy(body, buf.data(), body_len);
-        encipher->codec(encipher->ctx, (uint8_t*)name, (size_t)name_len);
-        encipher->codec(encipher->ctx, (uint8_t*)body, (size_t)body_len);
-        message_set(msg->chunks, name, name_len);
-        message_set(msg->chunks, body, body_len);
-        E_FREE(name);
-        E_FREE(body);
-    } else {
-        const char *name = pb.GetTypeName().data();
-        message_set(msg->chunks, name, name_len);
-        message_set(msg->chunks, buf.data(), body_len);
-        LOG_TRACE("net", "<- %s.",
-                name);
-    }
-    return msg;
 }
 
 blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb_body)
@@ -915,7 +844,15 @@ blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb
     return msg;
 }
 
+blob_t *net_encode(oid_t peer, const pb_t &pb)
+{
 
+    std::string name;
+    std::string body;
+
+    net_encode(pb, name, body);
+    return net_encode(peer, name, body);
+}
 
 bool net_decode(recv_message_t *msg)
 {
