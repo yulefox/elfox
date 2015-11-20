@@ -229,16 +229,6 @@ static void chunk_fini(chunk_t *c)
     E_FREE(c);
 }
 
-static chunk_t *chunk_clone(const chunk_t &src)
-{
-    chunk_t *dst = (chunk_t *)E_ALLOC(sizeof(*dst));
-
-    dst->size = src.offset;
-    dst->offset = 0;
-    memcpy(dst->data, src.data, dst->size);
-    return dst;
-}
-
 static recv_message_t *recv_message_init(context_t *ctx)
 {
     recv_message_t *msg = E_NEW recv_message_t;
@@ -587,10 +577,10 @@ static void push_send(context_t *ctx, blob_t *msg)
     chunk_queue::const_iterator itr = msg->chunks.begin();
 
     for (; itr != msg->chunks.end(); ++itr) {
-        chunk_t *c = chunk_clone(**itr);
-
+        chunk_t *c = *itr;
         ctx->send_data->chunks.push_back(c);
     }
+    msg->chunks.clear();
     ctx->send_data->pending_size += msg->total_size;
     ctx->send_data->total_size += msg->total_size;
     pthread_spin_unlock(&(ctx->lock));
