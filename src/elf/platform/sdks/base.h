@@ -2,20 +2,8 @@
 #define __PLATFORM_BASE_H
 
 #include <elf/elf.h>
-#include <elf/config.h>
-#include <elf/net/http.h>
-#include <elf/md5.h>
-#include <elf/base64.h>
-#include <elf/json.h>
-#include <elf/time.h>
-#include <elf/log.h>
-#include <elf/pc.h>
 #include <elf/platform/platform.h>
 #include <cJSON/cJSON.h>
-#include <fstream>
-#include <string>
-#include <map>
-#include <deque>
 
 namespace elf {
 
