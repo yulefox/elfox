@@ -46,6 +46,12 @@ enum platform_error {
     PLATFORM_UNKOWN_ERROR       = -7,
 };
 
+/*
+cJSON* platform_get_json(int type);
+size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata);
+int get_channel(cJSON *setting, const char *code, std::string &channel);
+*/
+
 int platform_init();
 int platform_fini();
 int platform_load(int type, const char *proto);
