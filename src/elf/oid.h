@@ -47,7 +47,6 @@ struct callback_t {
     oid_t lid; // listener id
     int ltype; // listner type
     int larg; // listener argument
-    bool busy; // is used
     callback func; // callback function
 };
 

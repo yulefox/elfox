@@ -51,7 +51,6 @@ void event_regist(int evt, callback_t *cb)
     } else {
         cl = itr_l->second;
     }
-    cb->busy = false;
     itr_c = cl->find(cb->lid);
     if (itr_c != cl->end()) {
         LOG_WARN("event", "<%lld><%lld> regist event %d (%d) ALREADY.",
@@ -88,14 +87,10 @@ void event_unregist(oid_t oid, oid_t lid, int evt)
             while (itr_c != cl->end()) {
                 callback_t *cb = itr_c->second;
 
-                if (!(cb->busy) && (lid == OID_NIL || lid == cb->lid)) {
+                if (lid == OID_NIL || lid == cb->lid) {
                     E_FREE(cb);
                     cl->erase(itr_c++);
                 } else {
-                    if (cb->busy && lid == OID_NIL) {
-                        LOG_WARN("event", "<%lld><%lld> unregist event %d (%d) FAILED.",
-                                cb->oid, cb->lid, cb->evt, cb->larg);
-                    }
                     ++itr_c;
                 }
             }
@@ -120,14 +115,10 @@ void event_unregist(oid_t oid, oid_t lid, int evt)
                 while (itr_c != cl->end()) {
                     callback_t *cb = itr_c->second;
 
-                    if (!(cb->busy) && (lid == OID_NIL || lid == cb->lid)) {
+                    if (lid == OID_NIL || lid == cb->lid) {
                         E_FREE(cb);
                         cl->erase(itr_c++);
                     } else {
-                        if (cb->busy && lid == OID_NIL) {
-                            LOG_WARN("event", "<%lld><%lld> unregist event %d (%d) FAILED.",
-                                    cb->oid, cb->lid, cb->evt, cb->larg);
-                        }
                         ++itr_c;
                     }
                 }
@@ -160,27 +151,16 @@ void event_emit(int evt, int arg_a, int arg_b, oid_t oid)
         return;
     }
 
-    callback_list *cl = itr_l->second;
-    callback_list::iterator itr_c = cl->begin();
+    callback_list cl = *(itr_l->second);
+    callback_list::iterator itr_c = cl.begin();
 
-    while (itr_c != cl->end()) {
+    for (; itr_c != cl.end(); ++itr_c) {
         callback_t *cb = itr_c->second;
 
-        cb->busy = true;
         cb->tid = oid;
         cb->targ_a = arg_a;
         cb->targ_b = arg_b;
-        if (cb->func(cb)) {
-            E_FREE(cb);
-            cl->erase(itr_c++);
-        } else {
-            cb->busy = false;
-            itr_c++;
-        }
-    }
-    if (cl->empty()) {
-        E_DELETE(cl);
-        ll->erase(itr_l);
+        cb->func(cb);
     }
 }
 } // namespace elf
