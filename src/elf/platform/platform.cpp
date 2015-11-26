@@ -94,6 +94,8 @@ cJSON* platform_get_json(int type)
     return itr->second;
 }
 
+void platform_push_resp(plat_base_resp* resp);
+
 size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
     size_t realsize = size * nmemb;
@@ -120,13 +122,15 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
         return realsize;
     }
 
+    plat_base_resp *base_resp = NULL;
+
     if (base_req->plat_type == PLAT_LJ) {
         cJSON *resp = cJSON_Parse(base_req->param.c_str());
         std::string st((char*)ptr, realsize);
         cJSON_AddStringToObject(resp, "status", st.c_str());
 
         base_req->resp = resp;
-        platform_lj_on_auth(base_req);
+        base_resp = platform_lj_on_auth(base_req);
         E_DELETE base_req;
     } else if (base_req->plat_type == PLAT_1SDK) {
         cJSON *resp = cJSON_Parse(base_req->param.c_str());
@@ -134,7 +138,7 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
         cJSON_AddStringToObject(resp, "status", st.c_str());
 
         base_req->resp = resp;
-        platform_1sdk_on_auth(base_req);
+        base_resp = platform_1sdk_on_auth(base_req);
         E_DELETE base_req;
     } else {
         bool unquote = false;
@@ -144,30 +148,33 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
         if (base_req->push_resp(ptr, realsize, unquote)) {
             switch (base_req->plat_type) {
             case PLAT_PP:
-                platform_pp_on_auth(base_req);
+                base_resp = platform_pp_on_auth(base_req);
                 break;
             case PLAT_UC:
-                platform_uc_on_auth(base_req);
+                base_resp = platform_uc_on_auth(base_req);
                 break;
             case PLAT_I4:
-                platform_i4_on_auth(base_req);
+                base_resp = platform_i4_on_auth(base_req);
                 break;
             case PLAT_HUAWEI:
-                platform_huawei_on_auth(base_req);
+                base_resp = platform_huawei_on_auth(base_req);
                 break;
             case PLAT_VIVO:
-                platform_vivo_on_auth(base_req);
+                base_resp = platform_vivo_on_auth(base_req);
                 break;
             case PLAT_ANZHI:
-                platform_anzhi_on_auth(base_req);
+                base_resp = platform_anzhi_on_auth(base_req);
                 break;
             case PLAT_QQ:
             case PLAT_WEIXIN:
-                platform_msdk_on_auth(base_req);
+                base_resp = platform_msdk_on_auth(base_req);
                 break;
             }
             E_DELETE base_req;
         }
+    }
+    if (base_resp != NULL) {
+        platform_push_resp(base_resp);
     }
     return realsize;
 }
@@ -200,6 +207,11 @@ int platform_auth(int plat_type, const char *data,
         break;
     }
     return PLATFORM_OK;
+}
+
+void platform_push_resp(plat_base_resp* resp)
+{
+    s_resps.push(resp);
 }
 
 int platform_proc() {

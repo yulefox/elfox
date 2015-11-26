@@ -53,29 +53,7 @@ struct plat_json_req : public plat_base_req {
     plat_json_req() : plat_base_req(PLAT_REQ_JSON, NULL, NULL) {}
     plat_json_req(auth_cb cb, void *args) : plat_base_req(PLAT_REQ_JSON, cb, args) {}
     virtual ~plat_json_req() {}
-
-    bool push_resp(void *ptr, size_t size, bool unquote) {
-        content.append((char*)ptr, size);
-        if (unquote) {
-            int size = sizeof(char) * (content.size() + 1);
-            char *buf = (char*)E_ALLOC(size);
-            memset(buf, 0, size);
-            strcpy(buf, content.c_str());
-            for (int i = 0;i < size; i++) {
-                if (buf[i] == '\'') {
-                    buf[i] = '\"';
-                }
-            }
-            resp = cJSON_Parse(buf);
-            E_FREE(buf);
-        } else {
-            resp = cJSON_Parse(content.c_str());
-        }
-        if (resp == NULL) {
-            return false;
-        }
-        return true;
-    }
+    virtual bool push_resp(void *ptr, size_t size, bool unquote);
 };
 
 // internal funcs

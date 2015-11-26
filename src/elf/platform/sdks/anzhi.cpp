@@ -33,12 +33,33 @@ plat_base_resp* platform_anzhi_on_auth(const plat_base_req *req)
             LOG_ERROR("platform", "%s", "anzhi onAuth() falied");
         }
     } else {
-        cJSON *uid = cJSON_GetObjectItem(msg, "uid");
-        if (uid == NULL || strcmp(uid->valuestring, "") == 0) {
-                ret = PLATFORM_PARAM_ERROR;
+        //char *base64_decode(char *input, int length, bool with_new_line)
+        char *ctx = base64_decode(msg->valuestring, strlen(msg->valuestring), false);
+        if (ctx == NULL) {
+            LOG_ERROR("platform", "%s", "anzhi onAuth() falied");
+            ret = PLATFORM_PARAM_ERROR;
         } else {
-            LOG_INFO("platform", "anzhi onAuth(): userId(%s) time(%s)",
-                    uid->valuestring, time->valuestring);
+            for (size_t i = 0;i < strlen(ctx); i++) {
+                if (ctx[i] == '\'') {
+                    ctx[i] = '\"';
+                }
+            }
+            cJSON *json = cJSON_Parse(ctx);
+            if (json == NULL) {
+                LOG_ERROR("platform", "%s", "anzhi onAuth() falied");
+                ret = PLATFORM_PARAM_ERROR;
+            } else {
+                cJSON *uid = cJSON_GetObjectItem(json, "uid");
+                if (uid == NULL || strcmp(uid->valuestring, "") == 0) {
+                    ret = PLATFORM_PARAM_ERROR;
+                } else {
+                    LOG_INFO("platform", "anzhi onAuth(): userId(%s) time(%s)",
+                            uid->valuestring, time->valuestring);
+                    cJSON_AddStringToObject(req->resp, "uid", uid->valuestring);
+                }
+            }
+            cJSON_Delete(json);
+            free(ctx);
         }
     }
 
@@ -88,9 +109,17 @@ int platform_anzhi_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_PARAM_ERROR;
     }
 
+    cJSON *userId = cJSON_GetObjectItem(json, "userId");
+    if (userId == NULL) {
+        return PLATFORM_PARAM_ERROR;
+    }
+
+    //appkey+account+sid+appsecret
     std::string ctx = appKey->valuestring;
+    ctx.append(userId->valuestring);
     ctx.append(token->valuestring);
     ctx.append(appSecret->valuestring);
+
     char *sign = base64_encode(ctx.c_str(), ctx.size(), false);
 
     struct tm ctm;
@@ -108,14 +137,20 @@ int platform_anzhi_auth(const char *param, auth_cb cb, void *args)
     post_url.append("?time=");
     post_url.append(now_s);
 
-    post_url.append("&appKey=");
+    post_url.append("&appkey=");
     post_url.append(appKey->valuestring);
+
+    post_url.append("&account=");
+    post_url.append(userId->valuestring);
 
     post_url.append("&sid=");
     post_url.append(token->valuestring);
 
     post_url.append("&sign=");
     post_url.append(sign);
+
+    LOG_DEBUG("net", "sid[%s]", token->valuestring);
+    LOG_DEBUG("net", "sign[%s]", sign);
 
     cJSON_Delete(json);
     free(sign);
