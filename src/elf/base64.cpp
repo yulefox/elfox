@@ -6,7 +6,7 @@
 
 namespace elf {
 
-char *base64_encode(const char *input, int length, bool with_new_line)
+std::string base64_encode(const char *input, int length, bool with_new_line)
 {
 	BIO *bmem = NULL;
 	BIO *b64 = NULL;
@@ -27,10 +27,12 @@ char *base64_encode(const char *input, int length, bool with_new_line)
 	buff[bptr->length] = 0;
 
 	BIO_free_all(b64);
-	return buff;
+    std::string res(buff);
+    free(buff);
+    return res;
 }
 
-char *base64_decode(char *input, int length, bool with_new_line)
+std::string base64_decode(char *input, int length, bool with_new_line)
 {
 	BIO *b64 = NULL;
 	BIO *bmem = NULL;
@@ -47,7 +49,9 @@ char *base64_decode(char *input, int length, bool with_new_line)
 
 	BIO_free_all(bmem);
 
-	return buffer;
+    std::string res(buffer);
+    free(buffer);
+    return res;
 }
 
 } // namespace elf

@@ -33,34 +33,27 @@ plat_base_resp* platform_anzhi_on_auth(const plat_base_req *req)
             LOG_ERROR("platform", "%s", "anzhi onAuth() falied");
         }
     } else {
-        //char *base64_decode(char *input, int length, bool with_new_line)
-        char *ctx = base64_decode(msg->valuestring, strlen(msg->valuestring), false);
-        if (ctx == NULL) {
+        std::string ctx = base64_decode(msg->valuestring, strlen(msg->valuestring), false);
+        for (size_t i = 0;i < ctx.size(); i++) {
+            if (ctx[i] == '\'') {
+                ctx[i] = '\"';
+            }
+        }
+        cJSON *json = cJSON_Parse(ctx.c_str());
+        if (json == NULL) {
             LOG_ERROR("platform", "%s", "anzhi onAuth() falied");
             ret = PLATFORM_PARAM_ERROR;
         } else {
-            for (size_t i = 0;i < strlen(ctx); i++) {
-                if (ctx[i] == '\'') {
-                    ctx[i] = '\"';
-                }
-            }
-            cJSON *json = cJSON_Parse(ctx);
-            if (json == NULL) {
-                LOG_ERROR("platform", "%s", "anzhi onAuth() falied");
+            cJSON *uid = cJSON_GetObjectItem(json, "uid");
+            if (uid == NULL || strcmp(uid->valuestring, "") == 0) {
                 ret = PLATFORM_PARAM_ERROR;
             } else {
-                cJSON *uid = cJSON_GetObjectItem(json, "uid");
-                if (uid == NULL || strcmp(uid->valuestring, "") == 0) {
-                    ret = PLATFORM_PARAM_ERROR;
-                } else {
-                    LOG_INFO("platform", "anzhi onAuth(): userId(%s) time(%s)",
-                            uid->valuestring, time->valuestring);
-                    cJSON_AddStringToObject(req->resp, "uid", uid->valuestring);
-                }
+                LOG_INFO("platform", "anzhi onAuth(): userId(%s) time(%s)",
+                        uid->valuestring, time->valuestring);
+                cJSON_AddStringToObject(req->resp, "uid", uid->valuestring);
             }
-            cJSON_Delete(json);
-            free(ctx);
         }
+        cJSON_Delete(json);
     }
 
     plat_base_resp *resp = E_NEW plat_base_resp;
@@ -120,7 +113,7 @@ int platform_anzhi_auth(const char *param, auth_cb cb, void *args)
     ctx.append(token->valuestring);
     ctx.append(appSecret->valuestring);
 
-    char *sign = base64_encode(ctx.c_str(), ctx.size(), false);
+    std::string sign = base64_encode(ctx.c_str(), ctx.size(), false);
 
     struct tm ctm;
     time64_t now = time_ms();
@@ -150,10 +143,9 @@ int platform_anzhi_auth(const char *param, auth_cb cb, void *args)
     post_url.append(sign);
 
     LOG_DEBUG("net", "sid[%s]", token->valuestring);
-    LOG_DEBUG("net", "sign[%s]", sign);
+    LOG_DEBUG("net", "sign[%s]", sign.c_str());
 
     cJSON_Delete(json);
-    free(sign);
 
     // do post request
     plat_json_req *json_req = E_NEW plat_json_req(cb, args);

@@ -16,8 +16,8 @@
 #include <string>
 
 namespace elf {
-    char *base64_encode(const char *input, int length, bool with_new_line);
-    char *base64_decode(char *input, int length, bool with_new_line);
+    std::string base64_encode(const char *input, int length, bool with_new_line);
+    std::string base64_decode(char *input, int length, bool with_new_line);
 } // namespace elf
 
 #endif /* !ELF_BASE64_H */
