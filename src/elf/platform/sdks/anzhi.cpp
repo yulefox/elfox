@@ -142,9 +142,6 @@ int platform_anzhi_auth(const char *param, auth_cb cb, void *args)
     post_url.append("&sign=");
     post_url.append(sign);
 
-    LOG_DEBUG("net", "sid[%s]", token->valuestring);
-    LOG_DEBUG("net", "sign[%s]", sign.c_str());
-
     cJSON_Delete(json);
 
     // do post request

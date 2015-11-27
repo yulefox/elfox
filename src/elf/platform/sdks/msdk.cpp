@@ -73,7 +73,7 @@ static std::string msdk_build_params(const char *appId, const char *appKey,
     res.append("&appid=");
     res.append(appId);
 
-    res.append("&sid=");
+    res.append("&sig=");
     res.append(sig);
 
     res.append("&openid=");
@@ -89,8 +89,9 @@ static void json_set(cJSON *root, const char *key, const char *val)
     cJSON *child = cJSON_GetObjectItem(root, key);
     if (child == NULL) {
         cJSON_AddStringToObject(root, key, val);
+    } else {
+        child->valuestring = strdup(val);
     }
-    child->valuestring = strdup(val);
 }
 
 int platform_qq_auth(const char *param, auth_cb cb, void *args)

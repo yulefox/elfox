@@ -12,14 +12,9 @@
 
 namespace elf {
     bool plat_json_req::push_resp(void *ptr, size_t size, bool unquote) {
-        LOG_ERROR("net", "%s", "push_resp");
         content.append((char*)ptr, size);
-        LOG_ERROR("net", "unquote: %d", unquote ? 1 : 0);
         if (unquote) {
-            LOG_ERROR("net", "%s", "unquote");
-
             std::string buf = content;
-            LOG_ERROR("net", "buf: %s", buf.c_str());
             for (size_t i = 0;i < buf.size(); i++) {
                 if (buf[i] == '\'') {
                     buf[i] = '\"';
