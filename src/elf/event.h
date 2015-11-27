@@ -24,6 +24,7 @@
 namespace elf {
 int event_init(void);
 int event_fini(void);
+int event_proc(void);
 
 ///
 /// Regist new event listener.

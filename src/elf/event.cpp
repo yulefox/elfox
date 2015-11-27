@@ -16,19 +16,34 @@ typedef std::map<int, listener_list *> listener_map;
 
 static listener_map s_listeners;
 
-int event_init(void)
-{
-    MODULE_IMPORT_SWITCH;
-    return 0;
-}
+struct event_reg_t {
+    int evt;
+    callback_t *cb;
 
-int event_fini(void)
-{
-    MODULE_IMPORT_SWITCH;
-    return 0;
-}
+    event_reg_t(int e, callback_t *c) :
+        evt(e),
+        cb(c)
+    {
+    }
+};
 
-void event_regist(int evt, callback_t *cb)
+struct event_unreg_t {
+    oid_t oid;
+    oid_t lid;
+    int evt;
+
+    event_unreg_t(oid_t o, oid_t l, int e) :
+        oid(o),
+        lid(l),
+        evt(e)
+    {
+    }
+};
+
+static std::list<event_reg_t *> s_regs;
+static std::list<event_unreg_t *> s_unregs;
+
+static void regist(int evt, callback_t *cb)
 {
     assert(cb);
     callback_list *cl = NULL;
@@ -62,7 +77,7 @@ void event_regist(int evt, callback_t *cb)
     }
 }
 
-void event_unregist(oid_t oid, oid_t lid, int evt)
+static void unregist(oid_t oid, oid_t lid, int evt)
 {
     LOG_TRACE("event", "<%lld> <%lld> unregist event %d.",
             oid, lid, evt);
@@ -131,6 +146,56 @@ void event_unregist(oid_t oid, oid_t lid, int evt)
     }
 }
 
+int event_init(void)
+{
+    MODULE_IMPORT_SWITCH;
+    return 0;
+}
+
+int event_fini(void)
+{
+    MODULE_IMPORT_SWITCH;
+    return 0;
+}
+
+int event_proc(void)
+{
+    std::list<event_reg_t *>::const_iterator itr_r = s_regs.begin();
+    std::list<event_unreg_t *>::const_iterator itr_u = s_unregs.begin();
+
+    for (; itr_u != s_unregs.end(); ++itr_u) {
+        event_unreg_t *s = *itr_u;
+
+        unregist(s->oid, s->lid, s->evt);
+        E_DELETE(s);
+    }
+
+    for (; itr_r != s_regs.end(); ++itr_r) {
+        event_reg_t *s = *itr_r;
+
+        regist(s->evt, s->cb);
+        E_DELETE(s);
+    }
+
+    s_regs.clear();
+    s_unregs.clear();
+    return 0;
+}
+
+void event_regist(int evt, callback_t *cb)
+{
+    event_reg_t *s = E_NEW event_reg_t(evt, cb);
+
+    s_regs.push_back(s);
+}
+
+void event_unregist(oid_t oid, oid_t lid, int evt)
+{
+    event_unreg_t *s = E_NEW event_unreg_t(oid, lid, evt);
+
+    s_unregs.push_back(s);
+}
+
 void event_emit(int evt, int arg_a, int arg_b, oid_t oid)
 {
     LOG_TRACE("event", "<%lld> emit event %d:%d(%d).",
@@ -151,10 +216,10 @@ void event_emit(int evt, int arg_a, int arg_b, oid_t oid)
         return;
     }
 
-    callback_list cl = *(itr_l->second);
-    callback_list::iterator itr_c = cl.begin();
+    callback_list *cl = itr_l->second;
+    callback_list::iterator itr_c = cl->begin();
 
-    for (; itr_c != cl.end(); ++itr_c) {
+    for (; itr_c != cl->end(); ++itr_c) {
         callback_t *cb = itr_c->second;
 
         cb->tid = oid;
