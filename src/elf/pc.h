@@ -70,8 +70,7 @@ public:
         pthread_mutex_unlock(&_ready);
 
         pthread_mutex_lock(&_mutex);
-        clone = _queue;
-        _queue.clear();
+        _queue.swap(clone);
         pthread_mutex_unlock(&_mutex);
         return 0;
     }

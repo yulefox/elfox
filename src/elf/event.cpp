@@ -16,32 +16,47 @@ typedef std::map<int, listener_list *> listener_map;
 
 static listener_map s_listeners;
 
-struct event_reg_t {
+enum event_oper {
+    EVENT_OPER_REGIST,
+    EVENT_OPER_UNREGIST,
+    EVENT_OPER_EMIT,
+};
+
+struct event_oper_t {
+    int oper;
     int evt;
+    int arg_a;
+    int arg_b;
+    oid_t oid;
+    oid_t lid;
     callback_t *cb;
 
-    event_reg_t(int e, callback_t *c) :
+    event_oper_t(int e, callback_t *c) :
+        oper(EVENT_OPER_REGIST),
         evt(e),
         cb(c)
     {
     }
-};
 
-struct event_unreg_t {
-    oid_t oid;
-    oid_t lid;
-    int evt;
-
-    event_unreg_t(oid_t o, oid_t l, int e) :
+    event_oper_t(int e, oid_t o, oid_t l) :
+        oper(EVENT_OPER_UNREGIST),
+        evt(e),
         oid(o),
-        lid(l),
-        evt(e)
+        lid(l)
+    {
+    }
+
+    event_oper_t(int e, int a, int b, oid_t o) :
+        oper(EVENT_OPER_EMIT),
+        evt(e),
+        arg_a(a),
+        arg_b(b),
+        oid(o)
     {
     }
 };
 
-static std::list<event_reg_t *> s_regs;
-static std::list<event_unreg_t *> s_unregs;
+static std::list<event_oper_t *> s_ops;
 
 static void regist(int evt, callback_t *cb)
 {
@@ -77,7 +92,7 @@ static void regist(int evt, callback_t *cb)
     }
 }
 
-static void unregist(oid_t oid, oid_t lid, int evt)
+static void unregist(int evt, oid_t oid, oid_t lid)
 {
     LOG_TRACE("event", "<%lld> <%lld> unregist event %d.",
             oid, lid, evt);
@@ -146,57 +161,7 @@ static void unregist(oid_t oid, oid_t lid, int evt)
     }
 }
 
-int event_init(void)
-{
-    MODULE_IMPORT_SWITCH;
-    return 0;
-}
-
-int event_fini(void)
-{
-    MODULE_IMPORT_SWITCH;
-    return 0;
-}
-
-int event_proc(void)
-{
-    std::list<event_reg_t *>::const_iterator itr_r = s_regs.begin();
-    std::list<event_unreg_t *>::const_iterator itr_u = s_unregs.begin();
-
-    for (; itr_u != s_unregs.end(); ++itr_u) {
-        event_unreg_t *s = *itr_u;
-
-        unregist(s->oid, s->lid, s->evt);
-        E_DELETE(s);
-    }
-
-    for (; itr_r != s_regs.end(); ++itr_r) {
-        event_reg_t *s = *itr_r;
-
-        regist(s->evt, s->cb);
-        E_DELETE(s);
-    }
-
-    s_regs.clear();
-    s_unregs.clear();
-    return 0;
-}
-
-void event_regist(int evt, callback_t *cb)
-{
-    event_reg_t *s = E_NEW event_reg_t(evt, cb);
-
-    s_regs.push_back(s);
-}
-
-void event_unregist(oid_t oid, oid_t lid, int evt)
-{
-    event_unreg_t *s = E_NEW event_unreg_t(oid, lid, evt);
-
-    s_unregs.push_back(s);
-}
-
-void event_emit(int evt, int arg_a, int arg_b, oid_t oid)
+static void emit(int evt, int arg_a, int arg_b, oid_t oid)
 {
     LOG_TRACE("event", "<%lld> emit event %d:%d(%d).",
             oid, evt, arg_a, arg_b);
@@ -227,6 +192,68 @@ void event_emit(int evt, int arg_a, int arg_b, oid_t oid)
         cb->targ_b = arg_b;
         cb->func(cb);
     }
+}
+
+int event_init(void)
+{
+    MODULE_IMPORT_SWITCH;
+    return 0;
+}
+
+int event_fini(void)
+{
+    MODULE_IMPORT_SWITCH;
+    return 0;
+}
+
+int event_proc(void)
+{
+    std::list<event_oper_t *> ops;
+
+    s_ops.swap(ops);
+
+    std::list<event_oper_t *>::const_iterator itr = ops.begin();
+    for (; itr != ops.end(); ++itr) {
+        event_oper_t *op = *itr;
+
+        switch (op->oper) {
+            case EVENT_OPER_REGIST:
+                regist(op->evt, op->cb);
+                break;
+            case EVENT_OPER_UNREGIST:
+                unregist(op->evt, op->oid, op->lid);
+                break;
+            case EVENT_OPER_EMIT:
+                emit(op->evt, op->arg_a, op->arg_b, op->oid);
+                break;
+            default:
+                assert(0);
+                break;
+        }
+        E_DELETE(op);
+    }
+    return 0;
+}
+
+void event_regist(int evt, callback_t *cb)
+{
+    event_oper_t *op = E_NEW event_oper_t(evt, cb);
+
+    s_ops.push_back(op);
+}
+
+void event_unregist(oid_t oid, oid_t lid, int evt)
+{
+    event_oper_t *op = E_NEW event_oper_t(evt, oid, lid);
+
+    s_ops.push_back(op);
+}
+
+void event_emit(int evt, int arg_a, int arg_b, oid_t oid)
+{
+    event_oper_t *op = E_NEW event_oper_t(evt, arg_a, arg_b, oid);
+
+    s_ops.push_back(op);
 }
 } // namespace elf
 
