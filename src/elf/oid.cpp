@@ -9,7 +9,7 @@
 
 namespace elf {
 int MAGIC_INDEX = 0;
-const int MAX_INDEX = 100000ll;
+const int MAX_INDEX  = 920000ll;
 const oid_t MAX_TIME = 10000000000000ll;
 
 oid_t oid_gen(void)
