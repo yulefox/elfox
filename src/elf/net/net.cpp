@@ -4,6 +4,7 @@
  */
 
 #include <elf/elf.h>
+#include <elf/lock.h>
 #include <elf/net/net.h>
 #include <elf/net/message.h>
 #include <elf/pc.h>
@@ -69,7 +70,7 @@ struct peer_t {
 
 struct context_t {
     peer_t peer;
-    pthread_spinlock_t lock;
+    mutex_t lock;
     blob_t *recv_data;
     blob_t *send_data;
     cipher_t *encipher;
@@ -86,8 +87,8 @@ typedef std::set<oid_t> context_set;
 
 static thread_t s_tid; // io thread
 static thread_t s_cid; // context thread
-static pthread_spinlock_t s_context_lock;
-static pthread_spinlock_t s_pre_context_lock;
+static spin_t s_context_lock;
+static spin_t s_pre_context_lock;
 static int s_epoll;
 static int s_sock;
 static recv_message_xqueue s_recv_msgs;
@@ -131,10 +132,10 @@ static void *context_thread(void *args)
         context_set pre_peers;
         context_set::iterator itr;
 
-        pthread_spin_lock(&s_pre_context_lock);
+        spin_lock(&s_pre_context_lock);
         pre_peers = s_pre_contexts;
         s_pre_contexts.clear();
-        pthread_spin_unlock(&s_pre_context_lock);
+        spin_unlock(&s_pre_context_lock);
 
         for (itr = pre_peers.begin(); itr != pre_peers.end(); ++itr) {
             context_close(*itr);
@@ -482,10 +483,10 @@ static context_t *context_init(oid_t peer, int fd,
     blob_init(ctx->recv_data);
     blob_init(ctx->send_data);
     event_init(ctx);
-    pthread_spin_init(&ctx->lock, PTHREAD_PROCESS_PRIVATE);
-    pthread_spin_lock(&s_context_lock);
+    mutex_init(&ctx->lock);
+    spin_lock(&s_context_lock);
     s_contexts[ctx->peer.id] = ctx;
-    pthread_spin_unlock(&s_context_lock);
+    spin_unlock(&s_context_lock);
 
     recv_message_t *msg = recv_message_init(ctx);
 
@@ -499,14 +500,14 @@ static void context_close(oid_t peer)
 {
     context_t *ctx = NULL;
 
-    pthread_spin_lock(&s_context_lock);
+    spin_lock(&s_context_lock);
     context_map::iterator itr = s_contexts.find(peer);
 
     if (itr != s_contexts.end()) {
         ctx = itr->second;
         s_contexts.erase(itr);
     }
-    pthread_spin_unlock(&s_context_lock);
+    spin_unlock(&s_context_lock);
 
     if (ctx == NULL) {
         return;
@@ -526,7 +527,7 @@ static void context_close(oid_t peer)
 static void context_fini(context_t *ctx)
 {
     assert(ctx);
-    pthread_spin_destroy(&ctx->lock);
+    mutex_fini(&ctx->lock);
     LOG_TRACE("net", "%s is FREED. S: %d/%d R: %d/%d.",
             ctx->peer.info,
             ctx->send_data->pending_size,
@@ -545,12 +546,12 @@ static context_t *context_find(oid_t peer)
     context_t *ctx = NULL;
     context_map::const_iterator itr;
 
-    pthread_spin_lock(&s_context_lock);
+    spin_lock(&s_context_lock);
     itr = s_contexts.find(peer);
     if (itr != s_contexts.end()) {
         ctx = itr->second;
     }
-    pthread_spin_unlock(&s_context_lock);
+    spin_unlock(&s_context_lock);
     return ctx;
 }
 
@@ -573,7 +574,7 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
 static void push_send(context_t *ctx, blob_t *msg)
 {
     assert(ctx && msg);
-    pthread_spin_lock(&(ctx->lock));
+    mutex_lock(&(ctx->lock));
     chunk_queue::const_iterator itr = msg->chunks.begin();
 
     for (; itr != msg->chunks.end(); ++itr) {
@@ -585,7 +586,7 @@ static void push_send(context_t *ctx, blob_t *msg)
     msg->chunks.clear();
     ctx->send_data->pending_size += msg->total_size;
     ctx->send_data->total_size += msg->total_size;
-    pthread_spin_unlock(&(ctx->lock));
+    mutex_unlock(&(ctx->lock));
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
         LOG_INFO("net", "%s epoll_ctl FAILED: %s.",
@@ -598,13 +599,13 @@ static void push_send(context_t *ctx, chunk_queue &chunks)
 {
     assert(ctx);
 
-    pthread_spin_lock(&(ctx->lock));
+    mutex_lock(&(ctx->lock));
     chunk_queue::const_reverse_iterator itr = chunks.rbegin();
 
     for (; itr != chunks.rend(); ++itr) {
         ctx->send_data->chunks.push_front(*itr);
     }
-    pthread_spin_unlock(&(ctx->lock));
+    mutex_unlock(&(ctx->lock));
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
         LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
@@ -618,7 +619,7 @@ static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
     assert(ctx);
 
     chunk_t *c = NULL;
-    pthread_spin_lock(&(ctx->lock));
+    mutex_lock(&(ctx->lock));
     if (!ctx->send_data->chunks.empty()) {
         c = ctx->send_data->chunks.front();
         ctx->send_data->chunks.pop_front();
@@ -626,7 +627,7 @@ static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
 
         epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt));			
     }
-    pthread_spin_unlock(&(ctx->lock));
+    mutex_unlock(&(ctx->lock));
     return c;
 }
 
@@ -638,8 +639,8 @@ int net_init(void)
         LOG_ERROR("net", "epoll_create FAILED: %s.", strerror(errno));
         return -1;
     }
-    pthread_spin_init(&s_context_lock, PTHREAD_PROCESS_PRIVATE);
-    pthread_spin_init(&s_pre_context_lock, PTHREAD_PROCESS_PRIVATE);
+    spin_init(&s_context_lock);
+    spin_init(&s_pre_context_lock);
     s_tid = thread_init(net_thread, NULL);
     s_cid = thread_init(context_thread, NULL);
     return 0;
@@ -648,8 +649,8 @@ int net_init(void)
 int net_fini(void)
 {
     MODULE_IMPORT_SWITCH;
-    pthread_spin_destroy(&s_pre_context_lock);
-    pthread_spin_destroy(&s_context_lock);
+    spin_fini(&s_pre_context_lock);
+    spin_fini(&s_context_lock);
     close(s_epoll);
     return 0;
 }
@@ -745,9 +746,9 @@ void net_close(oid_t peer)
     if (peer <= 0) {
         return;
     }
-    pthread_spin_lock(&s_pre_context_lock);
+    spin_lock(&s_pre_context_lock);
     s_pre_contexts.insert(peer);
-    pthread_spin_unlock(&s_pre_context_lock);
+    spin_unlock(&s_pre_context_lock);
 }
 
 int net_proc(void)

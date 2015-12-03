@@ -19,7 +19,6 @@
 
 #include <elf/cipher.h>
 #include <elf/config.h>
-#include <elf/mutex.h>
 #include <elf/oid.h>
 #include <elf/pb.h>
 #include <sys/epoll.h>

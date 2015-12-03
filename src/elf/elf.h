@@ -25,6 +25,7 @@
 #   define ELF_USE_HTTP
 #   define ELF_USE_INPUT
 #   define ELF_USE_JSON
+#   define ELF_USE_LOCK
 #   define ELF_USE_MATCHMAKING
 #   define ELF_USE_MD5
 #   define ELF_USE_NET
@@ -77,6 +78,10 @@
 #if defined(ELF_USE_JSON)
 #   include <elf/json.h>
 #endif /* ELF_USE_JSON */
+
+#if defined(ELF_USE_LCOK)
+#   include <elf/lock.h>
+#endif /* ELF_USE_LOCK */
 
 #if defined(ELF_USE_LOG)
 #   include <elf/log.h>
@@ -141,7 +146,6 @@
 
 #if defined(ELF_USE_THREAD)
 #   include <elf/thread.h>
-#   include <elf/mutex.h>
 #endif /* ELF_USE_THREAD */
 
 #if defined(ELF_USE_TIME)
