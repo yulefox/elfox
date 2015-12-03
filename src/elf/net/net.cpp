@@ -159,8 +159,10 @@ static void *context_thread(void *args)
 
 static int net_update(void)
 {
-    epoll_event evts[100];
-    int num = epoll_wait(s_epoll, evts, sizeof(evts)/sizeof(evts[0]), 5);
+#define EPOLL_EVENT_DEFAULT_SIZE    1024
+
+    epoll_event evts[EPOLL_EVENT_DEFAULT_SIZE];
+    int num = epoll_wait(s_epoll, evts, EPOLL_EVENT_DEFAULT_SIZE, 5);
 
     if (num < 0 && errno != EINTR) {
         LOG_ERROR("net", "epoll_wait FAILED: %s.",
