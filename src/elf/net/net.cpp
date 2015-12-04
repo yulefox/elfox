@@ -353,7 +353,7 @@ static bool message_splice(context_t *ctx)
     }
 
     if (msg_size < 0 || msg_size > MESSAGE_MAX_VALID_SIZE) {
-        LOG_WARN("net", "%s INVALID message size: %d.",
+        LOG_TRACE("net", "%s INVALID message size: %d.",
                 ctx->peer.info,
                 msg_size);
         net_close(ctx->peer.id);
@@ -371,7 +371,7 @@ static bool message_splice(context_t *ctx)
     }
 
     if (name_len < 0 || name_len > msg_size) {
-        LOG_WARN("net", "%s INVALID name length: %d:%d.",
+        LOG_TRACE("net", "%s INVALID name length: %d:%d.",
                 ctx->peer.info,
                 msg_size, name_len);
         net_close(ctx->peer.id);
@@ -380,7 +380,7 @@ static bool message_splice(context_t *ctx)
 
     int body_len = msg_size - SIZE_INTX2 - name_len;
     if (body_len < 0) {
-        LOG_WARN("net", "%s INVALID message size %d:%d:%d.",
+        LOG_TRACE("net", "%s INVALID message size %d:%d:%d.",
                 ctx->peer.info,
                 msg_size, name_len, body_len);
         net_close(ctx->peer.id);
@@ -1082,12 +1082,6 @@ static void on_read(const epoll_event &evt)
         }
     }
     push_recv(ctx, chunks);
-    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock,
-                &(ctx->evt))) {
-        LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
-                ctx->peer.info,
-                strerror(errno));
-    }
 }
 
 static void on_write(const epoll_event &evt)
