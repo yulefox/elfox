@@ -769,11 +769,10 @@ int net_proc(void)
 void net_stat(void)
 {
     context_t *ctx = NULL;
-    context_map::const_iterator itr;
+    context_map::const_iterator itr = s_contexts.begin();
 
     spin_lock(&s_context_lock);
-    itr = s_contexts.find(peer);
-    if (itr != s_contexts.end()) {
+    for (; itr != s_contexts.end(); ++itr) {
         ctx = itr->second;
 
         LOG_INFO("net", "%lld: RECV %d/%d SEND %d/%d.",
