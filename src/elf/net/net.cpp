@@ -768,6 +768,22 @@ int net_proc(void)
 
 void net_stat(void)
 {
+    context_t *ctx = NULL;
+    context_map::const_iterator itr;
+
+    spin_lock(&s_context_lock);
+    itr = s_contexts.find(peer);
+    if (itr != s_contexts.end()) {
+        ctx = itr->second;
+
+        LOG_INFO("net", "%lld: RECV %d/%d SEND %d/%d.",
+                ctx->peer.id,
+                ctx->recv_data->pending_size,
+                ctx->recv_data->total_size,
+                ctx->send_data->pending_size,
+                ctx->send_data->total_size);
+    }
+    spin_unlock(&s_context_lock);
 }
 
 const char *net_peer_ip(const context_t *ctx)

@@ -177,17 +177,16 @@ void timer_run(void)
         timer_t *head = s_mgr.timers[bucket];
         timer_t *t = head;
 
-        while (t) {
-            timer_t *n = t->next;
-
+        while (t) { // expire all timers
+            s_mgr.timers[bucket] = t->next;
             expire(t);
             ++s_mgr.timer_passed;
             --s_mgr.timer_remain;
-            if (n == head) {
+            if (head == s_mgr.timers[bucket]) {
                 s_mgr.timers[bucket] = NULL;
                 break;
             }
-            t = n;
+            t = s_mgr.timers[bucket];
         }
         bingo();
     }
@@ -223,6 +222,8 @@ const oid_t &timer_add(time64_t life, const char *func)
     t->cursor.a = (FRAME_CALC(t->life) + s_mgr.cursor.a) % MAX_CURSOR;
     t->script = true;
     strcpy(t->cb.script, func);
+    t->prev = NULL;
+    t->next = NULL;
     t->args = NULL;
     t->manual = true;
     schedule(t);
@@ -253,6 +254,8 @@ const oid_t &timer_add(time64_t life, callback func, void *args, bool manual)
     t->cursor.a = (FRAME_CALC(t->life) + s_mgr.cursor.a) % MAX_CURSOR;
     t->script = false;
     t->cb.func = func;
+    t->prev = NULL;
+    t->next = NULL;
     t->args = args;
     t->manual = manual;
     schedule(t);
@@ -424,6 +427,8 @@ static void bingo(void)
     ++next_cursor.a;
     if (WHEEL_CMP(next_cursor, 3)) {
         bucket = BUCKET_MAP(next_cursor, 3);
+        LOG_WARN("timer", "WHEEL 3 <%d>.",
+                next_cursor.a);
     } else if (WHEEL_CMP(next_cursor, 2)) {
         bucket = BUCKET_MAP(next_cursor, 2);
     } else if (WHEEL_CMP(next_cursor, 1)) {
