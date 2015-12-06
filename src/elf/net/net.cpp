@@ -61,6 +61,7 @@ struct chunk_t {
 };
 
 struct peer_t {
+    int idx;
     int sock;
     oid_t id;
     char ip[20];
@@ -103,7 +104,7 @@ static std::set<std::string> s_raw_msgs;
 ///
 static int net_update(void);
 
-static context_t *context_init(oid_t peer, int fd,
+static context_t *context_init(int idx, oid_t peer, int fd,
         const struct sockaddr_in &addr);
 static void context_close(oid_t peer);
 static void context_fini(context_t *ctx);
@@ -460,16 +461,18 @@ static void event_init(context_t *ctx)
     evt->events = EPOLLIN|EPOLLOUT|EPOLLET|EPOLLERR;
 }
 
-static context_t *context_init(oid_t peer, int fd,
+static context_t *context_init(int idx, oid_t peer, int fd,
         const struct sockaddr_in &addr)
 {
     context_t *ctx = E_NEW context_t;
 
+    ctx->peer.idx = idx;
     ctx->peer.id = (peer != OID_NIL) ? peer : oid_gen();
     ctx->peer.sock = fd;
     strcpy(ctx->peer.ip, inet_ntoa(addr.sin_addr));
     ctx->peer.port = ntohs(addr.sin_port);
-    sprintf(ctx->peer.info, "<%d>%lld (%s:%d)",
+    sprintf(ctx->peer.info, "%d <%d>%lld (%s:%d)",
+            ctx->peer.idx,
             ctx->peer.sock,
             ctx->peer.id,
             ctx->peer.ip,
@@ -661,8 +664,7 @@ void net_encrypt(encrypt_func encry, encrypt_func decry)
 {
 }
 
-int net_listen(oid_t peer, const std::string &name,
-        const std::string &ip, int port)
+int net_listen(const std::string &name, const std::string &ip, int port)
 {
     s_sock = socket(AF_INET, SOCK_STREAM, 0);
     set_nonblock(s_sock);
@@ -708,7 +710,7 @@ int net_listen(oid_t peer, const std::string &name,
     return 0;
 }
 
-int net_connect(oid_t peer, const std::string &name,
+int net_connect(int idx, oid_t peer, const std::string &name,
         const std::string &ip, int port)
 {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -731,7 +733,7 @@ int net_connect(oid_t peer, const std::string &name,
     // @todo ON_CONNECT
     set_nonblock(fd);
     getsockname(fd, (struct sockaddr *)(&addr), &len);
-    context_t *ctx = context_init(peer, fd, addr);
+    context_t *ctx = context_init(idx, peer, fd, addr);
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
         LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
@@ -775,7 +777,8 @@ void net_stat(void)
     for (; itr != s_contexts.end(); ++itr) {
         ctx = itr->second;
 
-        LOG_INFO("net", "%lld: RECV %d/%d SEND %d/%d.",
+        LOG_INFO("net", "%d %lld: RECV %d/%d SEND %d/%d.",
+                ctx->peer.idx,
                 ctx->peer.id,
                 ctx->recv_data->pending_size,
                 ctx->recv_data->total_size,
@@ -783,6 +786,21 @@ void net_stat(void)
                 ctx->send_data->total_size);
     }
     spin_unlock(&s_context_lock);
+}
+
+void net_peer_stat(oid_t peer)
+{
+    context_t *ctx = context_find(peer);
+
+    if (ctx != NULL) {
+        LOG_INFO("net", "%d %lld: RECV %d/%d SEND %d/%d.",
+                ctx->peer.idx,
+                ctx->peer.id,
+                ctx->recv_data->pending_size,
+                ctx->recv_data->total_size,
+                ctx->send_data->pending_size,
+                ctx->send_data->total_size);
+    }
 }
 
 const char *net_peer_ip(const context_t *ctx)
@@ -1021,7 +1039,7 @@ static void on_accept(const epoll_event &evt)
         // @todo ON_ACCEPT
         set_nonblock(fd);
 
-        context_t *ctx = context_init(OID_NIL, fd, addr);
+        context_t *ctx = context_init(0, OID_NIL, fd, addr);
 
         LOG_DEBUG("net", "%s", "accept new connection...");
 

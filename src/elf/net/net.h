@@ -58,24 +58,23 @@ void net_encrypt(encrypt_func encry, encrypt_func decry);
 
 ///
 /// Start server.
-/// @param peer Server id, not used now.
 /// @param name Server name.
 /// @param ip Listen ip string.
 /// @param port Listen port.
 /// @return (0).
 ///
-int net_listen(oid_t peer, const std::string &name,
-        const std::string &ip, int port);
+int net_listen(const std::string &name, const std::string &ip, int port);
 
 ///
 /// Start client.
+/// @param idx Application index.
 /// @param peer Peer id.
 /// @param name Peer name.
 /// @param ip Peer ip string.
 /// @param port Peer port.
 /// @return (0).
 ///
-int net_connect(oid_t peer, const std::string &name,
+int net_connect(int idx, oid_t peer, const std::string &name,
         const std::string &ip, int port);
 
 ///
@@ -95,6 +94,12 @@ int net_proc(void);
 /// @return (0).
 ///
 void net_stat(void);
+
+///
+/// Output statistics info of given peer.
+/// @param[in] peer Peer id.
+///
+void net_peer_stat(oid_t peer);
 
 ///
 /// Get peer address ip.
