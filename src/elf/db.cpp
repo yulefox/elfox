@@ -240,6 +240,10 @@ int db_connect(int idx, const std::string &host, const std::string &user,
         th_list->idx = idx;
         th_list->num = num;
         th_list->threads = E_NEW mysql_thread_t[num];
+        for (int i = 0;i < num; i++) {
+            mysql_thread_t *th = th_list->threads + i;
+            th->mysql = NULL;
+        }
         s_threads[idx] = th_list;
     }
 
