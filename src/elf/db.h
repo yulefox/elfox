@@ -62,6 +62,7 @@ int db_proc(void);
 
 /**
  * Initialize the DB module.
+/// @param[in] idx DB index.
  * @return ELF_RC_DB_OK(0).
  */
 int db_connect(int idx, const std::string &host, const std::string &user,
@@ -76,6 +77,7 @@ int db_ping(void);
 
 ///
 /// DB request(asynchronous).
+/// @param[in] idx DB index.
 /// @param[in] cmd SQL command.
 /// @param[in] sim Run simultaneously.
 /// @param[in] proc Callback function.
