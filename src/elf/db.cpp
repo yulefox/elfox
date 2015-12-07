@@ -236,7 +236,7 @@ int db_proc(void)
     return 0;
 }
 
-void db_req(const char *cmd, bool sim, db_callback proc,
+void db_req(int idx, const char *cmd, bool sim, db_callback proc,
         oid_t oid, pb_t *out, const std::string &field)
 {
     int idx = 0;
