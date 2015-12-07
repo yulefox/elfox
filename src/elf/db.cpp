@@ -33,37 +33,63 @@ struct query_t {
     time64_t stamp;     // request time stamp
 };
 
-static const int THREAD_NUM = 5;
-static const int THREAD_INDEX[THREAD_NUM] = {0, 1, 2, 3, 4};
-static MYSQL *s_mysqls[THREAD_NUM] = {NULL, NULL, NULL, NULL};
-static thread_t s_threads[THREAD_NUM];
-static xqueue<query_t *> s_queue_req[THREAD_NUM];
+
+typedef struct mysql_thread_s {
+    int idx;
+    thread_t tid;
+    MYSQL *mysql;
+    xqueue<query_t *> req;
+} mysql_thread_t;
+
+typedef struct thread_list_s {
+    int idx;
+    int num;
+    mysql_thread_t *threads;
+}thread_list_t;
+
+typedef std::map<int, thread_list_t*> thread_list_map;
+static thread_list_map s_threads;
+
+static const int THREAD_NUM_DEFAULT = 5;
+//static const int THREAD_NUM = 5;
+//static const int THREAD_INDEX[THREAD_NUM] = {0, 1, 2, 3, 4};
+//static MYSQL *s_mysqls[THREAD_NUM] = {NULL, NULL, NULL, NULL};
+//static MYSQL_MAP s_mysqls;
+//static THREAD_MAP s_threads;
+//static xqueue<query_t *> s_queue_req[THREAD_NUM];
 static xqueue<query_t *> s_queue_res;
 
 static void *handle(void *args);
-static void query(int idx);
+static void query(mysql_thread_t *th);
 static void destroy(query_t *q);
 static void response(query_t *q);
 static void retrieve_pb(query_t *q);
 static void retrieve_field(query_t *q);
 
+volatile int _running;
+
 static void *handle(void *args)
 {
-    int idx = *((int *)args);
+    mysql_thread_t *self = (mysql_thread_t*)args;
 
-    while (true) {
-        query(idx);
+    if (self == NULL) {
+        LOG_ERROR("db", "Create thread failed: %s", "mysql_thread_t is NULL");
+        return NULL;
+    }
+
+    while (_running) {
+        query(self);
     }
     return NULL;
 }
 
-static void query(int idx)
+static void query(mysql_thread_t *th)
 {
     query_t *q;
-    MYSQL *m = s_mysqls[idx];
+    MYSQL *m = th->mysql;
 
     try {
-        s_queue_req[idx].pop(q);
+        th->req.pop(q);
         assert(m && q);
 
         // query
@@ -171,6 +197,7 @@ static void retrieve_field(query_t *q)
 int db_init(void)
 {
     MODULE_IMPORT_SWITCH;
+    _running = 1;
     return ELF_RC_DB_OK;
 }
 
@@ -178,19 +205,54 @@ int db_fini(void)
 {
     MODULE_IMPORT_SWITCH;
 
-    for (int i = 0; i < THREAD_NUM; ++i) {
-        thread_fini(s_threads[i]);
+    _running = 0;
+    thread_list_map::iterator itr = s_threads.begin();
+    for (;itr != s_threads.end(); ++itr) {
+        thread_list_t *th_list = itr->second;
+        for (int i = 0;i < th_list->num; ++i) {
+            mysql_thread_t *th = th_list->threads + i;
+            thread_fini(th->tid);
+            if (th->mysql) {
+                mysql_close(th->mysql);
+            }
+        }
+        E_DELETE th_list->threads;
+        E_DELETE th_list;
     }
+    s_threads.clear();
     return ELF_RC_DB_OK;
 }
 
-int db_connect(const std::string &host, const std::string &user,
-        const std::string &passwd, const std::string &db, unsigned int port)
+int db_connect(int idx, const std::string &host, const std::string &user,
+        const std::string &passwd, const std::string &db, unsigned int port,
+        int num)
 {
-    for (int i = 0; i < THREAD_NUM; ++i) {
-        char value = 1;
-        MYSQL *m = s_mysqls[i];
+    if (num <= 0) {
+        num = THREAD_NUM_DEFAULT;
+    }
+    thread_list_t *th_list = NULL;
 
+    thread_list_map::iterator itr = s_threads.find(idx);
+    if (itr != s_threads.end()) {
+        th_list = itr->second;
+    } else {
+        th_list = E_NEW thread_list_t;
+        th_list->idx = idx;
+        th_list->num = num;
+        th_list->threads = E_NEW mysql_thread_t[num];
+        for (int i = 0;i < num; i++) {
+            mysql_thread_t *th = th_list->threads + i;
+            th->mysql = NULL;
+        }
+        s_threads[idx] = th_list;
+    }
+
+    for (int i = 0; i < num; ++i) {
+        mysql_thread_t *th = NULL;
+        th = th_list->threads + i;
+
+        char value = 1;
+        MYSQL * m = th->mysql;
         try {
             if (m && 0 == mysql_ping(m)) {
                 return ELF_RC_DB_OK;
@@ -205,11 +267,8 @@ int db_connect(const std::string &host, const std::string &user,
                         mysql_error(m));
                 return ELF_RC_DB_INIT_FAILED;
             }
-
-            thread_t tid = thread_init(handle, (void *)(THREAD_INDEX + i));
-
-            s_threads[i] = tid;
-            s_mysqls[i] = m;
+            th->mysql = m;
+            th->tid = thread_init(handle, (void *)th);
         } catch(...) {
             LOG_ERROR("db", "Connect DB failed: %s.",
                     mysql_error(m));
@@ -221,7 +280,7 @@ int db_connect(const std::string &host, const std::string &user,
 
 int db_proc(void)
 {
-    if (s_mysqls[0] == NULL) return -1;
+    if (s_threads.empty()) return -1;
 
     std::deque<query_t *> list;
     std::deque<query_t *>::iterator itr;
@@ -239,7 +298,13 @@ int db_proc(void)
 void db_req(int idx, const char *cmd, bool sim, db_callback proc,
         oid_t oid, pb_t *out, const std::string &field)
 {
-    int idx = 0;
+    thread_list_map::iterator itr = s_threads.find(idx);
+    if (itr == s_threads.end()) {
+        return;
+    }
+    thread_list_t *th_list = itr->second;
+
+    int tidx = 0;
     query_t *q = E_NEW query_t;
 
     if (proc == NULL && out == NULL) {
@@ -259,9 +324,10 @@ void db_req(int idx, const char *cmd, bool sim, db_callback proc,
     q->proc = proc;
     q->data = NULL;
     if (sim) {
-        idx = oid % (THREAD_NUM - 1) + 1;
+        tidx = oid % (th_list->num - 1) + 1;
     }
-    s_queue_req[idx].push(q);
+    mysql_thread_t *th = th_list->threads + tidx;
+    th->req.push(q);
 }
 
 void response(query_t *q)
@@ -295,8 +361,13 @@ void response(query_t *q)
 size_t db_pending_size(void)
 {
     size_t sum = 0;
-    for (int i = 0; i < THREAD_NUM; ++i) {
-        sum += s_queue_req[i].size();
+    thread_list_map::iterator itr = s_threads.begin();
+    for (;itr != s_threads.end(); ++itr) {
+        thread_list_t *th_list = itr->second;
+        for (int i = 0;i < th_list->num; i++) {
+            mysql_thread_t *th = th_list->threads + i;
+            sum += th->req.size();
+        }
     }
     return sum;
 }

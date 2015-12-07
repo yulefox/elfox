@@ -62,10 +62,12 @@ int db_proc(void);
 
 /**
  * Initialize the DB module.
+/// @param[in] idx DB index.
  * @return ELF_RC_DB_OK(0).
  */
-int db_connect(const std::string &host, const std::string &user,
-        const std::string &passwd, const std::string &db, unsigned int port);
+int db_connect(int idx, const std::string &host, const std::string &user,
+        const std::string &passwd, const std::string &db, unsigned int port,
+        int threads);
 
 /**
  * Check connection, reconnect if dropped.

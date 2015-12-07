@@ -517,6 +517,7 @@ static void context_close(oid_t peer)
     if (ctx == NULL) {
         return;
     }
+    close(ctx->peer.sock);
 
     recv_message_t *msg = recv_message_init(ctx);
 
@@ -524,7 +525,6 @@ static void context_close(oid_t peer)
     msg->peer = peer;
     s_recv_msgs.push(msg);
 
-    close(ctx->peer.sock);
     ctx->close_time = time_s();
     s_free_contexts.push(ctx);
 }

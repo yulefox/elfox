@@ -260,7 +260,7 @@ static bool load_xml(const std::string &path, pb_t *cfg)
     return true;
 }
 
-static bool load_tbl(const std::string &tbl_name, pb_t *cfg,
+static bool load_tbl(int idx, const std::string &tbl_name, pb_t *cfg,
         int type, db_callback proc)
 {
     char sql[1024];
@@ -269,12 +269,12 @@ static bool load_tbl(const std::string &tbl_name, pb_t *cfg,
             tbl_name.c_str());
     LOG_TRACE("db",
             "SQL: `%s'", sql);
-    db_req(sql, false, proc, type, cfg, "item");
+    db_req(idx, sql, false, proc, type, cfg, "item");
     return true;
 }
 
 pb_t *config_load(const std::string &name, const std::string &path,
-       int type, db_callback proc)
+       int type, db_callback proc, int idx)
 {
     pb_t *cfg = pb_create(name);
     std::string ext = path;
@@ -290,7 +290,7 @@ pb_t *config_load(const std::string &name, const std::string &path,
     } else if (ext == "xml") {
         res = load_xml(path, cfg);
     } else if (ext == path) {
-        res = load_tbl(path, cfg, type, proc);
+        res = load_tbl(idx, path, cfg, type, proc);
         cfg = NULL;
     }
 
