@@ -33,7 +33,7 @@ namespace elf {
 /// @return Config object if loaded done, or NULL.
 ///
 pb_t *config_load(const std::string &name, const std::string &path,
-        int type = 0, db_callback proc = NULL);
+        int type = 0, db_callback proc = NULL, int idx = 0);
 } // namespace elf
 
 #endif /* !ELF_CP_H */

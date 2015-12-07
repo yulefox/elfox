@@ -64,8 +64,9 @@ int db_proc(void);
  * Initialize the DB module.
  * @return ELF_RC_DB_OK(0).
  */
-int db_connect(const std::string &host, const std::string &user,
-        const std::string &passwd, const std::string &db, unsigned int port);
+int db_connect(int idx, const std::string &host, const std::string &user,
+        const std::string &passwd, const std::string &db, unsigned int port,
+        int threads);
 
 /**
  * Check connection, reconnect if dropped.
@@ -82,7 +83,7 @@ int db_ping(void);
 /// @param[out] out Store query data.
 /// @param[in] field pb field.
 ///
-void db_req(const char *cmd, bool sim = false, db_callback proc = NULL,
+void db_req(int idx, const char *cmd, bool sim = false, db_callback proc = NULL,
         oid_t oid = OID_NIL, pb_t *out = NULL,
         const std::string &field = "");
 
