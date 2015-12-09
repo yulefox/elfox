@@ -1148,8 +1148,10 @@ static void on_write(const epoll_event &evt)
             } else {
                 rem -= num;
                 c->offset += num;
+                mutex_lock(&(ctx->lock));
                 ctx->send_data->pending_size -= num;
                 ctx->send_data->total_size += num;
+                mutex_unlock(&(ctx->lock));
             }
         }
         chunk_fini(c);

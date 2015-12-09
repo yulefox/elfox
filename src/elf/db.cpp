@@ -358,16 +358,18 @@ void response(query_t *q)
     destroy(q);
 }
 
-size_t db_pending_size(void)
+size_t db_pending_size(int idx)
 {
     size_t sum = 0;
-    thread_list_map::iterator itr = s_threads.begin();
-    for (;itr != s_threads.end(); ++itr) {
-        thread_list_t *th_list = itr->second;
-        for (int i = 0;i < th_list->num; i++) {
-            mysql_thread_t *th = th_list->threads + i;
-            sum += th->req.size();
-        }
+    thread_list_map::iterator itr = s_threads.find(idx);
+    if (itr == s_threads.end()) {
+        return 0;
+    }
+
+    thread_list_t *th_list = itr->second;
+    for (int i = 0;i < th_list->num; i++) {
+        mysql_thread_t *th = th_list->threads + i;
+        sum += th->req.size();
     }
     return sum;
 }

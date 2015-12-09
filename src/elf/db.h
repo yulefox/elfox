@@ -91,9 +91,10 @@ void db_req(int idx, const char *cmd, bool sim = false, db_callback proc = NULL,
 
 ///
 /// Get size of pending request queues.
+/// @param[in] idx DB index.
 /// @return Size of pending request queues.
 ///
-size_t db_pending_size(void);
+size_t db_pending_size(int idx);
 } // namespace elf
 
 #endif /* !ELF_DB_H */
