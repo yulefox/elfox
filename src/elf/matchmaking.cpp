@@ -158,8 +158,9 @@ namespace elf {
         return NULL;
     }
 
-    bool MatchPool::pop(int size_type) {
-        std::vector<std::vector<MatchEntity*> > camps(_camp_size);
+    bool MatchPool::pop(int size_type, std::vector<std::vector<MatchEntity*> > &camps) {
+
+        camps.reserve(_camp_size);
 
         MatchEntity *ent = top(size_type);
         if (ent == NULL) {
@@ -199,24 +200,20 @@ namespace elf {
     bool MatchPool::pop(MatchRes &res) {
         std::vector<std::vector<MatchEntity*> > camps(_camp_size);
 
-        for (int i = _team_size;i >= 1; i--) {
-            pop(i);
+        for (size_t i = _team_size;i >= 1; i--) {
+            std::vector<std::vector<MatchEntity*> > camps;
+            pop(i, camps);
+            for (size_t j = 0;j < camps.size(); j++) {
+                TeamSet team;
+                for (size_t k = 0;k < camps[j].size(); j++) {
+                    MatchEntity *ent = camps[j][k];
+                    if (ent) {
+                        team.insert(ent->id);
+                    }
+                }
+                res.teams.push_back(team);
+            }
         }
-
-        /*
-        MatchEntity *ent = top();
-        if (ent == NULL) {
-            return false;
-        }
-
-        camps[0].push_back(ent);
-
-        MatchEntity *opt = get_opponent(ent);
-        if (opt == NULL) {
-            return false;
-        }
-        */
-
         return false;
     }
 
@@ -251,6 +248,7 @@ namespace elf {
         std::map<int, MatchPool*>::iterator itr;
         for (itr = s_pools.begin(); itr != s_pools.end(); ++itr) {
             MatchRes res;
+            res.type = itr->first; // type
             if (itr->second->pop(res)) {
                 resList.push_back(res);
             }
