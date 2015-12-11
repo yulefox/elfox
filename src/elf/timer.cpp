@@ -108,6 +108,9 @@ static void expire(timer_t *t);
 static void bingo(void);
 static void hash(int bucket);
 static bool timer_min(void *args);
+static void _timer_add(timer_t *head, timer_t *t);
+static void _timer_del(timer_t *t);
+static void _timer_remove(timer_t *t);
 
 int timer_init(void)
 {
