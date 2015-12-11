@@ -9,6 +9,7 @@
 #include <elf/timer.h>
 #include <algorithm>
 #include <list>
+#include <map>
 
 namespace elf {
 #define WHEEL_SET_BIT0                  8
@@ -45,7 +46,9 @@ struct timer_t {
     void *args; // callback arguments
     timer_t *next; // the next node of the tail node is NULL
     timer_t *prev; // the previous node of the head node is the tail
+    int bucket;
     bool manual; // manual destroy args
+    bool alive;
 };
 
 struct mgr_t {
@@ -66,6 +69,7 @@ struct mgr_t {
 };
 
 typedef std::list<callback> handler_list;
+typedef std::map<oid_t, timer_t*> timer_map;
 
 static handler_list s_handlers;
 
@@ -73,6 +77,7 @@ static const time64_t TIMER_FRAME_INTERVAL_DEFAULT = 50; // (ms)
 static const time64_t TIMER_FRAME_INTERVAL_MIN = 1; // (frame)
 static const time64_t TIMER_FRAME_INTERVAL_MAX = 1000; // (frame)
 static mgr_t s_mgr;
+static timer_map s_timers;
 
 /// calculate the number of life frames
 #define FRAME_CALC(t) ((time64_t)(t) / s_mgr.interval)
@@ -97,7 +102,6 @@ static mgr_t s_mgr;
 
 static void reset(void);
 static void push(timer_t *t, int bucket);
-static timer_t *get(const oid_t &tid, int *bucket);
 static void destroy(timer_t *t);
 static int schedule(timer_t *t);
 static void expire(timer_t *t);
@@ -174,19 +178,24 @@ void timer_run(void)
     }
     for (int i = 1; i <= frame; ++i) { // BINGO!
         unsigned char bucket = CURRENT_WHEEL_CURSOR;
+
         timer_t *head = s_mgr.timers[bucket];
         timer_t *t = head;
-
         while (t) { // expire all timers
-            s_mgr.timers[bucket] = t->next;
+            _timer_del(t);
+            if (!t->alive) {
+                _timer_remove(t);
+                continue;
+            }
             expire(t);
             ++s_mgr.timer_passed;
             --s_mgr.timer_remain;
-            if (head == s_mgr.timers[bucket]) {
+
+            if (t->next == t) {
                 s_mgr.timers[bucket] = NULL;
                 break;
             }
-            t = s_mgr.timers[bucket];
+            t = t->next;
         }
         bingo();
     }
@@ -222,11 +231,12 @@ const oid_t &timer_add(time64_t life, const char *func)
     t->cursor.a = (FRAME_CALC(t->life) + s_mgr.cursor.a) % MAX_CURSOR;
     t->script = true;
     strcpy(t->cb.script, func);
-    t->prev = NULL;
-    t->next = NULL;
+    t->prev = t;
+    t->next = t;
     t->args = NULL;
     t->manual = true;
-    schedule(t);
+    t->alive = true;
+    t->bucket = schedule(t);
     ++s_mgr.timer_total;
     ++s_mgr.timer_remain;
     return t->id;
@@ -254,13 +264,15 @@ const oid_t &timer_add(time64_t life, callback func, void *args, bool manual)
     t->cursor.a = (FRAME_CALC(t->life) + s_mgr.cursor.a) % MAX_CURSOR;
     t->script = false;
     t->cb.func = func;
-    t->prev = NULL;
-    t->next = NULL;
+    t->prev = t;
+    t->next = t;
     t->args = args;
     t->manual = manual;
-    schedule(t);
+    t->alive = true;
+    t->bucket = schedule(t);
     ++s_mgr.timer_total;
     ++s_mgr.timer_remain;
+    s_timers[t->id] = t;
     return t->id;
 }
 
@@ -271,21 +283,35 @@ void timer_cycle(callback func)
 
 void timer_remove(const oid_t &tid)
 {
-    int bucket;
-    timer_t *t = get(tid, &bucket);
+    timer_map::iterator itr = s_timers.find(tid);
+    if (itr != s_timers.end()) {
+        timer_t *t = itr->second;
+        t->alive = false;
+    }
+}
 
+static void _timer_add(timer_t *head, timer_t *t)
+{
+    head->next->prev = t;
+    t->next = head->next;
+    t->prev = head;
+    head->next = t;
+}
+
+static void _timer_del(timer_t *t)
+{
+    t->prev->next = t->next;
+    t->next->prev = t->prev;
+}
+
+static void _timer_remove(timer_t *t)
+{
+    if (t == NULL) {
+        return;
+    }
     if (t) {
-        timer_t *n = t->next;
+        s_timers.erase(t->id);
 
-        if (n != t) {
-            t->prev->next = n;
-            n->prev = t->prev;
-        } else {
-            n = NULL;
-        }
-        if (t == s_mgr.timers[bucket]) {
-            s_mgr.timers[bucket] = n;
-        }
         destroy(t);
         ++s_mgr.timer_cancelled;
         --s_mgr.timer_remain;
@@ -351,33 +377,11 @@ static void push(timer_t *t, int bucket)
 {
     timer_t *head = s_mgr.timers[bucket];
 
-    if (head) {
-        head->prev->next = t;
-        t->prev = head->prev;
+    if (head == NULL) {
+        s_mgr.timers[bucket] = t;
     } else {
-        head = s_mgr.timers[bucket] = t;
+        _timer_add(head, t);
     }
-    head->prev = t;
-    t->next = head;
-}
-
-static timer_t *get(const oid_t &tid, int *bucket)
-{
-    timer_t *head = NULL;
-    timer_t *t = NULL;
-
-    for (int i = 0; i < MAX_WHEEL_SET_SIZE; ++i) {
-        head = t = s_mgr.timers[i];
-        while (t) {
-            if (tid == t->id) {
-                *bucket = i;
-                return t;
-            }
-            if ((t = t->next) == head) break;
-        }
-    }
-    *bucket = 0;
-    return NULL;
 }
 
 static void destroy(timer_t *t)
@@ -444,20 +448,18 @@ static void bingo(void)
 
 static void hash(int bucket)
 {
-    timer_t *head = s_mgr.timers[bucket];
-    timer_t *t = head;
-
-    while (t) {
-        timer_t *n = t->next;
-
-        schedule(t);
-        if (n == head) {
-            s_mgr.timers[bucket] = NULL;
-            break;
-        }
-        t = n;
+    timer_t head;
+    head.prev = &head;
+    head.next = &head;
+    _timer_add(&head, s_mgr.timers[bucket]);
+    s_mgr.timers[bucket] = NULL;
+    for (timer_t *t = head.next;t != &head; t = t->next) {
+        timer_t *curr = t;
+        _timer_del(curr);
+        schedule(curr);
     }
 }
+
 static bool timer_min(void *args)
 {
     time_t cur = time_s();
