@@ -185,20 +185,22 @@ void timer_run(void)
         timer_t *head = s_mgr.timers[bucket];
         timer_t *t = head;
         while (t) { // expire all timers
-            _timer_del(t);
-            if (!t->alive) {
-                _timer_remove(t);
+            timer_t *curr = t;
+            t = t->next;
+
+            _timer_del(curr);
+            if (!curr->alive) {
+                _timer_remove(curr);
                 continue;
             }
-            expire(t);
+            expire(curr);
             ++s_mgr.timer_passed;
             --s_mgr.timer_remain;
 
-            if (t->next == t) {
+            if (t == curr) {
                 s_mgr.timers[bucket] = NULL;
                 break;
             }
-            t = t->next;
         }
         bingo();
     }
@@ -380,6 +382,9 @@ static void push(timer_t *t, int bucket)
 {
     timer_t *head = s_mgr.timers[bucket];
 
+    t->prev = t;
+    t->next = t;
+
     if (head == NULL) {
         s_mgr.timers[bucket] = t;
     } else {
@@ -456,8 +461,12 @@ static void hash(int bucket)
     head.next = &head;
     _timer_add(&head, s_mgr.timers[bucket]);
     s_mgr.timers[bucket] = NULL;
-    for (timer_t *t = head.next;t != &head; t = t->next) {
+
+    timer_t * t = head.next;
+    while (t != &head) {
         timer_t *curr = t;
+        t = t->next;
+
         _timer_del(curr);
         schedule(curr);
     }
