@@ -184,16 +184,15 @@ void timer_run(void)
         timer_t *t = head;
 
         s_mgr.timers[bucket] = NULL;
-        while (t) { // expire all timers
+        while (t != NULL) { // expire all timers
             timer_t *n = t->next;
 
             _del(t);
             if (t->cancel) {
                 _cancel(t);
-                continue;
+            } else {
+                _expire(t);
             }
-            _expire(t);
-
             if (n == head) {
                 break;
             }
@@ -341,10 +340,11 @@ static void _add(timer_t *t)
 {
     assert(t);
 
-    timer_t *head = s_mgr.timers[t->bucket];
+    int bucket = t->bucket;
+    timer_t *head = s_mgr.timers[bucket];
 
     if (head == NULL) {
-        head = s_mgr.timers[t->bucket] = t;
+        head = s_mgr.timers[bucket] = t;
     } else {
         head->prev->next = t;
         t->prev = head->prev;
@@ -359,13 +359,12 @@ static void _del(timer_t *t)
     assert(t);
     t->prev->next = t->next;
     t->next->prev = t->prev;
+    t->prev = t->next = t;
 }
 
 static void _cancel(timer_t *t)
 {
     assert(t);
-    s_timers.erase(t->id);
-
     _destroy(t);
     ++s_mgr.timer_cancelled;
     --s_mgr.timer_remain;
@@ -393,6 +392,7 @@ static void _reset(void)
 static void _destroy(timer_t *t)
 {
     if (t) {
+        s_timers.erase(t->id);
         if (!t->manual) {
             E_FREE(t->args);
         }
