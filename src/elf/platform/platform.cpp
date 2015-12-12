@@ -132,6 +132,9 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
         base_req->resp = resp;
         base_resp = platform_lj_on_auth(base_req);
         E_DELETE base_req;
+        if (strcmp((char*)ptr, "true") != 0 || strcmp((char*)ptr, "false") != 0) {
+            realsize = 0;
+        }
     } else if (base_req->plat_type == PLAT_1SDK) {
         cJSON *resp = cJSON_Parse(base_req->param.c_str());
         std::string st((char*)ptr, realsize);
