@@ -61,10 +61,10 @@ const oid_t &timer_add(time64_t life, callback func, void *args, bool manual);
 void timer_cycle(callback func);
 
 ///
-/// Remove timer with given tid.
+/// Cancel timer with given tid.
 /// @param tid Timer identification.
 ///
-void timer_remove(const oid_t &tid);
+void timer_cancel(const oid_t &tid);
 
 ///
 /// Pause all running timers.

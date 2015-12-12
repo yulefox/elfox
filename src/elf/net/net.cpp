@@ -1077,7 +1077,7 @@ static void on_read(const epoll_event &evt)
                 for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
                     chunk_fini(*itr);
                 }
-                LOG_TRACE("net", "%s recv FAILED: %s.",
+                LOG_INFO("net", "%s recv FAILED: %s.",
                         ctx->peer.info,
                         strerror(errno));
                 net_close(ctx->peer.id);
