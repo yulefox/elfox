@@ -9,6 +9,8 @@
 #include <curl/curl.h>
 #include <string>
 
+const static int HTTP_POST_TIMEOUT = 5; // 5 seconds;
+
 namespace elf {
 struct http_req_t {
     std::string json;
@@ -61,6 +63,10 @@ static void *http_post(void *args)
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_cb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
+
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, HTTP_POST_TIMEOUT);
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+
         res = curl_easy_perform(curl);
         if(res != CURLE_OK) {
             LOG_ERROR("http", "curl_easy_perform() failed(%d): %s %s, %s.",
