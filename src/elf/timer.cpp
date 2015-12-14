@@ -104,7 +104,6 @@ static void _reset(void);
 static void _destroy(timer_t *t);
 static void _schedule(timer_t *t);
 static void _add(timer_t *t);
-static void _del(timer_t *t);
 static void _cancel(timer_t *t);
 static void _expire(timer_t *t);
 static void _bingo(void);
@@ -187,7 +186,6 @@ void timer_run(void)
         while (t != NULL) { // expire all timers
             timer_t *n = t->next;
 
-            _del(t);
             if (t->cancel) {
                 _cancel(t);
             } else {
@@ -236,6 +234,7 @@ const oid_t &timer_add(time64_t life, const char *func)
     t->manual = true;
     t->cancel = false;
     _schedule(t);
+    s_timers[t->id] = t;
     ++s_mgr.timer_total;
     ++s_mgr.timer_remain;
     return t->id;
@@ -354,14 +353,6 @@ static void _add(timer_t *t)
 }
 
 
-static void _del(timer_t *t)
-{
-    assert(t);
-    t->prev->next = t->next;
-    t->next->prev = t->prev;
-    t->prev = t->next = t;
-}
-
 static void _cancel(timer_t *t)
 {
     assert(t);
@@ -428,8 +419,6 @@ static void _bingo(void)
     ++next_cursor.a;
     if (WHEEL_CMP(next_cursor, 3)) {
         bucket = BUCKET_MAP(next_cursor, 3);
-        LOG_WARN("timer", "WHEEL 3 <%d>.",
-                next_cursor.a);
     } else if (WHEEL_CMP(next_cursor, 2)) {
         bucket = BUCKET_MAP(next_cursor, 2);
     } else if (WHEEL_CMP(next_cursor, 1)) {
@@ -446,13 +435,12 @@ static void _bingo(void)
 static void _rehash(int bucket)
 {
     timer_t *head = s_mgr.timers[bucket];
-    timer_t *t = head;
     s_mgr.timers[bucket] = NULL;
+    timer_t *t = head;
 
     while (t != NULL) {
         timer_t *n = t->next;
 
-        _del(t);
         _schedule(t);
         if (n == head) {
             break;

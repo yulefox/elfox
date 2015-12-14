@@ -107,6 +107,7 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
     LOG_DEBUG("net", "on cb userdata: %p", base_req->args);
 
     if (ptr == NULL || realsize == 0) {
+        /*
         plat_base_resp *resp = E_NEW plat_base_resp;
 
         resp->code = PLATFORM_RESPONSE_FAILED;
@@ -119,6 +120,7 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
 
         // push resp
         s_resps.push(resp);
+        */
         return realsize;
     }
 
