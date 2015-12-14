@@ -17,11 +17,34 @@ struct http_req_t {
     void *args;
 };
 
+struct http_chunk_t {
+    char *data;
+    size_t size;
+};
+
+static size_t write_memory_cb(void *ptr, size_t size, size_t nmemb, void *data)
+{
+    size_t realsize = size * nmemb;
+    struct http_chunk_t *chunk = (struct http_chunk_t*)data;
+
+    chunk->data = (char*)E_REALLOC(chunk->data, chunk->size + realsize + 1);
+    if (chunk->data) {
+        memcpy((void*)(chunk->data + chunk->size), ptr, realsize);
+        chunk->size += realsize;
+        chunk->data[chunk->size] = 0;
+    }
+    return realsize;
+}
+
 static void *http_post(void *args)
 {
     http_req_t *post = (http_req_t *)args;
     CURL *curl = curl_easy_init();
     CURLcode res;
+
+    http_chunk_t chunk;
+    chunk.data = NULL;
+    chunk.size = 0;
 
     if (curl != NULL) {
         struct curl_slist *slist = NULL;
@@ -35,8 +58,8 @@ static void *http_post(void *args)
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json.c_str());
         //curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post->json.size());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post->cb);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, post->args);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_cb);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
         res = curl_easy_perform(curl);
         if(res != CURLE_OK) {
@@ -50,6 +73,13 @@ static void *http_post(void *args)
         curl_easy_cleanup(curl);
     } else {
         LOG_ERROR("http", "%s", "curl_easy_init() failed.");
+    }
+
+    if (chunk.data == NULL || chunk.size == 0) {
+        post->cb(0, 0, 0, post->args);
+    } else {
+        post->cb((void*)chunk.data, 1, chunk.size, post->args);
+        E_FREE(chunk.data);
     }
     E_DELETE post;
     return NULL;
