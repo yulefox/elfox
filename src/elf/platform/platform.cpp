@@ -174,6 +174,9 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
             case PLAT_WEIXIN:
                 base_resp = platform_msdk_on_auth(base_req);
                 break;
+            case PLAT_APPSTORE:
+                base_resp = platform_appstore_on_auth(base_req);
+                break;
             }
             E_DELETE base_req;
         }
@@ -207,6 +210,8 @@ int platform_auth(int plat_type, const char *data,
         return platform_qq_auth(data, cb, args);
     case PLAT_WEIXIN:
         return platform_weixin_auth(data, cb, args);
+    case PLAT_APPSTORE:
+        return platform_appstore_auth(data, cb, args);
     default:
         return PLATFORM_TYPE_ERROR;
         break;

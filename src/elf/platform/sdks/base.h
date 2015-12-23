@@ -71,6 +71,7 @@ int platform_vivo_auth(const char *param, auth_cb cb, void *args);
 int platform_anzhi_auth(const char *param, auth_cb cb, void *args);
 int platform_qq_auth(const char *param, auth_cb cb, void *args);
 int platform_weixin_auth(const char *param, auth_cb cb, void *args);
+int platform_appstore_auth(const char *param, auth_cb cb, void *args);
 
 plat_base_resp* platform_pp_on_auth(const plat_base_req *req);
 plat_base_resp* platform_uc_on_auth(const plat_base_req *req);
@@ -81,6 +82,7 @@ plat_base_resp* platform_huawei_on_auth(const plat_base_req *req);
 plat_base_resp* platform_vivo_on_auth(const plat_base_req *req);
 plat_base_resp* platform_anzhi_on_auth(const plat_base_req *req);
 plat_base_resp* platform_msdk_on_auth(const plat_base_req *req);
+plat_base_resp* platform_appstore_on_auth(const plat_base_req *req);
 
 } // namespace elf
 
