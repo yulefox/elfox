@@ -19,12 +19,12 @@ namespace elf {
 
 plat_base_resp* platform_appstore_on_auth(const plat_base_req *req)
 {
-    cJSON *code = cJSON_GetObjectItem(req->resp, "code");
+    cJSON *status = cJSON_GetObjectItem(req->resp, "status");
 
     int ret = PLATFORM_OK;
-    if (code == NULL || code->valueint != 0) {
+    if (status == NULL || strcmp(status->valuestring, "false") == 0) {
         ret = PLATFORM_PARAM_ERROR;
-        LOG_ERROR("platform", "appstore onAuth() falied: %d", code->valueint);
+        LOG_ERROR("platform", "appstore onAuth() falied: %d", status->valuestring);
     }
 
     cJSON *param = cJSON_Parse(req->param.c_str());
@@ -50,7 +50,7 @@ int platform_appstore_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_PARAM_ERROR;
     }
 
-    cJSON *setting = platform_get_json(PLAT_LJ);
+    cJSON *setting = platform_get_json(PLAT_APPSTORE);
     if (setting == NULL) {
         return PLATFORM_SETTING_ERROR;
     }
@@ -75,16 +75,16 @@ int platform_appstore_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_PARAM_ERROR;
     }
 
+    //http://42.62.77.103/gamechecktoken?game=jfjh&token=xxxx
     std::string post_url;
     post_url.append(url->valuestring);
-    post_url.append("?productCode=");
-    post_url.append(productCode->valuestring);
+    post_url.append("?game=jfjh");
 
     post_url.append("&token=");
     post_url.append(token->valuestring);
 
-    post_url.append("&userId=");
-    post_url.append(userId->valuestring);
+    //post_url.append("&userId=");
+    //post_url.append(userId->valuestring);
 
     cJSON_Delete(json);
 
