@@ -43,8 +43,8 @@ static void *http_post(void *args)
     http_req_t *post = (http_req_t *)args;
     CURL *curl = curl_easy_init();
     CURLcode res;
-
     http_chunk_t chunk;
+
     chunk.data = NULL;
     chunk.size = 0;
 

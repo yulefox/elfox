@@ -723,7 +723,7 @@ int net_connect(int idx, oid_t peer, const std::string &name,
     addr.sin_port = htons(port);
 
     if (0 != connect(fd, (struct sockaddr *)(&addr), sizeof(addr))) {
-        LOG_TRACE("net", "[%s] (%s:%d) connect FAILED: %s.",
+        LOG_INFO("net", "[%s] (%s:%d) connect FAILED: %s.",
                 name.c_str(), ip.c_str(), port,
                 strerror(errno));
         close(fd);
