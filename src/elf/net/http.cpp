@@ -9,7 +9,7 @@
 #include <curl/curl.h>
 #include <string>
 
-const static int HTTP_POST_TIMEOUT = 5; // 5 seconds;
+const static int HTTP_POST_TIMEOUT = 20; // 20 seconds;
 
 namespace elf {
 struct http_req_t {
