@@ -172,6 +172,10 @@ ELF_API int log_fini(void);
 #       define LOG_NOIMPL()
 #   endif /* ELF_DEBUG  */
 #endif /* ELF_PLATFORM_LINUX */
+
+
+void log_append(const char *ident, const char *data);
+
 } // namespace elf
 
 #endif /* !ELF_LOG_H */
