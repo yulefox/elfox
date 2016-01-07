@@ -130,7 +130,7 @@ int platform_qq_auth(const char *param, auth_cb cb, void *args)
     }
 
     // openid
-    cJSON *openId = cJSON_GetObjectItem(json, "openid");
+    cJSON *openId = cJSON_GetObjectItem(json, "openId");
     if (openId == NULL) {
         return PLATFORM_PARAM_ERROR;
     }
@@ -228,7 +228,7 @@ int platform_weixin_auth(const char *param, auth_cb cb, void *args)
     }
 
     // openid
-    cJSON *openId = cJSON_GetObjectItem(json, "openid");
+    cJSON *openId = cJSON_GetObjectItem(json, "openId");
     if (openId == NULL) {
         return PLATFORM_PARAM_ERROR;
     }
