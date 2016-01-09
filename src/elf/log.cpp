@@ -51,7 +51,7 @@ int log_fini(void)
 typedef struct log_entry_s {
     size_t offset;
     size_t size;
-    char *base;
+    int fd;
     char *ident;
 } log_entry_t;
 
@@ -65,17 +65,24 @@ static log_entry_t *log_entry_create(const char *ident)
     char fullname[256];
     int fd;
 
-    if(opendir(LOG_PATH) == NULL) {
-        if (mkdir(LOG_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0) {
-            return NULL;
-        }
+    os_mkdir(LOG_PATH);
+
+    struct tm *tm = NULL;
+    time_t now;
+
+    now = time(NULL);
+    tm = localtime(&now);
+    if (tm == NULL) {
+        return NULL;
     }
 
-    sprintf(fullname, "%s/%s.log", LOG_PATH, ident);
+    int year = tm->tm_year + 1900;
+    int mon = tm->tm_mon + 1;
+    int day = tm->tm_mday;
+
+    sprintf(fullname, "%s/%s-%d%02d%02d.log", LOG_PATH, ident, year, mon, day);
 
     fd = open(fullname, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH);
-    ftruncate(fd, LOG_FILE_SIZE);
-    lseek(fd, 0, SEEK_SET);
 
     entry = (log_entry_t*)malloc(sizeof(log_entry_t));
     if (entry == NULL) {
@@ -83,13 +90,11 @@ static log_entry_t *log_entry_create(const char *ident)
         return NULL;
     }
     
-    entry->base = (char*)mmap(NULL, LOG_FILE_SIZE, PROT_WRITE, MAP_SHARED, fd, 0);
+    entry->fd = fd;
+    entry->offset = lseek(fd, 0, SEEK_END);
     entry->size = LOG_FILE_SIZE;
-    entry->offset = strlen(entry->base);
     entry->ident = (char*)malloc(strlen(ident) + 1);
     strcpy(entry->ident, ident);
-    memset(entry->base + entry->offset, 0, LOG_FILE_SIZE - entry->offset);
-    close(fd);
 
     s_log_entry.insert(std::make_pair(ident, entry));
     return entry;
@@ -117,21 +122,19 @@ static int log_entry_close(log_entry_t *entry)
         return -1;
     }
 
+    close(entry->fd);
+
+    int year = tm->tm_year + 1900;
+    int mon = tm->tm_mon + 1;
+    int day = tm->tm_mday;
+
     int idx = now % 86400;
-    sprintf(newpath, "%s/%s-%d%d%d-%d.log",
-            LOG_PATH, entry->ident, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, idx);
-    sprintf(oldpath, "%s/%s.log", LOG_PATH, entry->ident);
+    sprintf(newpath, "%s/%s-%d%02d%02d-%d.log",
+            LOG_PATH, entry->ident, year, mon, day, idx);
+    sprintf(oldpath, "%s/%s-%d%02d%02d.log", LOG_PATH, entry->ident,
+            year, mon, day);
 
     rename(oldpath, newpath);
-    size_t i;
-    for (i = entry->offset; i < entry->size; i += 2) {
-        entry->base[i] = '\r';
-        entry->base[i+1] = '\n';
-    }
-    for (;i < entry->size; i++) {
-        entry->base[i] = '\0';
-    }
-    munmap(entry->base, entry->size);
     s_log_entry.erase(entry->ident);
     free(entry->ident);
     free(entry);
@@ -146,7 +149,8 @@ static void log_entry_append(log_entry_t *entry, const char *buf)
         log_entry_close(entry);
         log_append(ident, buf);
     } else {
-        memcpy((void*)(entry->base + entry->offset), (void*)buf, strlen(buf));
+        write(entry->fd, (const void*)buf, strlen(buf));
+        fsync(entry->fd);
         entry->offset += strlen(buf);
     }
 }
