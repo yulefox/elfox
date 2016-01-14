@@ -174,7 +174,7 @@ ELF_API int log_fini(void);
 #endif /* ELF_PLATFORM_LINUX */
 
 
-void log_append(const char *ident, const char *data);
+void log_append(const std::string &ident, const char *data);
 
 } // namespace elf
 

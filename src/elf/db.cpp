@@ -85,7 +85,7 @@ static void *handle(void *args)
 
 static void query(mysql_thread_t *th)
 {
-    query_t *q;
+    query_t *q = NULL;
     MYSQL *m = th->mysql;
 
     try {

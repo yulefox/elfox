@@ -52,10 +52,10 @@ typedef struct log_entry_s {
     size_t offset;
     size_t size;
     int fd;
-    char *ident;
+    char ident[128];
 } log_entry_t;
 
-typedef std::map<const char*, log_entry_t*> LOG_ENTRY_MAP;
+typedef std::map<std::string, log_entry_t*> LOG_ENTRY_MAP;
 
 static LOG_ENTRY_MAP s_log_entry;
 
@@ -93,14 +93,13 @@ static log_entry_t *log_entry_create(const char *ident)
     entry->fd = fd;
     entry->offset = lseek(fd, 0, SEEK_END);
     entry->size = LOG_FILE_SIZE;
-    entry->ident = (char*)malloc(strlen(ident) + 1);
     strcpy(entry->ident, ident);
 
     s_log_entry.insert(std::make_pair(ident, entry));
     return entry;
 }
 
-static log_entry_t *log_entry_find(const char *ident)
+static log_entry_t *log_entry_find(const std::string &ident)
 {
     LOG_ENTRY_MAP::iterator itr = s_log_entry.find(ident);
     if (itr == s_log_entry.end()) {
@@ -136,7 +135,6 @@ static int log_entry_close(log_entry_t *entry)
 
     rename(oldpath, newpath);
     s_log_entry.erase(entry->ident);
-    free(entry->ident);
     free(entry);
     return 0;
 }
@@ -155,11 +153,11 @@ static void log_entry_append(log_entry_t *entry, const char *buf)
     }
 }
 
-void log_append(const char *ident, const char *buf)
+void log_append(const std::string &ident, const char *buf)
 {
     log_entry_t *entry = log_entry_find(ident);
     if (entry == NULL) {
-        entry = log_entry_create(ident);
+        entry = log_entry_create(ident.c_str());
     }
     log_entry_append(entry, buf);
 }
