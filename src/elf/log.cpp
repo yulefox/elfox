@@ -18,6 +18,7 @@
 static const char *CONFIG_FILE_NAME = "CONFIG/log.conf";
 static const char *LOG_PATH = "log/events";
 static int LOG_FILE_SIZE = 1024 * 1024 * 100; // 100M
+static int DAILY_SECONDS = 86400;
 
 #define LOG(fmt, args...) printf(fmt, ##args)
 #define LOGE(fmt, args...) LOG(fmt, ##args)
@@ -53,6 +54,7 @@ typedef struct log_entry_s {
     size_t size;
     int fd;
     char ident[128];
+    time_t timestamp;
 } log_entry_t;
 
 typedef std::map<std::string, log_entry_t*> LOG_ENTRY_MAP;
@@ -92,6 +94,7 @@ static log_entry_t *log_entry_create(const char *ident)
     
     entry->fd = fd;
     entry->offset = lseek(fd, 0, SEEK_END);
+    entry->timestamp = now;
     entry->size = LOG_FILE_SIZE;
     strcpy(entry->ident, ident);
 
@@ -105,6 +108,7 @@ static log_entry_t *log_entry_find(const std::string &ident)
     if (itr == s_log_entry.end()) {
         return NULL;
     }
+
     return itr->second;
 }
 
@@ -113,21 +117,16 @@ static int log_entry_close(log_entry_t *entry)
     char oldpath[256];
     char newpath[256];
     struct tm *tm = NULL;
-    time_t now;
-
-    now = time(NULL);
-    tm = localtime(&now);
-    if (tm == NULL) {
-        return -1;
-    }
+    time_t now = entry->timestamp;
 
     close(entry->fd);
 
+    tm = localtime(&now);
     int year = tm->tm_year + 1900;
     int mon = tm->tm_mon + 1;
     int day = tm->tm_mday;
 
-    int idx = now % 86400;
+    int idx = now % DAILY_SECONDS;
     sprintf(newpath, "%s/%s-%d%02d%02d-%d.log",
             LOG_PATH, entry->ident, year, mon, day, idx);
     sprintf(oldpath, "%s/%s-%d%02d%02d.log", LOG_PATH, entry->ident,
@@ -141,7 +140,13 @@ static int log_entry_close(log_entry_t *entry)
 
 static void log_entry_append(log_entry_t *entry, const char *buf)
 {
-    if (entry->offset + strlen(buf) > entry->size) {
+    time_t created = entry->timestamp;
+    time_t now = time(NULL);
+
+    now = now - now % DAILY_SECONDS;
+    created = created - created % DAILY_SECONDS;
+
+    if (entry->offset + strlen(buf) > entry->size || now != created) {
         char ident[128];
         strcpy(ident, entry->ident);
         log_entry_close(entry);
