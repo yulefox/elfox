@@ -32,9 +32,9 @@ plat_base_resp* platform_huawei_on_auth(const plat_base_req *req)
             LOG_ERROR("platform", "huawei onAuth() falied: %s", error->valuestring);
         }
     } else {
-        LOG_INFO("platform", "huawei onAuth(): userId(%s), username(%s), userState(%d), userValidStatus(%d)",
-                userID->valuestring, username->valuestring,
-                userState->valueint, userValidStatus->valueint);
+        //LOG_INFO("platform", "huawei onAuth(): userId(%s), username(%s), userState(%d), userValidStatus(%d)",
+        //       userID->valuestring, username->valuestring,
+        //       userState->valueint, userValidStatus->valueint);
 
         if (strcmp(userID->valuestring, "") == 0) {
             ret = PLATFORM_PARAM_ERROR;
