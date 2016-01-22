@@ -81,6 +81,7 @@ struct context_t {
     int close_time;
     int last_time;
     int error_times;
+    bool internal;
 };
 
 typedef std::map<oid_t, context_t *> context_map;
@@ -485,6 +486,7 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     ctx->send_data = E_NEW blob_t;
     ctx->encipher = NULL;
     ctx->decipher = NULL;
+    ctx->internal = false;
     blob_init(ctx->recv_data);
     blob_init(ctx->send_data);
     event_init(ctx);
@@ -1104,7 +1106,7 @@ static void on_read(const epoll_event &evt)
         // append received chunk
         c->size = size;
         chunks.push_back(c);
-        if (chunks.size() > CHUNK_MAX_NUM) {
+        if (chunks.size() > CHUNK_MAX_NUM && ctx->internal == false) {
             chunk_queue::iterator itr = chunks.begin();
 
             for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
@@ -1177,8 +1179,10 @@ void net_cipher_set(oid_t peer, cipher_t *encipher, cipher_t *decipher)
 {
     context_t *ctx = context_find(peer);
     if (ctx != NULL) {
+        mutex_lock(&(ctx->lock));
         ctx->encipher = encipher;
         ctx->decipher = decipher;
+        mutex_unlock(&(ctx->lock));
     }
 }
 
@@ -1187,5 +1191,14 @@ void net_register_raw(const std::string &name)
     s_raw_msgs.insert(name);
 }
 
+void net_internal_set(oid_t peer, bool flag)
+{
+    context_t *ctx = context_find(peer);
+    if (ctx != NULL) {
+        mutex_lock(&(ctx->lock));
+        ctx->internal = true;
+        mutex_unlock(&(ctx->lock));
+    }
+}
 
 } // namespace elf

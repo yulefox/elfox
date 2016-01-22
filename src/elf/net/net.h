@@ -200,6 +200,8 @@ void net_cipher_set(oid_t peer, cipher_t *encipher, cipher_t *decipher);
 
 void net_register_raw(const std::string &name);
 
+void net_internal_set(oid_t peer, bool flag);
+
 
 } // namespace elf
 
