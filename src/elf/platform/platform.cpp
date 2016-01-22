@@ -56,7 +56,12 @@ int platform_load(int type, const char *proto)
                 "Can NOT parse json file %s.", proto);
         return -1;
     }
-    s_jsons.insert(std::make_pair<int, cJSON*>(type, json));
+
+    std::map<int, cJSON*>::iterator itr = s_jsons.find(type);
+    if (itr != s_jsons.end() && itr->second != NULL) {
+        cJSON_Delete(itr->second);
+    }
+    s_jsons[type] = json;
     return 0;
 }
 
