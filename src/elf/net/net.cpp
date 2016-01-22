@@ -1065,14 +1065,12 @@ static void on_read(const epoll_event &evt)
     context_t *ctx = static_cast<context_t *>(evt.data.ptr);
     int size = CHUNK_DEFAULT_SIZE;
     int sock = ctx->peer.sock;
-    int recv_cnt = 0;
     chunk_queue chunks;
 
     while (size > 0) {
         chunk_t *c = chunk_init();
 
         size = recv(sock, c->data, sizeof(c->data), 0);
-        recv_cnt++;
         if (size < 0) {
             chunk_fini(c);
             if (errno != EINTR && errno != EAGAIN) {
@@ -1113,13 +1111,13 @@ static void on_read(const epoll_event &evt)
                 chunk_fini(*itr);
             }
             net_close(ctx->peer.id);
-            LOG_WARN("net", "%s <%d><%d> INVALID peer closed.",
-                    ctx->peer.info, recv_cnt, chunks.size());
+            LOG_WARN("net", "%s <%d> chunk num over range, force closed.",
+                    ctx->peer.info, chunks.size());
             return;
         }
     }
-    if (recv_cnt >= 10) {
-        LOG_WARN("net", "%s on_read <%d><%d>", ctx->peer.info, recv_cnt, chunks.size());
+    if (chunks.size() >= 10) {
+        LOG_WARN("net", "%s chunk num over range: <%d>", ctx->peer.info, chunks.size());
     }
     push_recv(ctx, chunks);
 }
@@ -1200,5 +1198,4 @@ void net_internal_set(oid_t peer, bool flag)
         mutex_unlock(&(ctx->lock));
     }
 }
-
 } // namespace elf
