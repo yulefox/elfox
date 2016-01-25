@@ -28,10 +28,10 @@ static const int LINGER_TIME = 5;
 static const int CONTEXT_CLOSE_TIME = 300;
 static const int SIZE_INT = sizeof(int(0));
 static const int SIZE_INTX2 = sizeof(int(0)) * 2;
-static const int CHUNK_DEFAULT_SIZE = 65536;
+static const int CHUNK_MAX_SIZE = 65536;
 static const size_t CHUNK_MAX_NUM = 1024;
 static const int MESSAGE_MAX_NAME_LENGTH = 100;
-static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_DEFAULT_SIZE;
+static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_MAX_SIZE;
 static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
 static const int ENCRYPT_FLAG = 0x40000000;
@@ -55,9 +55,9 @@ struct blob_t {
 };
 
 struct chunk_t {
-    char data[CHUNK_DEFAULT_SIZE];
     int offset;
     int size;
+    char data[0];
 };
 
 struct peer_t {
@@ -219,13 +219,26 @@ static void set_nonblock(int sock)
     }
 }
 
-static chunk_t *chunk_init(void)
+static chunk_t *chunk_init(size_t size)
 {
-    chunk_t *c = (chunk_t *)E_ALLOC(sizeof(*c));
+    if (size <= 0) {
+        size = CHUNK_MAX_SIZE;
+    }
+    chunk_t *c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + size);
 
     c->offset = 0;
-    c->size = CHUNK_DEFAULT_SIZE;
-    memset(c->data, 0, CHUNK_DEFAULT_SIZE);
+    c->size = size;
+    memset(c->data, 0, size);
+    return c;
+}
+
+static chunk_t *chunk_init(const char *buf, size_t size)
+{
+    chunk_t *c = chunk_init(size);
+    if (c == NULL) {
+        return NULL;
+    }
+    memcpy(c->data, buf, size);
     return c;
 }
 
@@ -264,7 +277,11 @@ static void message_set(chunk_queue &chunks, const void *buf, int size)
             c = chunks.back();
         }
         if (c == NULL || c->offset >= c->size) {
-            c = chunk_init();
+            if (size < CHUNK_MAX_SIZE) {
+                c = chunk_init(size);
+            } else {
+                c = chunk_init(CHUNK_MAX_SIZE);
+            }
             chunks.push_back(c);
         }
 
@@ -1063,16 +1080,16 @@ static void on_accept(const epoll_event &evt)
 static void on_read(const epoll_event &evt)
 {
     context_t *ctx = static_cast<context_t *>(evt.data.ptr);
-    int size = CHUNK_DEFAULT_SIZE;
+    int size = CHUNK_MAX_SIZE;
     int sock = ctx->peer.sock;
     chunk_queue chunks;
 
+    static char buf[CHUNK_MAX_SIZE];
     while (size > 0) {
-        chunk_t *c = chunk_init();
 
-        size = recv(sock, c->data, sizeof(c->data), 0);
+        size = recv(sock, buf, sizeof(buf), 0);
+
         if (size < 0) {
-            chunk_fini(c);
             if (errno != EINTR && errno != EAGAIN) {
                 chunk_queue::iterator itr = chunks.begin();
 
@@ -1090,8 +1107,6 @@ static void on_read(const epoll_event &evt)
 
         // client disconnect socket
         if (0 == size) {
-            chunk_fini(c);
-
             chunk_queue::iterator itr = chunks.begin();
 
             for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
@@ -1100,6 +1115,8 @@ static void on_read(const epoll_event &evt)
             net_close(ctx->peer.id);
             return;
         }
+
+        chunk_t *c = chunk_init(buf, size);
 
         // append received chunk
         c->size = size;
