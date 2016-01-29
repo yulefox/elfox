@@ -21,9 +21,9 @@ plat_base_resp* platform_huawei_on_auth(const plat_base_req *req)
 {
     cJSON *error = cJSON_GetObjectItem(req->resp, "error");
     cJSON *userID = cJSON_GetObjectItem(req->resp, "userID");
-    cJSON *username = cJSON_GetObjectItem(req->resp, "userName");
-    cJSON *userState = cJSON_GetObjectItem(req->resp, "userState");
-    cJSON *userValidStatus = cJSON_GetObjectItem(req->resp, "userValidStatus");
+    //cJSON *username = cJSON_GetObjectItem(req->resp, "userName");
+    //cJSON *userState = cJSON_GetObjectItem(req->resp, "userState");
+    //cJSON *userValidStatus = cJSON_GetObjectItem(req->resp, "userValidStatus");
 
     int ret = PLATFORM_OK;
     if (userID == NULL) {
