@@ -34,6 +34,7 @@
 #   define ELF_USE_PLATFORM
 #   define ELF_USE_RAND
 #   define ELF_USE_SCRIPT
+#   define ELF_USE_SHM_ALLOC
 #   define ELF_USE_SINGLETON
 #   define ELF_USE_SKIPLIST
 #   define ELF_USE_THREAD
@@ -135,6 +136,10 @@
 #if defined(ELF_USE_SCRIPT)
 #   include <elf/script/script.h>
 #endif /* ELF_USE_SCRIPT */
+
+#if defined(ELF_USE_SHM_ALLOC)
+#   include <elf/shm_alloc.h>
+#endif /* ELF_USE_SHM_ALLOC */
 
 #if defined(ELF_USE_SINGLETON)
 #   include <elf/singleton.h>
