@@ -27,7 +27,6 @@ namespace elf {
         int status;
         int size;
         int camp;
-        oid_t team_id;
         time_t time;
 
         std::list<MatchEntity> members;
@@ -43,10 +42,10 @@ namespace elf {
             }
             return total;
         }
-        
+
         void get_members(TeamSet &memset) {
             if (members.empty()) {
-                memset.insert(team_id);
+                memset.insert(id);
                 return;
             }
             std::list<MatchEntity>::iterator itr;
@@ -111,17 +110,28 @@ namespace elf {
         return dst;
     }
 
-    oid_t MatchPool::Push(int elo, int size, oid_t teamId) {
-        MatchEntity *ent = E_NEW MatchEntity;
-        ent->id = oid_gen();
+    bool MatchPool::Push(int elo, int size, oid_t id) {
+        MatchEntity *ent = NULL;
+        std::map<oid_t, MatchEntity*>::iterator itr = _entities.find(id);
+        if (itr == _entities.end()) {
+            ent = E_NEW MatchEntity;
+        } else {
+            ent = itr->second;
+            if (ent == NULL) {
+                ent = E_NEW MatchEntity;
+            } else if (ent->status == MATCH_PENDING) {
+                return false;
+            }
+        }
+
+        ent->id = id;
         ent->elo = elo;
         ent->time = time_s();
         ent->status = MATCH_PENDING;
-        ent->team_id = teamId;
         ent->size = size;
 
         push(ent);
-        return ent->id;
+        return true;
     }
 
     void  MatchPool::push(MatchEntity *ent) {
@@ -156,11 +166,15 @@ namespace elf {
         if (que->candidates.empty()) {
             return false;
         }
-        while (!que->candidates.empty()) {
-            MatchEntity *curr = get_entity(que->candidates.front());
-            que->candidates.pop_front();
-            if (curr != NULL && curr->status == MATCH_PENDING) {
-                ent = *curr;
+
+        std::deque<oid_t>::iterator i_que = que->candidates.begin();
+        for (;i_que != que->candidates.end();) {
+            MatchEntity *curr = get_entity(*i_que);
+            if (curr == NULL || curr->status != MATCH_PENDING) {
+                i_que = que->candidates.erase(i_que);
+            } else  {
+                curr->status = MATCH_DONE;
+                ent = clone_entity(curr);
                 return true;
             }
         }
@@ -192,29 +206,43 @@ namespace elf {
 
     bool MatchPool::get_entity_rand(int need_size, MatchEntity *dst) {
         int size = 0;
-        while (size < need_size) {
-            std::map<int, MatchQueue*>::iterator itr = _queues.find(need_size - size);
-            for (;itr != _queues.end(); ++itr) {
-                MatchQueue *que = itr->second;
-                if (que == NULL || que->candidates.size() < size_t(need_size - size)) {
-                    break;
-                }
-                if (que->size_type > need_size - size) {
-                    continue;
-                }
+        for (int i = need_size;i >= 1; i--) {
+            std::map<int, MatchQueue*>::iterator itr = _queues.find(i);
+            if (itr == _queues.end()) {
+                continue;
+            }
+            MatchQueue *que = itr->second;
+            if (que == NULL || que->size_type > need_size - size) {
+                continue;
+            }
 
-                // rand
-                int size = que->candidates.size();
-                while (1) {
-                    int idx = rand(0, size - 1);
-                    MatchEntity *curr = get_entity(que->candidates[idx]);
-                    if (curr != NULL && curr->status == MATCH_PENDING) {
-                        curr->status = MATCH_DONE;
-                        dst->members.push_back(clone_entity(curr));
-                        size += curr->get_size();
-                        break;
-                    }
+            // rand
+            std::deque<oid_t>::iterator itr_c = que->candidates.begin();
+            std::vector<oid_t> candidates;
+            for (;itr_c != que->candidates.end(); ++itr_c) {
+                MatchEntity *curr = get_entity(*itr_c);
+                if (curr != NULL && curr->status == MATCH_PENDING) {
+                    candidates.push_back(*itr_c);
                 }
+            }
+
+            int size_type = que->size_type;
+            if (candidates.size() == 0 ||
+                candidates.size() < size_t((need_size - size) / size_type)) {
+                continue;
+            }
+            int total = candidates.size();
+            while (size + size_type <= need_size) {
+                int idx = rand(0, total - 1);
+                MatchEntity *curr = get_entity(candidates[idx]);
+                if (curr != NULL && curr->status == MATCH_PENDING) {
+                    curr->status = MATCH_DONE;
+                    dst->members.push_back(clone_entity(curr));
+                    size += size_type;
+                }
+            }
+            if (size == need_size) {
+                break;
             }
         }
         return size == need_size;
@@ -251,23 +279,29 @@ namespace elf {
             camps.push_back(ent);
         }
 
-        if (!pop(size_type, camps)) {
-            // free
-            for (int i = 0;i < _camp_size; i++) {
-                E_DELETE camps[i];
-            }
-            return false;
-        }
+        int success = pop(size_type, camps);
 
         // merge result
         res.type = _type;
         for (size_t i = 0;i < camps.size(); i++) {
             TeamSet members;
             camps[i]->get_members(members);
-            res.teams.push_back(members);
+            if (!success) {
+                // restore
+                TeamSet::iterator itr = members.begin();
+                for (;itr != members.end(); ++itr) {
+                    MatchEntity *ent = get_entity(*itr);
+                    if (ent) {
+                        ent->status = MATCH_PENDING;
+                    }
+                }
+            } else {
+                res.teams.push_back(members);
+            }
             E_DELETE camps[i];
         }
-        return true;
+
+        return success;
     }
 
     bool MatchPool::pop(int size_type, std::vector<MatchEntity*> &camps) {
@@ -376,6 +410,14 @@ namespace elf {
             }
         }
     }
+
+    void MatchPool::Cancel(oid_t id) {
+        std::map<int, MatchPool*>::iterator itr;
+        for (itr = s_pools.begin(); itr != s_pools.end(); ++itr) {
+            itr->second->Del(id);
+        }
+    }
+
 
     void MatchPool::Release() {
         std::map<int, MatchPool*>::iterator itr;

@@ -44,7 +44,7 @@ public:
 
 public:
     ~MatchPool();
-    oid_t Push(int elo, int size, oid_t team_id);
+    bool Push(int elo, int size, oid_t id);
     void Del(const oid_t &id);
 
 private:
@@ -85,6 +85,7 @@ private:
 public:
     static MatchPool *Create(int type, int mode, int team_size, int camp_size);
     static MatchPool *Get(int type);
+    static void Cancel(oid_t id);
     static void Proc(std::list<MatchRes> &res);
     static void Release();
 
