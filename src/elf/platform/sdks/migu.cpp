@@ -17,22 +17,26 @@
 
 namespace elf {
 
-plat_base_resp* platform_appstore_on_auth(const plat_base_req *req)
+plat_base_resp* platform_migu_on_auth(const plat_base_req *req)
 {
+    // 成功{“status”:”ok”}失败则会返回errCode（错误编号）和errMsg（错误提示）
+    //
     cJSON *status = cJSON_GetObjectItem(req->resp, "status");
 
     int ret = PLATFORM_OK;
-    if (status == NULL || strcmp(status->valuestring, "false") == 0) {
+    if (status == NULL || strcmp(status->valuestring, "ok") != 0) {
         ret = PLATFORM_PARAM_ERROR;
-        LOG_ERROR("platform", "appstore onAuth() falied: %d", status->valuestring);
+        cJSON *err = cJSON_GetObjectItem(req->resp, "errMsg");
+        if (err == NULL) {
+            LOG_ERROR("platform", "migu onAuth() falied: %d", status->valuestring);
+        } else {
+            LOG_ERROR("platform", "migu onAuth() falied: %d %s", status->valuestring, err->valuestring);
+        }
     }
 
-    cJSON *userId = cJSON_GetObjectItem(req->resp, "userId");
-    if (userId == NULL || strcmp(userId->valuestring, "") == 0) {
-        ret = PLATFORM_PARAM_ERROR;
-    } else {
-        cJSON_AddStringToObject(req->resp, "uid", userId->valuestring);
-    }
+    cJSON *param = cJSON_Parse(req->param.c_str());
+    cJSON *userId = cJSON_GetObjectItem(param, "userId");
+    cJSON_AddStringToObject(req->resp, "uid", userId->valuestring);
 
     plat_base_resp *resp = E_NEW plat_base_resp;
     resp->code = ret;
@@ -44,16 +48,16 @@ plat_base_resp* platform_appstore_on_auth(const plat_base_req *req)
     return resp;
 }
 
-int platform_appstore_auth(const char *param, auth_cb cb, void *args)
+int platform_migu_auth(const char *param, auth_cb cb, void *args)
 {
-    LOG_DEBUG("net", "platform_appstore_auth: %s", param);
+    LOG_DEBUG("net", "platform_migu_auth: %s", param);
 
     cJSON *json = cJSON_Parse(param);
     if (json == NULL) {
         return PLATFORM_PARAM_ERROR;
     }
 
-    cJSON *setting = platform_get_json(PLAT_APPSTORE);
+    cJSON *setting = platform_get_json(PLAT_MIGU);
     if (setting == NULL) {
         return PLATFORM_SETTING_ERROR;
     }
@@ -63,38 +67,30 @@ int platform_appstore_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_SETTING_ERROR;
     }
 
-    cJSON *productCode = cJSON_GetObjectItem(setting, "productCode");
-    if (productCode == NULL) {
-        return PLATFORM_SETTING_ERROR;
+    cJSON *body = cJSON_GetObjectItem(json, "body");
+    if (body == NULL) {
+        return PLATFORM_PARAM_ERROR;
     }
-
-    //cJSON *userId = cJSON_GetObjectItem(json, "userId");
-    //if (userId == NULL) {
-    //    return PLATFORM_PARAM_ERROR;
-    //}
 
     cJSON *token = cJSON_GetObjectItem(json, "token");
     if (token == NULL) {
         return PLATFORM_PARAM_ERROR;
     }
 
-    //http://42.62.77.103/gamechecktoken?game=jfjh&token=xxxx
     std::string post_url;
     post_url.append(url->valuestring);
-    post_url.append("?game=jfjh");
+    post_url.append("?body=");
+    post_url.append(body->valuestring);
 
     post_url.append("&token=");
     post_url.append(token->valuestring);
-
-    //post_url.append("&userId=");
-    //post_url.append(userId->valuestring);
 
     cJSON_Delete(json);
 
     // do post request
     plat_json_req *json_req = E_NEW plat_json_req(cb, args);
-    json_req->plat_type = PLAT_APPSTORE;
-    json_req->channel = "AppStore";
+    json_req->plat_type = PLAT_MIGU;
+    json_req->channel = "migu";
     json_req->param = std::string(param);
 
     http_json(post_url.c_str(), "", write_callback, json_req);
