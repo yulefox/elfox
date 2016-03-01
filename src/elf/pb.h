@@ -32,6 +32,7 @@ typedef std::map<int, pb_t *> pb_map_int;
 typedef std::multimap<int, pb_t *> pb_mmap_int;
 typedef std::pair <pb_mmap_int::iterator, pb_mmap_int::iterator> pb_mmap_iint;
 typedef std::map<std::string, pb_t *> pb_map_str;
+typedef std::map<int, pb_map_id * > pb_mmap_id;
 
 typedef pb_t *(*pb_new)(void);
 
