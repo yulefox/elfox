@@ -351,10 +351,14 @@ namespace elf {
         for (;itr != _entities.end();) {
             MatchEntity *ent = itr->second;
             if (ent == NULL || ent->status != MATCH_PENDING) {
-                if (ent != NULL) {
-                    E_DELETE ent;
+                if (ret) {
+                    if (ent != NULL) {
+                        E_DELETE ent;
+                    }
+                    _entities.erase(itr++);
+                } else {
+                    ent->status = MATCH_PENDING;
                 }
-                _entities.erase(itr++);
             } else {
                 ++itr;
             }
