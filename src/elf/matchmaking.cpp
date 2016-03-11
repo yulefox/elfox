@@ -168,13 +168,13 @@ namespace elf {
         }
 
         std::deque<oid_t>::iterator i_que = que->candidates.begin();
-        for (;i_que != que->candidates.end();) {
+        for (;i_que != que->candidates.end(); ++i_que) {
             MatchEntity *curr = get_entity(*i_que);
-            if (curr == NULL || curr->status != MATCH_PENDING) {
-                i_que = que->candidates.erase(i_que);
-            } else  {
+            if (curr && curr->status == MATCH_PENDING) {
                 curr->status = MATCH_DONE;
-                ent = clone_entity(curr);
+                //ent = clone_entity(curr);
+                ent.members.push_back(clone_entity(curr));
+                ent.size = size_type;
                 return true;
             }
         }
