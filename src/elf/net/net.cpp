@@ -887,17 +887,15 @@ blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb
         encipher->codec(encipher->ctx, (uint8_t*)body, (size_t)body_len);
         message_set(msg->chunks, name, name_len);
         message_set(msg->chunks, body, body_len);
-        LOG_TRACE("net", "<- %s.",
-                name);
         E_FREE(name);
         E_FREE(body);
     } else {
         const char *name = pb_name.data();
         message_set(msg->chunks, name, name_len);
         message_set(msg->chunks, pb_body.data(), body_len);
-        LOG_TRACE("net", "<- %s.",
-                name);
     }
+    LOG_TRACE("net", "<- %s.",
+            pb_name.c_str());
     return msg;
 }
 
