@@ -350,17 +350,25 @@ namespace elf {
         std::map<oid_t, MatchEntity*>::iterator itr = _entities.begin();
         for (;itr != _entities.end();) {
             MatchEntity *ent = itr->second;
-            if (ent == NULL || ent->status != MATCH_PENDING) {
-                if (ret) {
-                    if (ent != NULL) {
-                        E_DELETE ent;
-                    }
-                    _entities.erase(itr++);
-                } else {
-                    ent->status = MATCH_PENDING;
-                }
+            if (ent == NULL) {
+                _entities.erase(itr++);
             } else {
-                ++itr;
+                if (ent->status == MATCH_DELETED) {
+                    E_DELETE ent;
+                    _entities.erase(itr++);
+                } else if (ent->status == MATCH_DONE) {
+                    if (ret) {
+                        if (ent != NULL) {
+                            E_DELETE ent;
+                        }
+                        _entities.erase(itr++);
+                    } else {
+                        ent->status = MATCH_PENDING;
+                        ++itr;
+                    }
+                } else {
+                    ++itr;
+                }
             }
         }
 
