@@ -30,7 +30,7 @@ plat_base_resp* platform_migu_on_auth(const plat_base_req *req)
         if (err == NULL) {
             LOG_ERROR("platform", "migu onAuth() falied: %d", status->valuestring);
         } else {
-            LOG_ERROR("platform", "migu onAuth() falied: %d %s", status->valuestring, err->valuestring);
+            LOG_ERROR("platform", "migu onAuth() falied: %s %s", status->valuestring, err->valuestring);
         }
     }
 
