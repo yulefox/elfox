@@ -754,6 +754,7 @@ int net_connect(int idx, oid_t peer, const std::string &name,
     getsockname(fd, (struct sockaddr *)(&addr), &len);
     context_t *ctx = context_init(idx, peer, fd, addr);
 
+    ctx->internal = true;
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
         LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
                 name.c_str(), ip.c_str(), port,
