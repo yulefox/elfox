@@ -202,7 +202,7 @@ void net_register_raw(const std::string &name);
 
 void net_internal_set(oid_t peer, bool flag);
 
-
+bool net_internal(const context_t &ctx);
 } // namespace elf
 
 #endif /* !ELF_NET_NET_H */

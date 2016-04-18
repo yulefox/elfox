@@ -1215,4 +1215,9 @@ void net_internal_set(oid_t peer, bool flag)
         mutex_unlock(&(ctx->lock));
     }
 }
+
+bool net_internal(const context_t &ctx)
+{
+    return ctx.internal;
+}
 } // namespace elf
