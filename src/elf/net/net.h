@@ -25,6 +25,15 @@
 #include <string>
 
 namespace elf {
+enum net_stat_flag {
+    NET_STAT_NONE       = 0,
+    NET_STAT_REQ        = 0x01,
+    NET_STAT_RES        = 0x02,
+    NET_STAT_MESSAGES   = 0x02,
+    NET_STAT_CONTEXTS   = 0x10,
+    NET_STAT_ALL        = 0xff,
+};
+
 typedef void (*encrypt_func)(char* buf, int len);
 struct blob_t;
 struct context_t;
@@ -66,6 +75,15 @@ void net_encrypt(encrypt_func encry, encrypt_func decry);
 int net_listen(const std::string &name, const std::string &ip, int port);
 
 ///
+/// Start server supporting IPv6.
+/// @param name Server name.
+/// @param ip Listen ip string.
+/// @param port Listen port.
+/// @return (0).
+///
+int net_listen6(const std::string &name, const std::string &ip, int port);
+
+///
 /// Start client.
 /// @param idx Application index.
 /// @param peer Peer id.
@@ -75,6 +93,18 @@ int net_listen(const std::string &name, const std::string &ip, int port);
 /// @return (0).
 ///
 int net_connect(int idx, oid_t peer, const std::string &name,
+        const std::string &ip, int port);
+
+///
+/// Start client supports IPv6.
+/// @param idx Application index.
+/// @param peer Peer id.
+/// @param name Peer name.
+/// @param ip Peer ip string.
+/// @param port Peer port.
+/// @return (0).
+///
+int net_connect6(int idx, oid_t peer, const std::string &name,
         const std::string &ip, int port);
 
 ///
@@ -91,9 +121,15 @@ int net_proc(void);
 
 ///
 /// Output statistics info.
-/// @return (0).
+/// @param flag Statistics flag.
 ///
-void net_stat(void);
+void net_stat(int flag);
+
+///
+/// Statistics message info.
+/// @param msg Receive message data.
+///
+void net_stat_message(const recv_message_t &msg);
 
 ///
 /// Output statistics info of given peer.

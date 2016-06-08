@@ -41,11 +41,37 @@ struct chunk_t;
 struct context_t;
 struct peer_t;
 struct recv_message_t;
+struct stat_msg_t;
 
 typedef std::list<chunk_t *> chunk_queue;
+typedef std::map<std::string, stat_msg_t *> msg_map;
 typedef std::queue<context_t *> free_context_queue;
 typedef std::deque<recv_message_t *> recv_message_queue;
 typedef xqueue<recv_message_t *> recv_message_xqueue;
+
+struct stat_msg_t {
+    int msg_num; // number of recv given msg
+    int msg_size; // size of recv given msg
+
+    stat_msg_t() :
+        msg_num(0), 
+        msg_size(0)
+    {
+    }
+};
+
+struct stat_t {
+    int msg_num; // number of recv msg
+    int msg_size; // size of recv msg
+    msg_map req_msgs; // request message map
+    msg_map res_msgs; // response message map
+
+    stat_t() :
+        msg_num(0), 
+        msg_size(0)
+    {
+    }
+};
 
 struct blob_t {
     chunk_queue chunks;
@@ -64,7 +90,8 @@ struct peer_t {
     int idx;
     int sock;
     oid_t id;
-    char ip[20];
+    char ip[INET_ADDRSTRLEN];
+    char ipv6[INET6_ADDRSTRLEN];
     int port;
     char info[64];
 };
@@ -91,8 +118,10 @@ static thread_t s_tid; // io thread
 static thread_t s_cid; // context thread
 static spin_t s_context_lock;
 static spin_t s_pre_context_lock;
+static stat_t s_stat;
 static int s_epoll;
 static int s_sock;
+static int s_sock6;
 static recv_message_xqueue s_recv_msgs;
 static context_map s_contexts;
 static context_set s_pre_contexts;
@@ -107,9 +136,12 @@ static int net_update(void);
 
 static context_t *context_init(int idx, oid_t peer, int fd,
         const struct sockaddr_in &addr);
+static context_t *context_init6(int idx, oid_t peer, int fd,
+        const struct sockaddr_in6 &addr);
 static void context_close(oid_t peer);
 static void context_fini(context_t *ctx);
 static void on_accept(const epoll_event &evt);
+static void on_accept6(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
 static void on_write(const epoll_event &evt);
 static void on_error(const epoll_event &evt);
@@ -174,6 +206,8 @@ static int net_update(void)
     for (int i = 0; i < num; ++i) {
         if (evts[i].data.fd == s_sock) {
             on_accept(evts[i]);
+        } else if (evts[i].data.fd == s_sock6) {
+            on_accept6(evts[i]);
         } else if (evts[i].events & EPOLLIN) {
             on_read(evts[i]);
         } else if (evts[i].events & EPOLLOUT) {
@@ -520,6 +554,47 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     return ctx;
 }
 
+static context_t *context_init6(int idx, oid_t peer, int fd,
+        const struct sockaddr_in6 &addr)
+{
+    context_t *ctx = E_NEW context_t;
+
+    ctx->peer.idx = idx;
+    ctx->peer.id = (peer != OID_NIL) ? peer : oid_gen();
+    ctx->peer.sock = fd;
+    inet_ntop(AF_INET6, &addr.sin6_addr, ctx->peer.ipv6, sizeof(addr));
+    ctx->peer.port = ntohs(addr.sin6_port);
+    sprintf(ctx->peer.info, "%d <%d>%lld (%s:%d)(%s)",
+            ctx->peer.idx,
+            ctx->peer.sock,
+            ctx->peer.id,
+            ctx->peer.ipv6,
+            ctx->peer.port);
+
+    ctx->last_time = ctx->start_time = time_s();
+    ctx->close_time = 0;
+    ctx->error_times = 0;
+    ctx->recv_data = E_NEW blob_t;
+    ctx->send_data = E_NEW blob_t;
+    ctx->encipher = NULL;
+    ctx->decipher = NULL;
+    ctx->internal = false;
+    blob_init(ctx->recv_data);
+    blob_init(ctx->send_data);
+    event_init(ctx);
+    mutex_init(&ctx->lock);
+    spin_lock(&s_context_lock);
+    s_contexts[ctx->peer.id] = ctx;
+    spin_unlock(&s_context_lock);
+
+    recv_message_t *msg = recv_message_init(ctx);
+
+    msg->name = "Init.Req";
+    msg->peer = ctx->peer.id;
+    s_recv_msgs.push(msg);
+    return ctx;
+}
+
 static void context_close(oid_t peer)
 {
     context_t *ctx = NULL;
@@ -729,6 +804,52 @@ int net_listen(const std::string &name, const std::string &ip, int port)
     return 0;
 }
 
+int net_listen6(const std::string &name, const std::string &ip, int port)
+{
+    s_sock6 = socket(AF_INET6, SOCK_STREAM, 0);
+    set_nonblock(s_sock6);
+
+    epoll_event evt;
+
+    memset(&evt, 0, sizeof(evt));
+    evt.data.fd = s_sock6;
+    evt.events = EPOLLIN|EPOLLET|EPOLLERR|EPOLLHUP;
+    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, s_sock6, &evt)) {
+        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
+        close(s_sock6);
+        return -1;
+    }
+
+    struct sockaddr_in6 addr;
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin6_family = AF_INET6;
+    inet_pton(AF_INET6, ip.c_str(), &(addr.sin6_addr));
+    addr.sin6_port = htons(port);
+
+    if (0 != bind(s_sock6, (sockaddr *)&addr, sizeof(addr))) {
+        LOG_ERROR("net", "[%s] (%s:%d) bind FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
+        close(s_sock6);
+        return -1;
+    }
+
+    // backlog: size of pending queue waiting to be accepted
+    if (0 != listen(s_sock6, BACKLOG)) {
+        LOG_ERROR("net", "[%s] (%s:%d) listen FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
+        close(s_sock6);
+        return -1;
+    }
+
+    // @todo ON_LISTEN
+    return 0;
+}
+
 int net_connect(int idx, oid_t peer, const std::string &name,
         const std::string &ip, int port)
 {
@@ -765,6 +886,42 @@ int net_connect(int idx, oid_t peer, const std::string &name,
     return 0;
 }
 
+int net_connect6(int idx, oid_t peer, const std::string &name,
+        const std::string &ip, int port)
+{
+    int fd = socket(AF_INET6, SOCK_STREAM, 0);
+    struct sockaddr_in6 addr;
+    socklen_t len = sizeof(addr);
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin6_family = AF_INET6;
+    inet_pton(AF_INET6, ip.c_str(), &(addr.sin6_addr));
+    addr.sin6_port = htons(port);
+
+    if (0 != connect(fd, (struct sockaddr *)(&addr), sizeof(addr))) {
+        LOG_INFO("net", "[%s] (%s:%d) connect FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
+        close(fd);
+        return -1;
+    }
+
+    // @todo ON_CONNECT
+    set_nonblock(fd);
+    getsockname(fd, (struct sockaddr *)(&addr), &len);
+    context_t *ctx = context_init6(idx, peer, fd, addr);
+
+    ctx->internal = true;
+    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
+        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
+        net_close(ctx->peer.id);
+        return -1;
+    }
+    return 0;
+}
+
 void net_close(oid_t peer)
 {
     if (peer <= 0) {
@@ -782,30 +939,112 @@ int net_proc(void)
 
     s_recv_msgs.swap(msgs);
     for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
-        message_handle(*itr);
-        recv_message_fini(*itr);
+        recv_message_t *msg = *itr;
+
+        message_handle(msg);
+        recv_message_fini(msg);
     }
     return 0;
 }
 
-void net_stat(void)
+static void net_stat_detail(int flag)
 {
-    context_t *ctx = NULL;
-    context_map::const_iterator itr = s_contexts.begin();
+    LOG_INFO("net", "msg num: %d, msg size: %d",
+            s_stat.msg_num,
+            s_stat.msg_size);
 
-    spin_lock(&s_context_lock);
-    for (; itr != s_contexts.end(); ++itr) {
-        ctx = itr->second;
 
-        LOG_INFO("net", "%d %lld: RECV %d/%d SEND %d/%d.",
-                ctx->peer.idx,
-                ctx->peer.id,
-                ctx->recv_data->pending_size,
-                ctx->recv_data->total_size,
-                ctx->send_data->pending_size,
-                ctx->send_data->total_size);
+    stat_msg_t *sm = NULL;
+    msg_map::iterator itr;
+
+    if (flag & NET_STAT_REQ) {
+        msg_map &msgs = s_stat.req_msgs;
+
+        for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
+            sm = itr->second;
+            LOG_INFO("net", "  %s> msg num: %d, msg size: %d",
+                    itr->first.c_str(),
+                    sm->msg_num,
+                    sm->msg_size);
+            E_DELETE(sm);
+        }
+        msgs.clear();
     }
-    spin_unlock(&s_context_lock);
+
+    if (flag & NET_STAT_RES) {
+        msg_map &msgs = s_stat.res_msgs;
+
+        for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
+            sm = itr->second;
+            LOG_INFO("net", "  %s> msg num: %d, msg size: %d",
+                    itr->first.c_str(),
+                    sm->msg_num,
+                    sm->msg_size);
+            E_DELETE(sm);
+        }
+        msgs.clear();
+    }
+    s_stat.msg_num = 0;
+    s_stat.msg_size = 0;
+}
+
+void net_stat(int flag)
+{
+    if (flag & NET_STAT_CONTEXTS) {
+        context_t *ctx = NULL;
+        context_map::const_iterator itr = s_contexts.begin();
+
+        spin_lock(&s_context_lock);
+        for (; itr != s_contexts.end(); ++itr) {
+            ctx = itr->second;
+
+            LOG_INFO("net", "%d %lld: RECV %d/%d SEND %d/%d.",
+                    ctx->peer.idx,
+                    ctx->peer.id,
+                    ctx->recv_data->pending_size,
+                    ctx->recv_data->total_size,
+                    ctx->send_data->pending_size,
+                    ctx->send_data->total_size);
+        }
+        spin_unlock(&s_context_lock);
+    }
+    net_stat_detail(flag);
+}
+
+void net_stat_message(const recv_message_t &msg)
+{
+    msg_map::iterator itr;
+    stat_msg_t *sm = NULL;
+
+    s_stat.msg_num++;
+    if (msg.pb != NULL) {
+        int size = msg.pb->ByteSize();
+
+        s_stat.msg_size += size;
+        if (msg.name.find(".Res") != std::string::npos) {
+            itr = s_stat.res_msgs.find(msg.name);
+            if (itr == s_stat.res_msgs.end()) {
+                sm = E_NEW stat_msg_t;
+                s_stat.res_msgs.insert(std::make_pair(msg.name, sm));
+            } else {
+                sm = itr->second;
+            }
+        } else if (msg.name.find(".Req") != std::string::npos) {
+            itr = s_stat.req_msgs.find(msg.name);
+            if (itr == s_stat.req_msgs.end()) {
+                sm = E_NEW stat_msg_t;
+                s_stat.req_msgs.insert(std::make_pair(msg.name, sm));
+            } else {
+                sm = itr->second;
+            }
+        } else {
+            LOG_WARN("net", "INVALID message type: %s.",
+                    msg.name.c_str());
+            return;
+        }
+        sm->msg_num++;
+        sm->msg_size += size;
+    }
 }
 
 void net_peer_stat(oid_t peer)
@@ -1060,6 +1299,40 @@ static void on_accept(const epoll_event &evt)
         set_nonblock(fd);
 
         context_t *ctx = context_init(0, OID_NIL, fd, addr);
+
+        LOG_DEBUG("net", "%s", "accept new connection...");
+
+        if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
+            LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
+                    ctx->peer.info,
+                    strerror(errno));
+            net_close(ctx->peer.id);
+        }
+        len = sizeof(addr);
+    }
+    if (fd < 0) {
+        if (errno != EINTR && errno != EAGAIN) {
+            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
+        }
+    }
+}
+
+static void on_accept6(const epoll_event &evt)
+{
+    struct sockaddr_in6 addr;
+    socklen_t len = sizeof(addr);
+    int fd = 0;
+    while ((fd = accept(s_sock6, (sockaddr *)&addr, &len)) > 0) {
+        if (0 != getpeername(fd, (sockaddr *)&addr, &len)) {
+            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
+            close(fd);
+            return;
+        }
+
+        // @todo ON_ACCEPT
+        set_nonblock(fd);
+
+        context_t *ctx = context_init6(0, OID_NIL, fd, addr);
 
         LOG_DEBUG("net", "%s", "accept new connection...");
 
