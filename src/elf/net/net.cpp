@@ -28,6 +28,8 @@ static const int LINGER_TIME = 5;
 static const int CONTEXT_CLOSE_TIME = 300;
 static const int SIZE_INT = sizeof(int(0));
 static const int SIZE_INTX2 = sizeof(int(0)) * 2;
+static const int MESSAGE_LITE_SIZE = 10;
+static const int CHUNK_MIN_SIZE = 4096;
 static const int CHUNK_MAX_SIZE = 65536;
 static const size_t CHUNK_MAX_NUM = 1024;
 static const int MESSAGE_MAX_NAME_LENGTH = 100;
@@ -81,7 +83,8 @@ struct blob_t {
 };
 
 struct chunk_t {
-    int offset;
+    int wr_offset;
+    int rd_offset;
     int size;
     char data[0];
 };
@@ -260,7 +263,8 @@ static chunk_t *chunk_init(size_t size)
     }
     chunk_t *c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + size);
 
-    c->offset = 0;
+    c->wr_offset = 0;
+    c->rd_offset = 0;
     c->size = size;
     memset(c->data, 0, size);
     return c;
@@ -299,7 +303,7 @@ static void recv_message_fini(recv_message_t *msg)
     E_DELETE msg;
 }
 
-static void message_set(chunk_queue &chunks, const void *buf, int size)
+static void chunks_push(chunk_queue &chunks, const void *buf, int size)
 {
     assert(buf);
 
@@ -310,19 +314,20 @@ static void message_set(chunk_queue &chunks, const void *buf, int size)
         if (!chunks.empty()) {
             c = chunks.back();
         }
-        if (c == NULL || c->offset >= c->size) {
-            if (size < CHUNK_MAX_SIZE) {
-                c = chunk_init(size);
+        if (c == NULL || c->wr_offset >= c->size) {
+            if (size < MESSAGE_LITE_SIZE) {
+                c = chunk_init(CHUNK_MIN_SIZE);
             } else {
                 c = chunk_init(CHUNK_MAX_SIZE);
             }
             chunks.push_back(c);
         }
 
-        int real = std::min(c->size - c->offset, rem);
+        int real = std::min(c->size - c->wr_offset, rem);
 
-        memcpy(c->data + c->offset, buf, real);
-        c->offset += real;
+        memcpy(c->data + c->wr_offset, buf, real);
+        c->wr_offset += real;
+        c->size = c->wr_offset;
         rem -= real;
         buf = (char *)buf + real;
     }
@@ -337,15 +342,15 @@ static void message_get(chunk_queue &chunks, void *buf, int size)
     while (rem > 0 && itr != chunks.end()) {
         chunk_t *c = *itr;
 
-        assert(c != NULL && c->size > 0 && c->size > c->offset);
+        assert(c != NULL && c->size > 0 && c->size > c->rd_offset);
 
-        int real = c->size - c->offset;
-        char *src = c->data + c->offset;
+        int real = c->size - c->rd_offset;
+        char *src = c->data + c->rd_offset;
         char *dst = (char *)buf + offset;
 
         if (real > rem) {
             memcpy(dst, src, rem);
-            c->offset += rem;
+            c->rd_offset += rem;
             rem = 0;
         } else {
             memcpy(dst, src, real);
@@ -366,14 +371,14 @@ static void message_get(chunk_queue &chunks, std::string &buf, int size)
     while (rem > 0 && itr != chunks.end()) {
         chunk_t *c = *itr;
 
-        assert(c != NULL && c->size > 0 && c->size > c->offset);
+        assert(c != NULL && c->size > 0 && c->size > c->rd_offset);
 
-        int real = c->size - c->offset;
-        char *src = c->data + c->offset;
+        int real = c->size - c->rd_offset;
+        char *src = c->data + c->rd_offset;
 
         if (real > rem) {
             buf.append(src, rem);
-            c->offset += rem;
+            c->rd_offset += rem;
             rem = 0;
         } else {
             buf.append(src, real);
@@ -467,14 +472,6 @@ static bool message_splice(context_t *ctx)
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
 
-    /*
-    // DO FUCK LIUTAN
-    if (msg->name == "BS.Req") {
-        recv_message_fini(msg);
-    } else {
-        s_recv_msgs.push(msg);
-    }
-    */
     ctx->recv_data->pending_size -= msg_size;
     ctx->recv_data->total_size += msg_size;
     msg_size = 0;
@@ -678,9 +675,7 @@ static void push_send(context_t *ctx, blob_t *msg)
 
     for (; itr != msg->chunks.end(); ++itr) {
         chunk_t *c = *itr;
-        c->size = c->offset;
-        c->offset = 0;
-        ctx->send_data->chunks.push_back(c);
+        chunks_push(ctx->send_data->chunks, c->data, c->wr_offset);
     }
     msg->chunks.clear();
     ctx->send_data->pending_size += msg->total_size;
@@ -1110,12 +1105,12 @@ blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb
     int body_len = pb_body.size();
 
     msg->total_size = name_len + body_len + SIZE_INTX2;
-    message_set(msg->chunks, &(msg->total_size), SIZE_INT);
+    chunks_push(msg->chunks, &(msg->total_size), SIZE_INT);
     if (encipher != NULL) {
         int len = name_len | ENCRYPT_FLAG;
-        message_set(msg->chunks, &len, SIZE_INT);
+        chunks_push(msg->chunks, &len, SIZE_INT);
     } else {
-        message_set(msg->chunks, &name_len, SIZE_INT);
+        chunks_push(msg->chunks, &name_len, SIZE_INT);
     }
     if (encipher != NULL) { // encrypt
         char *name = (char *)E_ALLOC(name_len);
@@ -1125,14 +1120,14 @@ blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb
         memcpy(body, pb_body.data(), body_len);
         encipher->codec(encipher->ctx, (uint8_t*)name, (size_t)name_len);
         encipher->codec(encipher->ctx, (uint8_t*)body, (size_t)body_len);
-        message_set(msg->chunks, name, name_len);
-        message_set(msg->chunks, body, body_len);
+        chunks_push(msg->chunks, name, name_len);
+        chunks_push(msg->chunks, body, body_len);
         E_FREE(name);
         E_FREE(body);
     } else {
         const char *name = pb_name.data();
-        message_set(msg->chunks, name, name_len);
-        message_set(msg->chunks, pb_body.data(), body_len);
+        chunks_push(msg->chunks, name, name_len);
+        chunks_push(msg->chunks, pb_body.data(), body_len);
     }
     LOG_TRACE("net", "<- %s.",
             pb_name.c_str());
@@ -1420,14 +1415,15 @@ static void on_write(const epoll_event &evt)
 
     pop_send(ctx, chunks);
 
+    int sum = 0;
     chunk_queue::iterator itr = chunks.begin();
     while (itr != chunks.end()) {
         chunk_t *c = *itr;
-        int rem = c->size - c->offset;
+        int rem = c->size - c->rd_offset;
 
         while (rem > 0) {
             int num = send(ctx->peer.sock,
-                    c->data + c->offset, rem, 0);
+                    c->data + c->rd_offset, rem, 0);
             if (num < 0) {
                 if (errno != EINTR && errno != EAGAIN) {
                     for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
@@ -1443,16 +1439,18 @@ static void on_write(const epoll_event &evt)
                 return;
             } else {
                 rem -= num;
-                c->offset += num;
-                mutex_lock(&(ctx->lock));
-                ctx->send_data->pending_size -= num;
-                ctx->send_data->total_size += num;
-                mutex_unlock(&(ctx->lock));
+                c->rd_offset += num;
+                sum += num;
             }
         }
         chunk_fini(c);
         itr = chunks.erase(itr);
     }
+
+    mutex_lock(&(ctx->lock));
+    ctx->send_data->pending_size -= sum;
+    ctx->send_data->total_size += sum;
+    mutex_unlock(&(ctx->lock));
 }
 
 static void on_error(const epoll_event &evt)
