@@ -675,7 +675,9 @@ static void push_send(context_t *ctx, blob_t *msg)
 
     for (; itr != msg->chunks.end(); ++itr) {
         chunk_t *c = *itr;
+
         chunks_push(ctx->send_data->chunks, c->data, c->wr_offset);
+        chunk_fini(c);
     }
     msg->chunks.clear();
     ctx->send_data->pending_size += msg->total_size;
