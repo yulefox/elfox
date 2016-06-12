@@ -78,7 +78,7 @@ int platform_tsdk_auth(const char *param, auth_cb cb, void *args)
     }
 
     std::string sign;
-    sign.append("userId=");
+    sign.append("userID=");
     sign.append(userId->valuestring);
     sign.append("token=");
     sign.append(token->valuestring);
@@ -87,7 +87,7 @@ int platform_tsdk_auth(const char *param, auth_cb cb, void *args)
 
     std::string post_url;
     post_url.append(url->valuestring);
-    post_url.append("?userId=");
+    post_url.append("?userID=");
     post_url.append(userId->valuestring);
 
     post_url.append("&token=");
