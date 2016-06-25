@@ -132,16 +132,18 @@ int http_json(const char *url, const char *json,
 
 int urlencode(const char *in, ssize_t size, std::string &out)
 {
-    CURL *curl = curl_easy_init();
-    if(curl) {
-        char *buf = curl_easy_escape(curl, in, size);
+    CURL *h = curl_easy_init();
+    int ret = -1;
+    if(h) {
+        char *buf = curl_easy_escape(h, in, size);
         if(buf) {
             out = std::string(buf);
             curl_free(buf);
-            return 0;
+            ret = 0;
         }
+        curl_easy_cleanup(h);
     }
-    return -1;
+    return ret;
 }
 
 } // namespace elf
