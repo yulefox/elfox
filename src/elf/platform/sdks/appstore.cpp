@@ -31,7 +31,7 @@ plat_base_resp* platform_appstore_on_auth(const plat_base_req *req)
     if (userId == NULL || strcmp(userId->valuestring, "") == 0) {
         ret = PLATFORM_PARAM_ERROR;
     } else {
-        cJSON_AddStringToObject(req->resp, "uid", userId->valuestring);
+        json_set(req->resp, "uid", userId->valuestring);
     }
 
     plat_base_resp *resp = E_NEW plat_base_resp;

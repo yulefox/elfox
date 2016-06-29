@@ -50,7 +50,7 @@ plat_base_resp* platform_anzhi_on_auth(const plat_base_req *req)
             } else {
                 LOG_INFO("platform", "anzhi onAuth(): userId(%s) time(%s)",
                         uid->valuestring, time->valuestring);
-                cJSON_AddStringToObject(req->resp, "uid", uid->valuestring);
+                json_set(req->resp, "uid", uid->valuestring);
             }
         }
         cJSON_Delete(json);

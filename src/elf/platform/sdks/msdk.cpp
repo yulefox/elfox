@@ -41,7 +41,7 @@ plat_base_resp* platform_msdk_on_auth(const plat_base_req *req)
     if (code == PLATFORM_OK) {
         cJSON *param = cJSON_Parse(req->param.c_str());
         cJSON *openid = cJSON_GetObjectItem(param, "openid");
-        cJSON_AddStringToObject(resp->resp, "uid", openid->valuestring);
+        json_set(resp->resp, "uid", openid->valuestring);
     }
 
     resp->cb = req->cb;
@@ -82,16 +82,6 @@ static std::string msdk_build_params(const char *appId, const char *appKey,
     res.append("&encode=1");
 
     return res;
-}
-
-static void json_set(cJSON *root, const char *key, const char *val)
-{
-    cJSON *child = cJSON_GetObjectItem(root, key);
-    if (child == NULL) {
-        cJSON_AddStringToObject(root, key, val);
-    } else {
-        child->valuestring = strdup(val);
-    }
 }
 
 int platform_qq_auth(const char *param, auth_cb cb, void *args)

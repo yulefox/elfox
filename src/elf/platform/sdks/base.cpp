@@ -30,5 +30,17 @@ namespace elf {
         }
         return true;
     }
+
+    //
+    void json_set(cJSON *root, const char *key, const char *val)
+    {
+        cJSON *child = cJSON_GetObjectItem(root, key);
+        if (child == NULL) {
+            cJSON_AddStringToObject(root, key, val);
+        } else {
+            if (child->valuestring) free(child->valuestring);
+            child->valuestring = strdup(val);
+        }
+    }
 }
 

@@ -56,6 +56,8 @@ struct plat_json_req : public plat_base_req {
     virtual bool push_resp(void *ptr, size_t size, bool unquote);
 };
 
+void json_set(cJSON *root, const char *key, const char *val);
+
 // internal funcs
 cJSON* platform_get_json(int type);
 size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata);

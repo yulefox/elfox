@@ -107,8 +107,7 @@ int platform_uc_auth(const char *param, auth_cb cb, void *args)
 
     // data/sid
     cJSON *data = cJSON_GetObjectItem(req, "data");
-    cJSON *sid = cJSON_GetObjectItem(data, "sid");
-    sid->valuestring = strdup(cJSON_GetObjectItem(json, "token")->valuestring);
+    json_set(data, "sid", cJSON_GetObjectItem(json, "token")->valuestring);
 
     // game/appId
     cJSON *game = cJSON_GetObjectItem(req, "game");
@@ -118,11 +117,10 @@ int platform_uc_auth(const char *param, auth_cb cb, void *args)
     // sign data
     std::string signtx;
     signtx.append("sid=");
-    signtx.append(sid->valuestring);
+    signtx.append(cJSON_GetObjectItem(json, "token")->valuestring);
     signtx.append(appKey->valuestring);
     std::string md5sum = md5((unsigned char*)signtx.c_str(), signtx.length());
-    cJSON *sign = cJSON_GetObjectItem(req, "sign");
-    sign->valuestring = strdup(md5sum.c_str());
+    json_set(req, "sign", md5sum.c_str());
 
     //char *encode = cJSON_PrintUnformatted(req);
     char *encode = cJSON_Print(req);

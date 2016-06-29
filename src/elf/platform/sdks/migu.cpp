@@ -36,7 +36,8 @@ plat_base_resp* platform_migu_on_auth(const plat_base_req *req)
 
     cJSON *param = cJSON_Parse(req->param.c_str());
     cJSON *userId = cJSON_GetObjectItem(param, "userId");
-    cJSON_AddStringToObject(req->resp, "uid", userId->valuestring);
+
+    json_set(req->resp, "uid", userId->valuestring);
 
     plat_base_resp *resp = E_NEW plat_base_resp;
     resp->code = ret;

@@ -89,11 +89,8 @@ int platform_i4_auth(const char *param, auth_cb cb, void *args)
 
     // token
     std::string token = cJSON_GetObjectItem(json, "token")->valuestring;
-    cJSON *req_token = cJSON_GetObjectItem(req, "token");
-    if (req_token == NULL) {
-        cJSON_AddStringToObject(req, "token", token.c_str());
-    }
-    req_token->valuestring = strdup(token.c_str());
+
+    json_set(req, "token", token.c_str());
 
     char *encode = cJSON_Print(req);
     std::string content = std::string(encode);
