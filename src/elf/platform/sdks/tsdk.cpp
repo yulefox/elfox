@@ -22,13 +22,13 @@ namespace elf {
 
 plat_base_resp* platform_tsdk_on_auth(const plat_base_req *req)
 {
-    cJSON *status = cJSON_GetObjectItem(req->resp, "status");
+    cJSON *status = cJSON_GetObjectItem(req->resp, "state");
     //cJSON *data = cJSON_GetObjectItem(req->resp, "data");
 
     LOG_INFO("platform", "tsdk onAuth(): status(%s)", status->valuestring);
 
     int ret = PLATFORM_OK;
-    if (strcmp(status->valuestring, "1") != 0) {
+    if (status->valueint != 1) {
         ret = PLATFORM_PARAM_ERROR;
     }
 
