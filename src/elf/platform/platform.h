@@ -36,6 +36,7 @@ enum platform_type {
     PLAT_APPSTORE   = 11,
     PLAT_MIGU       = 12,
     PLAT_TSIXI      = 13,
+    PLAT_FACEBOOK   = 14,
 };
 
 enum platform_error {
