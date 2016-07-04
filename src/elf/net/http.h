@@ -20,6 +20,12 @@
 #include <elf/config.h>
 
 namespace elf {
+
+enum HTTP_REQ_METHOD {
+    HTTP_POST = 1,
+    HTTP_GET = 2,
+};
+
 typedef size_t (*http_response)(void *ptr, size_t size, size_t nmemb, void *args);
 
 ///
@@ -42,7 +48,7 @@ int http_fini(void);
 /// @param args Callback arguments.
 /// @return (0).
 ///
-int http_json(const char *url, const char *json,
+int http_json(int method, const char *url, const char *json,
         http_response func, void *args);
 
 int urlencode(const char *in, ssize_t size, std::string &out);

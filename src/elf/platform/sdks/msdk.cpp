@@ -167,6 +167,8 @@ int platform_qq_auth(const char *param, auth_cb cb, void *args)
     post_url.append(url->valuestring);
     post_url.append("?");
     post_url.append(params);
+    post_url.append("&openkey=");
+    post_url.append(token->valuestring);
 
     cJSON_Delete(json);
 
@@ -176,7 +178,7 @@ int platform_qq_auth(const char *param, auth_cb cb, void *args)
     json_req->channel = "qq";
     json_req->param = std::string(param);
 
-    http_json(post_url.c_str(), content.c_str(), write_callback, json_req);
+    http_json(HTTP_GET, post_url.c_str(), content.c_str(), write_callback, json_req);
 
     LOG_DEBUG("net", "url: %s", post_url.c_str());
     return PLATFORM_OK;
@@ -253,6 +255,8 @@ int platform_weixin_auth(const char *param, auth_cb cb, void *args)
     post_url.append(url->valuestring);
     post_url.append("?");
     post_url.append(params);
+    post_url.append("&openkey=");
+    post_url.append(token->valuestring);
 
     cJSON_Delete(json);
 
@@ -262,7 +266,7 @@ int platform_weixin_auth(const char *param, auth_cb cb, void *args)
     json_req->channel = "weixin";
     json_req->param = std::string(param);
 
-    http_json(post_url.c_str(), content.c_str(), write_callback, json_req);
+    http_json(HTTP_GET, post_url.c_str(), content.c_str(), write_callback, json_req);
 
     LOG_DEBUG("net", "url: %s", post_url.c_str());
     return PLATFORM_OK;

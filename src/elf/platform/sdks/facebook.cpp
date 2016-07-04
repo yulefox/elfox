@@ -118,7 +118,7 @@ int platform_facebook_auth(const char *param, auth_cb cb, void *args)
     json_req->channel = "facebook";
     json_req->param = std::string(param);
 
-    http_json(post_url.c_str(), "", write_callback, json_req);
+    http_json(HTTP_POST, post_url.c_str(), "", write_callback, json_req);
 
     LOG_DEBUG("net", "url: %s", post_url.c_str());
     return PLATFORM_OK;
