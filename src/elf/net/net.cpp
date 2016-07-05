@@ -690,6 +690,7 @@ static void push_send(context_t *ctx, blob_t *msg)
     }
 }
 
+/*
 static void push_send(context_t *ctx, chunk_queue &chunks)
 {
     assert(ctx);
@@ -708,6 +709,7 @@ static void push_send(context_t *ctx, chunk_queue &chunks)
             strerror(errno));
     }
 }
+*/
 
 static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
 {
