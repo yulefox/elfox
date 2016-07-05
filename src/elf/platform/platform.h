@@ -37,6 +37,7 @@ enum platform_type {
     PLAT_MIGU       = 12,
     PLAT_TSIXI      = 13,
     PLAT_FACEBOOK   = 14,
+    PLAT_QIANGUI    = 15,
 };
 
 enum platform_error {
@@ -61,6 +62,14 @@ int platform_fini();
 int platform_load(int type, const char *proto);
 int platform_auth(int plat_type, const char *data, auth_cb cb, void *args);
 int platform_proc();
+
+
+int qg_stat_login(const std::string &userId, int server, int loginTime);
+int qg_stat_create(const std::string &userId, int server, int64_t roleId, int createTime);
+int qg_stat_online_5m(int server, int total, int time);
+int qg_stat_logout(const std::string &userId, int server,
+        int64_t roleId, const std::string &roleName,
+        int roleLevel, int roleCareer, int roleFightPower, int offlineTime);
 
 
 } // namespace elf
