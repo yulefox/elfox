@@ -45,7 +45,12 @@ namespace elf {
             return PLATFORM_SETTING_ERROR;
         }
 
-        cJSON *appId = cJSON_GetObjectItem(setting, "appId");
+        cJSON *appId = NULL;
+        if (server < 200000) {
+            appId = cJSON_GetObjectItem(setting, "appIdIOS");
+        } else {
+            appId = cJSON_GetObjectItem(setting, "appId");
+        }
         if (appId == NULL) {
             return PLATFORM_SETTING_ERROR;
         }
@@ -97,7 +102,12 @@ namespace elf {
             return PLATFORM_SETTING_ERROR;
         }
 
-        cJSON *appId = cJSON_GetObjectItem(setting, "appId");
+        cJSON *appId = NULL;
+        if (server < 200000) {
+            appId = cJSON_GetObjectItem(setting, "appIdIOS");
+        } else {
+            appId = cJSON_GetObjectItem(setting, "appId");
+        }
         if (appId == NULL) {
             return PLATFORM_SETTING_ERROR;
         }
@@ -155,10 +165,16 @@ namespace elf {
             return PLATFORM_SETTING_ERROR;
         }
 
-        cJSON *appId = cJSON_GetObjectItem(setting, "appId");
+        cJSON *appId = NULL;
+        if (server < 200000) {
+            appId = cJSON_GetObjectItem(setting, "appIdIOS");
+        } else {
+            appId = cJSON_GetObjectItem(setting, "appId");
+        }
         if (appId == NULL) {
             return PLATFORM_SETTING_ERROR;
         }
+
 
         cJSON *appKey = cJSON_GetObjectItem(setting, "appKey");
         if (appKey == NULL) {
@@ -227,10 +243,16 @@ key是表示平台和游戏双方提前协商约定好的密钥
             return PLATFORM_SETTING_ERROR;
         }
 
-        cJSON *appId = cJSON_GetObjectItem(setting, "appId");
+        cJSON *appId = NULL;
+        if (server < 200000) {
+            appId = cJSON_GetObjectItem(setting, "appIdIOS");
+        } else {
+            appId = cJSON_GetObjectItem(setting, "appId");
+        }
         if (appId == NULL) {
             return PLATFORM_SETTING_ERROR;
         }
+
 
         cJSON *appKey = cJSON_GetObjectItem(setting, "appKey");
         if (appKey == NULL) {
