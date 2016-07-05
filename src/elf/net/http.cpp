@@ -12,10 +12,12 @@
 const static int HTTP_POST_TIMEOUT = 20; // 20 seconds;
 
 namespace elf {
+
 struct http_req_t {
     std::string json;
     std::string url;
     http_response cb;
+    int method;
     void *args;
 };
 
@@ -57,8 +59,10 @@ static void *http_post(void *args)
         //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
         curl_easy_setopt(curl, CURLOPT_URL, post->url.c_str());
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json.c_str());
+        if (post->method == HTTP_POST) {
+            curl_easy_setopt(curl, CURLOPT_POST, 1L);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post->json.c_str());
+        }
         //curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post->json.size());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_cb);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
@@ -114,13 +118,14 @@ int http_fini(void)
     return 0;
 }
 
-int http_json(const char *url, const char *json,
+int http_json(int method, const char *url, const char *json,
         http_response func, void *args)
 {
     LOG_DEBUG("http", "url: %s", url);
     LOG_DEBUG("http", "json: %s", json);
     http_req_t *post = E_NEW http_req_t;
 
+    post->method = method;
     post->url = std::string(url);
     post->json = std::string(json);
     post->cb = func;

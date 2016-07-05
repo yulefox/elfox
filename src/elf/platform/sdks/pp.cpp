@@ -132,7 +132,7 @@ int platform_pp_auth(const char *param, auth_cb cb, void *args)
     json_req->plat_type = PLAT_PP;
     json_req->channel = "pp";
 
-    http_json(url->valuestring, content.c_str(), write_callback, json_req);
+    http_json(HTTP_POST, url->valuestring, content.c_str(), write_callback, json_req);
 
     LOG_DEBUG("net", "url: %s, json: %s", url->valuestring, content.c_str());
     return PLATFORM_OK;

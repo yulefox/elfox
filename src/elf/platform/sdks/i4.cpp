@@ -103,7 +103,7 @@ int platform_i4_auth(const char *param, auth_cb cb, void *args)
     json_req->plat_type = PLAT_I4;
     json_req->channel = "i4";
 
-    http_json(post_url.c_str(), content.c_str(), write_callback, json_req);
+    http_json(HTTP_POST, post_url.c_str(), content.c_str(), write_callback, json_req);
 
     LOG_DEBUG("net", "url: %s, json: %s", url->valuestring, content.c_str());
     return PLATFORM_OK;
