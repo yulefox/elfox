@@ -27,10 +27,12 @@ plat_base_resp* platform_migu_on_auth(const plat_base_req *req)
     if (status == NULL || strcmp(status->valuestring, "ok") != 0) {
         ret = PLATFORM_PARAM_ERROR;
         cJSON *err = cJSON_GetObjectItem(req->resp, "errMsg");
-        if (err == NULL) {
-            LOG_ERROR("platform", "migu onAuth() falied: %d", status->valuestring);
-        } else {
-            LOG_ERROR("platform", "migu onAuth() falied: %s %s", status->valuestring, err->valuestring);
+        if (status != NULL) {
+            if (err == NULL) {
+                LOG_ERROR("platform", "migu onAuth() falied: %d", status->valuestring);
+            } else {
+                LOG_ERROR("platform", "migu onAuth() falied: %s %s", status->valuestring, err->valuestring);
+            }
         }
     }
 

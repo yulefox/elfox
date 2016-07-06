@@ -46,11 +46,11 @@ void oid_ismap_add(id_ismap &ism, int idx, oid_t id)
 
 void oid_ismap_del(id_ismap &ism, int idx, oid_t id)
 {
-    id_set *s = NULL;
     id_ismap::iterator itr = ism.find(idx);
 
     if (itr != ism.end()) {
-        s = itr->second;
+        id_set *s = itr->second;
+
         s->erase(id);
     }
 }
@@ -72,11 +72,11 @@ void oid_illmap_add(id_illmap &illm, int idx, oid_t k, oid_t v)
 
 void oid_illmap_del(id_illmap &illm, int idx, oid_t k)
 {
-    id_llmap *m = NULL;
     id_illmap::iterator itr = illm.find(idx);
 
     if (itr != illm.end()) {
-        m = itr->second;
+        id_llmap *m = itr->second;
+
         m->erase(k);
     }
 }

@@ -117,12 +117,12 @@ int platform_anzhi_auth(const char *param, auth_cb cb, void *args)
 
     struct tm ctm;
     time64_t now = time_ms();
-    char now_s[64];
+    char sec[64], now_s[64];
     time_t tm = (time_t)(now / 1000);
 
     localtime_r(&tm, &ctm);
-    strftime(now_s, sizeof(now_s), "%Y%m%d%H%M%S", &ctm);
-    sprintf(now_s, "%s%lld", now_s, now - tm * 1000);
+    strftime(sec, sizeof(sec), "%Y%m%d%H%M%S", &ctm);
+    sprintf(now_s, "%s%lld", sec, now - tm * 1000);
 
 
     std::string post_url;

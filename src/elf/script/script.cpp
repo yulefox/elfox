@@ -94,7 +94,6 @@ int script_func_exec(const char *func, const char *sig, ...)
 {
     int lev = 1; /* `func` is global function */
     int err = 0;
-    size_t tok_len = 0;
     const char *cur_mod = func,  *mod;
     char module[MAX_MODULE_NAME_LENGTH];
 
@@ -105,7 +104,8 @@ int script_func_exec(const char *func, const char *sig, ...)
         return SCRIPT_RC_ERROR;
     }
     while ((mod = strchr(cur_mod, '.'))) {
-        tok_len = mod - cur_mod;
+        size_t tok_len = mod - cur_mod;
+
         strncpy(module, cur_mod, tok_len);
         module[tok_len] = '\0';
         cur_mod = mod + 1;
@@ -145,6 +145,7 @@ int script_func_exec(const char *func, const char *sig, ...)
         default: /* double */
             LOG_ERROR("script", "invalid option (%c)", *sig);
             lua_pop(L, lev + argc);
+            va_end(args);
             return SCRIPT_RC_ERROR;
         }
     }

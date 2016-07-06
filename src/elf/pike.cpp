@@ -95,9 +95,7 @@ static void _addikey_next(ff_addikey_t *addikey) {
 }
 
 static void _generate(pike_t *ctx) {
-    int base;
-    int i;
-	for (i = 0;i < 1024; i++) {
+	for (int i = 0; i < 1024; i++) {
 		int32_t carry = ctx->addikey[0].carry + ctx->addikey[1].carry + ctx->addikey[2].carry;
         uint32_t tmp;
 		if (carry == 0 || carry == 3) {
@@ -120,7 +118,9 @@ static void _generate(pike_t *ctx) {
 		tmp = ctx->addikey[0].buffer[ctx->addikey[0].index] ^
             ctx->addikey[1].buffer[ctx->addikey[1].index] ^
             ctx->addikey[2].buffer[ctx->addikey[2].index];
-		base = i << 2;
+
+        int base = i << 2;
+
 		ctx->buffer[base] = (uint8_t)tmp;
 		ctx->buffer[base+1] = (uint8_t)(tmp >> 8);
 		ctx->buffer[base+2] = (uint8_t)(tmp >> 16);
@@ -129,20 +129,18 @@ static void _generate(pike_t *ctx) {
 	ctx->index = 0;
 }
 
-
-
 uint8_t *pike_codec(pike_t *ctx, uint8_t *data, size_t size) {
-    size_t remnant;
-    size_t off;
     if (size == 0) {
         return data;
     }
 
-    off = 0;
+    size_t remnant = 0;
+    size_t off = 0;
+
     for (;;) {
         size_t i;
 		remnant = 4096 - ctx->index;
-		if (remnant <= 0) {
+		if (remnant == 0) {
 			_generate(ctx);
 			continue;
 		}
@@ -156,7 +154,7 @@ uint8_t *pike_codec(pike_t *ctx, uint8_t *data, size_t size) {
 			off++;
 		}
 		ctx->index += remnant;
-        if (size <= 0) break;
+        if (size == 0) break;
 	}
     return data;
 }

@@ -16,10 +16,10 @@ static int gettimeofday(struct timeval *tp, void *tzp)
 {
     FILETIME ft;
     LARGE_INTEGER li;           /* union defination  */
-    long long t;
-    static int tzflag;
 
     if (tp) {
+        long long t;
+
         GetSystemTimeAsFileTime(&ft);
         li.LowPart = ft.dwLowDateTime;
         li.HighPart = ft.dwHighDateTime;

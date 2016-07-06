@@ -34,6 +34,10 @@ struct event_oper_t {
     event_oper_t(int e, callback_t *c) :
         oper(EVENT_OPER_REGIST),
         evt(e),
+        arg_a(0),
+        arg_b(0),
+        oid(OID_NIL),
+        lid(OID_NIL),
         cb(c)
     {
     }
@@ -41,8 +45,11 @@ struct event_oper_t {
     event_oper_t(int e, oid_t o, oid_t l) :
         oper(EVENT_OPER_UNREGIST),
         evt(e),
+        arg_a(0),
+        arg_b(0),
         oid(o),
-        lid(l)
+        lid(l),
+        cb(NULL)
     {
     }
 
@@ -51,7 +58,9 @@ struct event_oper_t {
         evt(e),
         arg_a(a),
         arg_b(b),
-        oid(o)
+        oid(o),
+        lid(OID_NIL),
+        cb(NULL)
     {
     }
 };

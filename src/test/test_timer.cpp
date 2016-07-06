@@ -27,11 +27,6 @@ typedef factory::object object;
 
 static tut::factory tf("timer");
 
-void bingo(void *args)
-{
-    LOG_TEST("%s", "bingo");
-}
-
 template<>
 template<>
 void object::test<1>() {

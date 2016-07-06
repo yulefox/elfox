@@ -258,7 +258,7 @@ static void set_nonblock(int sock)
 
 static chunk_t *chunk_init(size_t size)
 {
-    if (size <= 0) {
+    if (size == 0) {
         size = CHUNK_MAX_SIZE;
     }
     chunk_t *c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + size);
@@ -561,7 +561,7 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
     ctx->peer.sock = fd;
     inet_ntop(AF_INET6, &addr.sin6_addr, ctx->peer.ipv6, sizeof(addr));
     ctx->peer.port = ntohs(addr.sin6_port);
-    sprintf(ctx->peer.info, "%d <%d>%lld (%s:%d)(%s)",
+    sprintf(ctx->peer.info, "%d <%d>%lld (%s:%d)",
             ctx->peer.idx,
             ctx->peer.sock,
             ctx->peer.id,
@@ -983,12 +983,11 @@ static void net_stat_detail(int flag)
 void net_stat(int flag)
 {
     if (flag & NET_STAT_CONTEXTS) {
-        context_t *ctx = NULL;
         context_map::const_iterator itr = s_contexts.begin();
 
         spin_lock(&s_context_lock);
         for (; itr != s_contexts.end(); ++itr) {
-            ctx = itr->second;
+            context_t *ctx = itr->second;
 
             LOG_INFO("net", "%d %lld: RECV %d/%d SEND %d/%d.",
                     ctx->peer.idx,
@@ -1006,10 +1005,10 @@ void net_stat(int flag)
 void net_stat_message(const recv_message_t &msg)
 {
     msg_map::iterator itr;
-    stat_msg_t *sm = NULL;
 
     s_stat.msg_num++;
     if (msg.pb != NULL) {
+        stat_msg_t *sm = NULL;
         int size = msg.pb->ByteSize();
 
         s_stat.msg_size += size;
@@ -1088,7 +1087,6 @@ void net_encode(const pb_t &pb, std::string &name, std::string &body)
 blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb_body)
 {
     context_t *ctx = context_find(peer);
-    std::string buf;
     blob_t *msg = E_NEW blob_t;
 
     cipher_t *encipher = NULL;

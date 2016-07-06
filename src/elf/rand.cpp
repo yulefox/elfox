@@ -75,8 +75,7 @@ void roll_rm(int min, int max, roll_res &res, int times)
         while (times) {
             int n = rand(min, max);
 
-            if (res.find(n) != res.end()) {
-                res.erase(n);
+            if (res.erase(n) > 0) {
                 --times;
             }
         }
