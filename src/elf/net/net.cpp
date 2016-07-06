@@ -676,6 +676,7 @@ static void push_send(context_t *ctx, blob_t *msg)
     for (; itr != msg->chunks.end(); ++itr) {
         chunk_t *c = *itr;
 
+        c->size = c->wr_offset;
         ctx->send_data->chunks.push_back(c);
     }
     msg->chunks.clear();
@@ -690,7 +691,6 @@ static void push_send(context_t *ctx, blob_t *msg)
     }
 }
 
-/*
 static void push_send(context_t *ctx, chunk_queue &chunks)
 {
     assert(ctx);
@@ -709,7 +709,6 @@ static void push_send(context_t *ctx, chunk_queue &chunks)
             strerror(errno));
     }
 }
-*/
 
 static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
 {
@@ -1423,13 +1422,17 @@ static void on_write(const epoll_event &evt)
             int num = send(ctx->peer.sock,
                     c->data + c->rd_offset, rem, 0);
             if (num < 0) {
-                for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
-                    chunk_fini(*itr);
+                if (errno != EINTR && errno != EAGAIN) {
+                    for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
+                        chunk_fini(*itr);
+                    }
+                    net_close(ctx->peer.id);
+                    LOG_ERROR("net", "%s send FAILED: %s.",
+                            ctx->peer.info,
+                            strerror(errno));
+                } else {
+                    push_send(ctx, chunks);
                 }
-                net_close(ctx->peer.id);
-                LOG_ERROR("net", "%s send FAILED: %s.",
-                        ctx->peer.info,
-                        strerror(errno));
                 return;
             } else {
                 rem -= num;
