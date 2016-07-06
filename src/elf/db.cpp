@@ -88,12 +88,9 @@ static void query(mysql_thread_t *th)
     query_t *q = NULL;
     MYSQL *m = th->mysql;
 
-    if (m == NULL || q == NULL) {
-        return;
-    }
-
     try {
         th->req.pop(q);
+        assert(m && q);
 
         // query
         int status = mysql_real_query(m, q->cmd.c_str(), q->cmd.length());
@@ -130,9 +127,7 @@ static void query(mysql_thread_t *th)
 
 static void destroy(query_t *q)
 {
-    if (q == NULL) {
-        return;
-    }
+    assert(q);
 
     if (q->data) {
         mysql_free_result(q->data);
