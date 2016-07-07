@@ -24,7 +24,9 @@ plat_base_resp* platform_appstore_on_auth(const plat_base_req *req)
     int ret = PLATFORM_OK;
     if (status == NULL || strcmp(status->valuestring, "false") == 0) {
         ret = PLATFORM_PARAM_ERROR;
-        LOG_ERROR("platform", "appstore onAuth() falied: %d", status->valuestring);
+        if (status != NULL) {
+            LOG_ERROR("platform", "appstore onAuth() falied: %d", status->valuestring);
+        }
     }
 
     cJSON *userId = cJSON_GetObjectItem(req->resp, "userId");

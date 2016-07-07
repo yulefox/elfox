@@ -298,7 +298,7 @@ namespace elf {
             } else {
                 res.teams.push_back(members);
             }
-            E_DELETE camps[i];
+            S_DELETE(camps[i]);
         }
 
         return success;

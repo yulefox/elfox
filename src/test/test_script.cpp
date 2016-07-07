@@ -33,6 +33,9 @@ void object::test<1>() {
 
     int rc = script_file_exec("scripts/init.lua");
 
+    if (rc != 0) {
+        printf("%d", rc);
+    }
     // truncated 64-bit time64_t into 32-bit integer
     rc = script_func_exec("S.test", "i", (int)elf::time_ms());
 
