@@ -33,6 +33,10 @@ namespace elf {
         return s;
     }
 
+    static size_t cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
+        return size * nmemb;
+    }
+
     int qg_stat_login(const std::string &userId, int server, int loginTime)
     {
         cJSON *setting = platform_get_json(PLAT_QIANGUI);
@@ -70,6 +74,7 @@ namespace elf {
 
         ///
         std::string post_url;
+        post_url.append(url->valuestring);
         post_url.append("/logLogin");
         post_url.append("?gameId=");
         post_url.append(appId->valuestring);
@@ -86,7 +91,8 @@ namespace elf {
         post_url.append("&sign=");
         post_url.append(sign);
 
-        http_json(HTTP_GET, post_url.c_str(), "", NULL, NULL);
+        // do post request
+        http_json(HTTP_POST, post_url.c_str(), "", cb, NULL);
         return 0;
     }
 
@@ -129,6 +135,7 @@ namespace elf {
         ///http://www.qg8.com/7yworld-ad-collection/gameStatistics/createRole?gameId=游戏ID&createTime=创建时间&serverNo=区服编号&userId=用户ID&roleId=角色ID&sign=签名
         ///
         std::string post_url;
+        post_url.append(url->valuestring);
         post_url.append("/createRole");
         post_url.append("?gameId=");
         post_url.append(appId->valuestring);
@@ -148,7 +155,8 @@ namespace elf {
         post_url.append("&sign=");
         post_url.append(sign);
 
-        http_json(HTTP_GET, post_url.c_str(), "", NULL, NULL);
+        // do post request
+        http_json(HTTP_POST, post_url.c_str(), "", cb, NULL);
         return 0;
     }
 
@@ -191,6 +199,7 @@ namespace elf {
 
         ///
         std::string post_url;
+        post_url.append(url->valuestring);
         post_url.append("/online/5m");
         post_url.append("?gameId=");
         post_url.append(appId->valuestring);
@@ -207,7 +216,9 @@ namespace elf {
         post_url.append("&sign=");
         post_url.append(sign);
 
-        http_json(HTTP_GET, post_url.c_str(), "", NULL, NULL);
+        // do post request
+        http_json(HTTP_POST, post_url.c_str(), "", cb, NULL);
+
         return 0;
     }
 
@@ -277,6 +288,7 @@ key是表示平台和游戏双方提前协商约定好的密钥
         //http://localhost:8080/7yworld-ad-collection/gameStatistics/logLogout?gameId=游戏ID&offlineTime=离线时间&roleCareer=职业&roleFightPower=战力&roleId=角色ID&roleLevel=角色等级&roleName=角色名称&serverNo=区服编号&userId=用户ID&sign=签名
         ///
         std::string post_url;
+        post_url.append(url->valuestring);
         post_url.append("/logLogout");
         post_url.append("?gameId=");
         post_url.append(appId->valuestring);
@@ -311,7 +323,9 @@ key是表示平台和游戏双方提前协商约定好的密钥
         post_url.append("&sign=");
         post_url.append(sign);
 
-        http_json(HTTP_GET, post_url.c_str(), "", NULL, NULL);
+
+        // do post request
+        http_json(HTTP_POST, post_url.c_str(), "", cb, NULL);
         return 0;
     }
 
