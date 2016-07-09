@@ -974,7 +974,7 @@ int net_proc(void)
 
 static void net_stat_detail(int flag)
 {
-    LOG_INFO("net", "msg num: %d, msg size: %d, contexts: %d/%d, chunks: %d/%d",
+    LOG_INFO("stat", "msg num: %d, msg size: %d, contexts: %d/%d, chunks: %d/%d",
             s_stat.msg_num,
             s_stat.msg_size,
             s_stat.context_size_created,
@@ -990,7 +990,7 @@ static void net_stat_detail(int flag)
 
         for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
             sm = itr->second;
-            LOG_INFO("net", "  %s> msg num: %d, msg size: %d",
+            LOG_INFO("stat", "  %s> msg num: %d, msg size: %d",
                     itr->first.c_str(),
                     sm->msg_num,
                     sm->msg_size);
@@ -1004,7 +1004,7 @@ static void net_stat_detail(int flag)
 
         for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
             sm = itr->second;
-            LOG_INFO("net", "  %s> msg num: %d, msg size: %d",
+            LOG_INFO("stat", "  %s> msg num: %d, msg size: %d",
                     itr->first.c_str(),
                     sm->msg_num,
                     sm->msg_size);
@@ -1025,7 +1025,7 @@ void net_stat(int flag)
         for (; itr != s_contexts.end(); ++itr) {
             context_t *ctx = itr->second;
 
-            LOG_INFO("net", "%d %lld: RECV %d/%d SEND %d/%d.",
+            LOG_INFO("stat", "%d %lld: RECV %d/%d SEND %d/%d.",
                     ctx->peer.idx,
                     ctx->peer.id,
                     ctx->recv_data->pending_size,
@@ -1079,7 +1079,7 @@ void net_peer_stat(oid_t peer)
     context_t *ctx = context_find(peer);
 
     if (ctx != NULL) {
-        LOG_INFO("net", "%d %lld: RECV %d/%d SEND %d/%d.",
+        LOG_INFO("stat", "%d %lld: RECV %d/%d SEND %d/%d.",
                 ctx->peer.idx,
                 ctx->peer.id,
                 ctx->recv_data->pending_size,

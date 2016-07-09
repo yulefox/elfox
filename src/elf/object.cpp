@@ -51,6 +51,13 @@ void Object::OnInit(void)
     }
 }
 
+void Object::Stat(void)
+{
+    LOG_INFO("stat", "protobufs: %d, objects: %d",
+            s_pbs.size(),
+            s_objs.size());
+}
+
 void Object::Release(void)
 {
     obj_map_id::iterator itr = s_objs.begin();

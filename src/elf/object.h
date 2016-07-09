@@ -73,6 +73,12 @@ public:
     void OnInit(void);
 
     ///
+    /// Output statistics info.
+    ///
+    void Stat(void);
+
+
+    ///
     /// Release all Object/protobuf objects.
     ///
     static void Release(void);
