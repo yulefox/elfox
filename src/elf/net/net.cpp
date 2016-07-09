@@ -113,7 +113,7 @@ struct chunk_t {
 
     ~chunk_t()
     {
-        S_DELETE(data);
+        E_DELETE []data;
         ++s_stat.chunk_size_released;
     }
 };
