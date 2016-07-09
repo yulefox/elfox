@@ -67,13 +67,23 @@ struct stat_t {
     int msg_size; // size of recv msg
     msg_map req_msgs; // request message map
     msg_map res_msgs; // response message map
+    size_t context_size_created;
+    size_t context_size_released;
+    size_t chunk_size_created;
+    size_t chunk_size_released;
 
     stat_t() :
         msg_num(0), 
-        msg_size(0)
+        msg_size(0),
+        context_size_created(0),
+        context_size_released(0),
+        chunk_size_created(0),
+        chunk_size_released(0)
     {
     }
 };
+
+static stat_t s_stat;
 
 struct blob_t {
     chunk_queue chunks;
@@ -86,7 +96,22 @@ struct chunk_t {
     int wr_offset;
     int rd_offset;
     int size;
-    char data[0];
+    char *data;
+
+    chunk_t(int size) :
+        wr_offset(0),
+        rd_offset(0),
+        size(size)
+    {
+        ++s_stat.chunk_size_created;
+        data = E_NEW char[size];
+    }
+
+    ~chunk_t()
+    {
+        S_DELETE(data);
+        ++s_stat.chunk_size_released;
+    }
 };
 
 struct peer_t {
@@ -112,6 +137,16 @@ struct context_t {
     int last_time;
     int error_times;
     bool internal;
+
+    context_t()
+    {
+        ++s_stat.context_size_created;
+    }
+
+    ~context_t()
+    {
+        ++s_stat.context_size_released;
+    }
 };
 
 typedef std::map<oid_t, context_t *> context_map;
@@ -121,7 +156,6 @@ static thread_t s_tid; // io thread
 static thread_t s_cid; // context thread
 static spin_t s_context_lock;
 static spin_t s_pre_context_lock;
-static stat_t s_stat;
 static int s_epoll;
 static int s_sock;
 static int s_sock6;
@@ -261,18 +295,13 @@ static chunk_t *chunk_init(size_t size)
     if (size == 0) {
         size = CHUNK_MAX_SIZE;
     }
-    chunk_t *c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + size);
-
-    c->wr_offset = 0;
-    c->rd_offset = 0;
-    c->size = size;
-    memset(c->data, 0, size);
-    return c;
+    return E_NEW chunk_t(size);
 }
 
 static chunk_t *chunk_init(const char *buf, size_t size)
 {
     chunk_t *c = chunk_init(size);
+
     if (c == NULL) {
         return NULL;
     }
@@ -282,7 +311,7 @@ static chunk_t *chunk_init(const char *buf, size_t size)
 
 static void chunk_fini(chunk_t *c)
 {
-    E_FREE(c);
+    S_DELETE(c);
 }
 
 static recv_message_t *recv_message_init(context_t *ctx)
@@ -548,6 +577,7 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     msg->name = "Init.Req";
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
+
     return ctx;
 }
 
@@ -624,7 +654,7 @@ static void context_fini(context_t *ctx)
 {
     assert(ctx);
     mutex_fini(&ctx->lock);
-    LOG_TRACE("net", "%s is FREED. S: %d/%d R: %d/%d.",
+    LOG_INFO("net", "%s is FREED. S: %d/%d R: %d/%d.",
             ctx->peer.info,
             ctx->send_data->pending_size,
             ctx->send_data->total_size,
@@ -686,8 +716,8 @@ static void push_send(context_t *ctx, blob_t *msg)
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
         LOG_INFO("net", "%s epoll_ctl FAILED: %s.",
-            ctx->peer.info,
-            strerror(errno));
+                ctx->peer.info,
+                strerror(errno));
     }
 }
 
@@ -705,8 +735,8 @@ static void push_send(context_t *ctx, chunk_queue &chunks)
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
         LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
-            ctx->peer.info,
-            strerror(errno));
+                ctx->peer.info,
+                strerror(errno));
     }
 }
 
@@ -944,10 +974,13 @@ int net_proc(void)
 
 static void net_stat_detail(int flag)
 {
-    LOG_INFO("net", "msg num: %d, msg size: %d",
+    LOG_INFO("net", "msg num: %d, msg size: %d, contexts: %d/%d, chunks: %d/%d",
             s_stat.msg_num,
-            s_stat.msg_size);
-
+            s_stat.msg_size,
+            s_stat.context_size_created,
+            s_stat.context_size_released,
+            s_stat.chunk_size_created,
+            s_stat.chunk_size_released);
 
     stat_msg_t *sm = NULL;
     msg_map::iterator itr;
@@ -1400,7 +1433,7 @@ static void on_read(const epoll_event &evt)
             return;
         }
     }
-    if (chunks.size() >= 10) {
+    if (chunks.size() >= CHUNK_MAX_NUM / 2) {
         LOG_WARN("net", "%s chunk num over range: <%d>", ctx->peer.info, chunks.size());
     }
     push_recv(ctx, chunks);
