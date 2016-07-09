@@ -75,7 +75,7 @@ public:
     ///
     /// Output statistics info.
     ///
-    void Stat(void);
+    static void Stat(void);
 
 
     ///
