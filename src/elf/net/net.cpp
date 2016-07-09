@@ -716,8 +716,11 @@ static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
 
     chunk_t *c = NULL;
     mutex_lock(&(ctx->lock));
-    clone = ctx->send_data->chunks;
-    ctx->send_data->chunks.clear();
+    chunk_queue &src = ctx->send_data->chunks;
+    for (size_t i = 0; i < CHUNK_MAX_NUM && !src.empty(); ++i) {
+        clone.push_back(src.front());
+        src.pop_front();
+    }
     mutex_unlock(&(ctx->lock));
     return c;
 }
