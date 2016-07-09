@@ -100,22 +100,7 @@ struct chunk_t {
     int wr_offset;
     int rd_offset;
     int size;
-    char *data;
-
-    chunk_t(int size) :
-        wr_offset(0),
-        rd_offset(0),
-        size(size)
-    {
-        ++s_stat.chunk_size_created;
-        data = E_NEW char[size];
-    }
-
-    ~chunk_t()
-    {
-        E_DELETE []data;
-        ++s_stat.chunk_size_released;
-    }
+    char data[0];
 };
 
 struct peer_t {
@@ -299,7 +284,14 @@ static chunk_t *chunk_init(size_t size)
     if (size == 0) {
         size = CHUNK_MAX_SIZE;
     }
-    return E_NEW chunk_t(size);
+    chunk_t *c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + size);
+
+    c->wr_offset = 0;
+    c->rd_offset = 0;
+    c->size = size;
+    memset(c->data, 0, size);
+    ++s_stat.chunk_size_created;
+    return c;
 }
 
 static chunk_t *chunk_init(const char *buf, size_t size)
@@ -316,6 +308,7 @@ static chunk_t *chunk_init(const char *buf, size_t size)
 static void chunk_fini(chunk_t *c)
 {
     S_DELETE(c);
+    ++s_stat.chunk_size_released;
 }
 
 static recv_message_t *recv_message_init(context_t *ctx)
@@ -1428,6 +1421,7 @@ static void on_read(const epoll_event &evt)
 
         // append received chunk
         c->size = size;
+        s_stat.recv_msg_size += size;
         chunks.push_back(c);
         if (chunks.size() > CHUNK_MAX_NUM && ctx->internal == false) {
             chunk_queue::iterator itr = chunks.begin();
@@ -1445,7 +1439,6 @@ static void on_read(const epoll_event &evt)
         LOG_WARN("net", "%s chunk num over range: <%d>", ctx->peer.info, chunks.size());
     }
     push_recv(ctx, chunks);
-    s_stat.recv_msg_size += size;
 }
 
 static void on_write(const epoll_event &evt)
