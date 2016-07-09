@@ -295,7 +295,7 @@ int db_proc(void)
     return 0;
 }
 
-void db_req(int idx, const char *cmd, bool sim, db_callback proc,
+void db_req(int idx, const char *cmd, bool parallel, db_callback proc,
         oid_t oid, pb_t *out, const std::string &field)
 {
     thread_list_map::iterator itr = s_threads.find(idx);
@@ -323,7 +323,7 @@ void db_req(int idx, const char *cmd, bool sim, db_callback proc,
     q->field = field;
     q->proc = proc;
     q->data = NULL;
-    if (sim && oid != elf::OID_NIL) {
+    if (parallel && oid != elf::OID_NIL) {
         tidx = oid % (th_list->num - 1) + 1;
     }
     mysql_thread_t *th = th_list->threads + tidx;
