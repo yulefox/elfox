@@ -25,7 +25,7 @@
 namespace elf {
 static const int LINGER_ONOFF = 0;
 static const int LINGER_TIME = 5;
-static const int CONTEXT_CLOSE_TIME = 300;
+static const int CONTEXT_CLOSE_TIME = 90;
 static const int SIZE_INT = sizeof(int(0));
 static const int SIZE_INTX2 = sizeof(int(0)) * 2;
 static const int MESSAGE_LITE_SIZE = 10;
