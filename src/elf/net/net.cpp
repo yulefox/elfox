@@ -63,8 +63,10 @@ struct stat_msg_t {
 };
 
 struct stat_t {
-    int msg_num; // number of recv msg
-    int msg_size; // size of recv msg
+    int send_msg_num; // number of send msg
+    int send_msg_size; // size of send msg
+    int recv_msg_num; // number of recv msg
+    int recv_msg_size; // size of recv msg
     msg_map req_msgs; // request message map
     msg_map res_msgs; // response message map
     size_t context_size_created;
@@ -73,8 +75,10 @@ struct stat_t {
     size_t chunk_size_released;
 
     stat_t() :
-        msg_num(0), 
-        msg_size(0),
+        send_msg_num(0), 
+        send_msg_size(0),
+        recv_msg_num(0), 
+        recv_msg_size(0),
         context_size_created(0),
         context_size_released(0),
         chunk_size_created(0),
@@ -719,6 +723,7 @@ static void push_send(context_t *ctx, blob_t *msg)
                 ctx->peer.info,
                 strerror(errno));
     }
+    ++s_stat.send_msg_num;
 }
 
 static void push_send(context_t *ctx, chunk_queue &chunks)
@@ -974,9 +979,11 @@ int net_proc(void)
 
 static void net_stat_detail(int flag)
 {
-    LOG_INFO("stat", "msg num: %d, msg size: %d, contexts: %d/%d, chunks: %d/%d",
-            s_stat.msg_num,
-            s_stat.msg_size,
+    LOG_INFO("stat", "send msg: %d(%d), recv msg: %d(%d), contexts: %d/%d, chunks: %d/%d",
+            s_stat.send_msg_num,
+            s_stat.send_msg_size,
+            s_stat.recv_msg_num,
+            s_stat.recv_msg_size,
             s_stat.context_size_created,
             s_stat.context_size_released,
             s_stat.chunk_size_created,
@@ -1012,8 +1019,10 @@ static void net_stat_detail(int flag)
         }
         msgs.clear();
     }
-    s_stat.msg_num = 0;
-    s_stat.msg_size = 0;
+    s_stat.send_msg_num = 0;
+    s_stat.send_msg_size = 0;
+    s_stat.recv_msg_num = 0;
+    s_stat.recv_msg_size = 0;
 }
 
 void net_stat(int flag)
@@ -1042,12 +1051,11 @@ void net_stat_message(const recv_message_t &msg)
 {
     msg_map::iterator itr;
 
-    s_stat.msg_num++;
+    s_stat.recv_msg_num++;
     if (msg.pb != NULL) {
         stat_msg_t *sm = NULL;
         int size = msg.pb->ByteSize();
 
-        s_stat.msg_size += size;
         if (msg.name.find(".Res") != std::string::npos) {
             itr = s_stat.res_msgs.find(msg.name);
             if (itr == s_stat.res_msgs.end()) {
@@ -1437,6 +1445,7 @@ static void on_read(const epoll_event &evt)
         LOG_WARN("net", "%s chunk num over range: <%d>", ctx->peer.info, chunks.size());
     }
     push_recv(ctx, chunks);
+    s_stat.recv_msg_size += size;
 }
 
 static void on_write(const epoll_event &evt)
@@ -1481,6 +1490,7 @@ static void on_write(const epoll_event &evt)
     mutex_lock(&(ctx->lock));
     ctx->send_data->pending_size -= sum;
     ctx->send_data->total_size += sum;
+    s_stat.send_msg_size += sum;
     mutex_unlock(&(ctx->lock));
 }
 
