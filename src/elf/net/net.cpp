@@ -1021,6 +1021,8 @@ static void net_stat_detail(int flag)
 
 void net_stat(int flag)
 {
+    net_stat_detail(flag);
+
     if (flag & NET_STAT_CONTEXTS) {
         context_map::const_iterator itr = s_contexts.begin();
 
@@ -1038,7 +1040,6 @@ void net_stat(int flag)
         }
         spin_unlock(&s_context_lock);
     }
-    net_stat_detail(flag);
 }
 
 void net_stat_message(const recv_message_t &msg)
