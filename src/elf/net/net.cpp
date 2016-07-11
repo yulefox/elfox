@@ -710,13 +710,14 @@ static void push_send(context_t *ctx, blob_t *msg)
     ctx->send_data->pending_size += msg->total_size;
     ctx->send_data->total_size += msg->total_size;
     mutex_unlock(&(ctx->lock));
+    ++s_stat.send_msg_num;
+    s_stat.send_msg_size += msg->total_size;
 
     if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
         LOG_INFO("net", "%s epoll_ctl FAILED: %s.",
                 ctx->peer.info,
                 strerror(errno));
     }
-    ++s_stat.send_msg_num;
 }
 
 static void push_send(context_t *ctx, chunk_queue &chunks)
@@ -1044,7 +1045,6 @@ void net_stat_message(const recv_message_t &msg)
 {
     msg_map::iterator itr;
 
-    s_stat.recv_msg_num++;
     if (msg.pb != NULL) {
         stat_msg_t *sm = NULL;
         int size = msg.pb->ByteSize();
@@ -1072,6 +1072,8 @@ void net_stat_message(const recv_message_t &msg)
         }
         sm->msg_num++;
         sm->msg_size += size;
+        s_stat.recv_msg_num++;
+        s_stat.recv_msg_size += size;
     }
 }
 
@@ -1421,7 +1423,6 @@ static void on_read(const epoll_event &evt)
 
         // append received chunk
         c->size = size;
-        s_stat.recv_msg_size += size;
         chunks.push_back(c);
         if (chunks.size() > CHUNK_MAX_NUM && ctx->internal == false) {
             chunk_queue::iterator itr = chunks.begin();
@@ -1483,7 +1484,6 @@ static void on_write(const epoll_event &evt)
     mutex_lock(&(ctx->lock));
     ctx->send_data->pending_size -= sum;
     ctx->send_data->total_size += sum;
-    s_stat.send_msg_size += sum;
     mutex_unlock(&(ctx->lock));
 }
 
