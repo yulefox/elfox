@@ -307,7 +307,7 @@ static chunk_t *chunk_init(const char *buf, size_t size)
 
 static void chunk_fini(chunk_t *c)
 {
-    S_DELETE(c);
+    E_FREE(c);
     ++s_stat.chunk_size_released;
 }
 
