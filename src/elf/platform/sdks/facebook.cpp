@@ -116,7 +116,7 @@ int platform_facebook_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_SETTING_ERROR;
     }
 
-    cJSON *appKey = cJSON_GetObjectItem(setting, "appKey");
+    cJSON *appKey = cJSON_GetObjectItem(plat_info, "appKey");
     if (appKey == NULL) {
         return PLATFORM_SETTING_ERROR;
     }
