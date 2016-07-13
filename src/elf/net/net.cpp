@@ -1471,7 +1471,7 @@ static void on_write(const epoll_event &evt)
                 } else {
                     push_send(ctx, chunks);
                 }
-                return;
+                goto stat;
             } else {
                 rem -= num;
                 c->rd_offset += num;
@@ -1481,10 +1481,9 @@ static void on_write(const epoll_event &evt)
         chunk_fini(c);
         itr = chunks.erase(itr);
     }
-
+stat:
     mutex_lock(&(ctx->lock));
     ctx->send_data->pending_size -= sum;
-    ctx->send_data->total_size += sum;
     mutex_unlock(&(ctx->lock));
 }
 
