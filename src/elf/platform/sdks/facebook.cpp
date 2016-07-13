@@ -66,6 +66,12 @@ plat_base_resp* platform_facebook_on_auth(const plat_base_req *req)
     return resp;
 }
 
+/*
+ *    "ios" : {
+        "appID" : "1157500974315562",
+        "appKey" : "d6b6b720ccd00e315e9fbd22b4075378"
+    },
+*/
 
 int platform_facebook_auth(const char *param, auth_cb cb, void *args)
 {
@@ -86,14 +92,33 @@ int platform_facebook_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_SETTING_ERROR;
     }
 
-    cJSON *appKey = cJSON_GetObjectItem(setting, "appKey");
-    if (appKey == NULL) {
-        return PLATFORM_SETTING_ERROR;
-    }
-
     cJSON *token = cJSON_GetObjectItem(json, "token");
     if (token == NULL) {
         return PLATFORM_PARAM_ERROR;
+    }
+
+    bool ios = false;
+    cJSON *plat = cJSON_GetObjectItem(json, "platform");
+    if (plat && !strcmp(plat->valuestring, "ios")) {
+        ios = true;
+    }
+
+    cJSON *plat_info = NULL;
+
+    if (ios) {
+        plat_info = cJSON_GetObjectItem(setting, "ios");
+    } else {
+        plat_info = cJSON_GetObjectItem(setting, "android");
+    }
+
+    if (plat_info == NULL) {
+        LOG_DEBUG("net", "%s", "no found platform info...");
+        return PLATFORM_SETTING_ERROR;
+    }
+
+    cJSON *appKey = cJSON_GetObjectItem(plat_info, "appKey");
+    if (appKey == NULL) {
+        return PLATFORM_SETTING_ERROR;
     }
 
     /*
@@ -118,7 +143,7 @@ int platform_facebook_auth(const char *param, auth_cb cb, void *args)
     json_req->channel = "facebook";
     json_req->param = std::string(param);
 
-    http_json(HTTP_POST, post_url.c_str(), "", write_callback, json_req);
+    http_json(HTTP_GET, post_url.c_str(), "", write_callback, json_req);
 
     LOG_DEBUG("net", "url: %s", post_url.c_str());
     return PLATFORM_OK;
