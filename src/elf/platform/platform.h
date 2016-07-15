@@ -38,6 +38,7 @@ enum platform_type {
     PLAT_TSIXI      = 13,
     PLAT_FACEBOOK   = 14,
     PLAT_QIANGUI    = 15,
+    PLAT_SIFU       = 16,
 };
 
 enum platform_error {
