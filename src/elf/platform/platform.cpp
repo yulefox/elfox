@@ -240,6 +240,8 @@ int platform_auth(int plat_type, const char *data,
         return platform_tsdk_auth(data, cb, args);
     case PLAT_FACEBOOK:
         return platform_facebook_auth(data, cb, args);
+    case PLAT_SIFU:
+        return platform_sifu_auth(data, cb, args);
     default:
         return PLATFORM_TYPE_ERROR;
         break;
