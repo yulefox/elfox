@@ -21,23 +21,27 @@ namespace elf {
     static std::string itos(int val)
     {
         std::string s;
+        std::string r;
         std::stringstream ss(s);
-        ss >> val;
-        return s;
+        ss << val;
+        ss >> r;
+        return r;
     }
     static std::string itos(int64_t val)
     {
         std::string s;
+        std::string r;
         std::stringstream ss(s);
-        ss >> val;
-        return s;
+        ss << val;
+        ss >> r;
+        return r;
     }
 
     static size_t cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
         return size * nmemb;
     }
 
-    int qg_stat_login(const std::string &userId, int server, int loginTime)
+    int qg_stat_login(const std::string &userId, int server, int64_t loginTime)
     {
         cJSON *setting = platform_get_json(PLAT_QIANGUI);
         if (setting == NULL) {
@@ -50,7 +54,7 @@ namespace elf {
         }
 
         cJSON *appId = NULL;
-        if (server < 200000) {
+        if (server > 100000 && server < 200000) {
             appId = cJSON_GetObjectItem(setting, "appIdIOS");
         } else {
             appId = cJSON_GetObjectItem(setting, "appId");
@@ -96,7 +100,7 @@ namespace elf {
         return 0;
     }
 
-    int qg_stat_create(const std::string &userId, int server, int64_t roleId, int createTime)
+    int qg_stat_create(const std::string &userId, int server, int64_t roleId, int64_t createTime)
     {
         cJSON *setting = platform_get_json(PLAT_QIANGUI);
         if (setting == NULL) {
@@ -109,7 +113,7 @@ namespace elf {
         }
 
         cJSON *appId = NULL;
-        if (server < 200000) {
+        if (server > 100000 && server < 200000) {
             appId = cJSON_GetObjectItem(setting, "appIdIOS");
         } else {
             appId = cJSON_GetObjectItem(setting, "appId");
@@ -161,7 +165,7 @@ namespace elf {
     }
 
 
-    int qg_stat_online_5m(int server, int total, int time)
+    int qg_stat_online_5m(int server, int total, int64_t time)
     {
         cJSON *setting = platform_get_json(PLAT_QIANGUI);
         if (setting == NULL) {
@@ -174,7 +178,7 @@ namespace elf {
         }
 
         cJSON *appId = NULL;
-        if (server < 200000) {
+        if (server > 100000 && server < 200000) {
             appId = cJSON_GetObjectItem(setting, "appIdIOS");
         } else {
             appId = cJSON_GetObjectItem(setting, "appId");
@@ -216,6 +220,7 @@ namespace elf {
         post_url.append("&sign=");
         post_url.append(sign);
 
+        LOG_DEBUG("net", "%s", post_url.c_str());
         // do post request
         http_json(HTTP_POST, post_url.c_str(), "", cb, NULL);
 
@@ -242,7 +247,7 @@ key是表示平台和游戏双方提前协商约定好的密钥
 */
     int qg_stat_logout(const std::string &userId, int server,
             int64_t roleId, const std::string &roleName,
-            int roleLevel, int roleCareer, int roleFightPower, int offlineTime)
+            int roleLevel, int roleCareer, int roleFightPower, int64_t offlineTime)
     {
         cJSON *setting = platform_get_json(PLAT_QIANGUI);
         if (setting == NULL) {
@@ -255,7 +260,7 @@ key是表示平台和游戏双方提前协商约定好的密钥
         }
 
         cJSON *appId = NULL;
-        if (server < 200000) {
+        if (server > 100000 && server < 200000) {
             appId = cJSON_GetObjectItem(setting, "appIdIOS");
         } else {
             appId = cJSON_GetObjectItem(setting, "appId");
@@ -304,9 +309,6 @@ key是表示平台和游戏双方提前协商约定好的密钥
 
         post_url.append("&roleId=");
         post_url.append(itos(roleId));
-
-        post_url.append("&roleLevel=");
-        post_url.append(itos(roleLevel));
 
         post_url.append("&roleLevel=");
         post_url.append(itos(roleLevel));
