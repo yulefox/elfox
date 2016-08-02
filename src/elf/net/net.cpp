@@ -335,7 +335,7 @@ static void chunk_fini(chunk_t *c)
     }
     if (c->real_size == CHUNK_SIZE_S) {
         spin_lock(&s_chunk_s_lock);
-        if (s_chunks_s.size() < CHUNK_MAX_NUM) {
+        if (s_chunks_s.size() < CHUNK_MAX_NUM * 10) {
             s_chunks_s.push_back(c);
             spin_unlock(&s_chunk_s_lock);
             return;
