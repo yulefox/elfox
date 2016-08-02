@@ -142,6 +142,14 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
         if (strcmp((char*)ptr, "true") != 0 || strcmp((char*)ptr, "false") != 0) {
             realsize = 0;
         }
+    } else if (base_req->plat_type == PLAT_SIFU) {
+        cJSON *resp = cJSON_Parse(base_req->param.c_str());
+        std::string st((char*)ptr, realsize);
+        cJSON_AddStringToObject(resp, "status", st.c_str());
+
+        base_req->resp = resp;
+        base_resp = platform_sifu_on_auth(base_req);
+        E_DELETE base_req;
     } else if (base_req->plat_type == PLAT_1SDK) {
         cJSON *resp = cJSON_Parse(base_req->param.c_str());
         std::string st((char*)ptr, realsize);
@@ -232,6 +240,8 @@ int platform_auth(int plat_type, const char *data,
         return platform_tsdk_auth(data, cb, args);
     case PLAT_FACEBOOK:
         return platform_facebook_auth(data, cb, args);
+    case PLAT_SIFU:
+        return platform_sifu_auth(data, cb, args);
     default:
         return PLATFORM_TYPE_ERROR;
         break;

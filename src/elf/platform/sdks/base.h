@@ -77,6 +77,7 @@ int platform_appstore_auth(const char *param, auth_cb cb, void *args);
 int platform_migu_auth(const char *param, auth_cb cb, void *args);
 int platform_tsdk_auth(const char *param, auth_cb cb, void *args);
 int platform_facebook_auth(const char *param, auth_cb cb, void *args);
+int platform_sifu_auth(const char *param, auth_cb cb, void *args);
 
 plat_base_resp* platform_pp_on_auth(const plat_base_req *req);
 plat_base_resp* platform_uc_on_auth(const plat_base_req *req);
@@ -91,6 +92,7 @@ plat_base_resp* platform_appstore_on_auth(const plat_base_req *req);
 plat_base_resp* platform_migu_on_auth(const plat_base_req *req);
 plat_base_resp* platform_tsdk_on_auth(const plat_base_req *req);
 plat_base_resp* platform_facebook_on_auth(const plat_base_req *req);
+plat_base_resp* platform_sifu_on_auth(const plat_base_req *req);
 
 } // namespace elf
 
