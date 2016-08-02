@@ -1002,7 +1002,7 @@ int net_proc(void)
 
 static void net_stat_detail(int flag)
 {
-    LOG_INFO("stat", "send msg: %d(%d), recv msg: %d(%d), contexts: %d/%d, chunks: %d/%d",
+    LOG_INFO("stat", "send msg: %d(%d), recv msg: %d(%d), contexts: %d/%d, chunks: %d/%d(%d/%d)",
             s_stat.send_msg_num,
             s_stat.send_msg_size,
             s_stat.recv_msg_num,
@@ -1010,7 +1010,9 @@ static void net_stat_detail(int flag)
             s_stat.context_size_created,
             s_stat.context_size_released,
             s_stat.chunk_size_created,
-            s_stat.chunk_size_released);
+            s_stat.chunk_size_released,
+            s_chunks_s.size(),
+            s_chunks_l.size());
 
     stat_msg_t *sm = NULL;
     msg_map::iterator itr;
