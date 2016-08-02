@@ -28,7 +28,6 @@ static const int LINGER_TIME = 5;
 static const int CONTEXT_CLOSE_TIME = 90;
 static const int SIZE_INT = sizeof(int(0));
 static const int SIZE_INTX2 = sizeof(int(0)) * 2;
-static const int MESSAGE_LITE_SIZE = 10;
 static const int CHUNK_SIZE_S = 256;
 static const int CHUNK_SIZE_L = 4096;
 static const size_t CHUNK_MAX_NUM = 8192;
@@ -145,6 +144,8 @@ typedef std::set<oid_t> context_set;
 static thread_t s_tid; // io thread
 static thread_t s_cid; // context thread
 static spin_t s_context_lock;
+static spin_t s_chunk_s_lock;
+static spin_t s_chunk_l_lock;
 static spin_t s_pre_context_lock;
 static int s_epoll;
 static int s_sock;
@@ -289,16 +290,20 @@ static chunk_t *chunk_init(size_t size)
 
     if (size <= CHUNK_SIZE_S) {
         real_size = CHUNK_SIZE_S;
+        spin_lock(&s_chunk_s_lock);
         if (!s_chunks_s.empty()) {
             c = s_chunks_s.front();
             s_chunks_s.pop_front();
         }
+        spin_unlock(&s_chunk_s_lock);
     } else if (size <= CHUNK_SIZE_L) {
         real_size = CHUNK_SIZE_L;
+        spin_lock(&s_chunk_l_lock);
         if (!s_chunks_l.empty()) {
             c = s_chunks_l.front();
             s_chunks_l.pop_front();
         }
+        spin_unlock(&s_chunk_l_lock);
     }
     if (c == NULL) {
         c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + real_size);
@@ -329,15 +334,21 @@ static void chunk_fini(chunk_t *c)
         return;
     }
     if (c->real_size == CHUNK_SIZE_S) {
+        spin_lock(&s_chunk_s_lock);
         if (s_chunks_s.size() < CHUNK_MAX_NUM) {
             s_chunks_s.push_back(c);
+            spin_unlock(&s_chunk_s_lock);
             return;
         }
+        spin_unlock(&s_chunk_s_lock);
     } else if (c->real_size == CHUNK_SIZE_L) {
+        spin_lock(&s_chunk_l_lock);
         if (s_chunks_l.size() < CHUNK_MAX_NUM) {
             s_chunks_l.push_back(c);
+            spin_unlock(&s_chunk_l_lock);
             return;
         }
+        spin_unlock(&s_chunk_l_lock);
     }
     E_FREE(c);
     ++s_stat.chunk_size_released;
@@ -373,11 +384,7 @@ static void chunks_push(chunk_queue &chunks, const void *buf, int size)
             c = chunks.back();
         }
         if (c == NULL || c->wr_offset >= c->data_size) {
-            if (size < MESSAGE_LITE_SIZE) {
-                c = chunk_init(CHUNK_SIZE_S);
-            } else {
-                c = chunk_init(CHUNK_SIZE_L);
-            }
+            c = chunk_init(size);
             chunks.push_back(c);
         }
 
@@ -794,6 +801,8 @@ int net_init(void)
         LOG_ERROR("net", "epoll_create FAILED: %s.", strerror(errno));
         return -1;
     }
+    spin_init(&s_chunk_s_lock);
+    spin_init(&s_chunk_l_lock);
     spin_init(&s_context_lock);
     spin_init(&s_pre_context_lock);
     s_tid = thread_init(net_thread, NULL);
@@ -806,6 +815,8 @@ int net_fini(void)
     MODULE_IMPORT_SWITCH;
     spin_fini(&s_pre_context_lock);
     spin_fini(&s_context_lock);
+    spin_fini(&s_chunk_s_lock);
+    spin_fini(&s_chunk_l_lock);
     close(s_epoll);
     return 0;
 }
