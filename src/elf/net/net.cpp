@@ -144,8 +144,8 @@ typedef std::set<oid_t> context_set;
 static thread_t s_tid; // io thread
 static thread_t s_cid; // context thread
 static spin_t s_context_lock;
-static spin_t s_chunk_s_lock;
-static spin_t s_chunk_l_lock;
+static mutex_t s_chunk_s_lock;
+static mutex_t s_chunk_l_lock;
 static spin_t s_pre_context_lock;
 static int s_epoll;
 static int s_sock;
@@ -196,10 +196,11 @@ static void *context_thread(void *args)
         context_set pre_peers;
         context_set::iterator itr;
 
-        spin_lock(&s_pre_context_lock);
-        pre_peers = s_pre_contexts;
-        s_pre_contexts.clear();
-        spin_unlock(&s_pre_context_lock);
+        {
+            spin lock(&s_pre_context_lock);
+            pre_peers = s_pre_contexts;
+            s_pre_contexts.clear();
+        }
 
         for (itr = pre_peers.begin(); itr != pre_peers.end(); ++itr) {
             context_close(*itr);
@@ -289,21 +290,21 @@ static chunk_t *chunk_init(size_t size)
     chunk_t *c = NULL;
 
     if (size <= CHUNK_SIZE_S) {
+        lock chunk_lock(&s_chunk_s_lock);
+
         real_size = CHUNK_SIZE_S;
-        spin_lock(&s_chunk_s_lock);
         if (!s_chunks_s.empty()) {
             c = s_chunks_s.front();
             s_chunks_s.pop_front();
         }
-        spin_unlock(&s_chunk_s_lock);
     } else if (size <= CHUNK_SIZE_L) {
+        lock chunk_lock(&s_chunk_l_lock);
+
         real_size = CHUNK_SIZE_L;
-        spin_lock(&s_chunk_l_lock);
         if (!s_chunks_l.empty()) {
             c = s_chunks_l.front();
             s_chunks_l.pop_front();
         }
-        spin_unlock(&s_chunk_l_lock);
     }
     if (c == NULL) {
         c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + real_size);
@@ -334,21 +335,19 @@ static void chunk_fini(chunk_t *c)
         return;
     }
     if (c->real_size == CHUNK_SIZE_S) {
-        spin_lock(&s_chunk_s_lock);
+        lock chunk_lock(&s_chunk_s_lock);
+
         if (s_chunks_s.size() < CHUNK_MAX_NUM * 10) {
             s_chunks_s.push_back(c);
-            spin_unlock(&s_chunk_s_lock);
             return;
         }
-        spin_unlock(&s_chunk_s_lock);
     } else if (c->real_size == CHUNK_SIZE_L) {
-        spin_lock(&s_chunk_l_lock);
+        lock chunk_lock(&s_chunk_l_lock);
+
         if (s_chunks_l.size() < CHUNK_MAX_NUM) {
             s_chunks_l.push_back(c);
-            spin_unlock(&s_chunk_l_lock);
             return;
         }
-        spin_unlock(&s_chunk_l_lock);
     }
     E_FREE(c);
     ++s_stat.chunk_size_released;
@@ -604,9 +603,11 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     blob_init(ctx->send_data);
     event_init(ctx);
     mutex_init(&ctx->lock);
-    spin_lock(&s_context_lock);
-    s_contexts[ctx->peer.id] = ctx;
-    spin_unlock(&s_context_lock);
+
+    {
+        spin lock(&s_context_lock);
+        s_contexts[ctx->peer.id] = ctx;
+    }
 
     recv_message_t *msg = recv_message_init(ctx);
 
@@ -646,9 +647,11 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
     blob_init(ctx->send_data);
     event_init(ctx);
     mutex_init(&ctx->lock);
-    spin_lock(&s_context_lock);
-    s_contexts[ctx->peer.id] = ctx;
-    spin_unlock(&s_context_lock);
+
+    {
+        spin lock(&s_context_lock);
+        s_contexts[ctx->peer.id] = ctx;
+    }
 
     recv_message_t *msg = recv_message_init(ctx);
 
@@ -662,14 +665,15 @@ static void context_close(oid_t peer)
 {
     context_t *ctx = NULL;
 
-    spin_lock(&s_context_lock);
-    context_map::iterator itr = s_contexts.find(peer);
+    {
+        spin lock(&s_context_lock);
+        context_map::iterator itr = s_contexts.find(peer);
 
-    if (itr != s_contexts.end()) {
-        ctx = itr->second;
-        s_contexts.erase(itr);
+        if (itr != s_contexts.end()) {
+            ctx = itr->second;
+            s_contexts.erase(itr);
+        }
     }
-    spin_unlock(&s_context_lock);
 
     if (ctx == NULL) {
         return;
@@ -708,12 +712,14 @@ static context_t *context_find(oid_t peer)
     context_t *ctx = NULL;
     context_map::const_iterator itr;
 
-    spin_lock(&s_context_lock);
-    itr = s_contexts.find(peer);
-    if (itr != s_contexts.end()) {
-        ctx = itr->second;
+    {
+        spin lock(&s_context_lock);
+
+        itr = s_contexts.find(peer);
+        if (itr != s_contexts.end()) {
+            ctx = itr->second;
+        }
     }
-    spin_unlock(&s_context_lock);
     return ctx;
 }
 
@@ -801,8 +807,8 @@ int net_init(void)
         LOG_ERROR("net", "epoll_create FAILED: %s.", strerror(errno));
         return -1;
     }
-    spin_init(&s_chunk_s_lock);
-    spin_init(&s_chunk_l_lock);
+    mutex_init(&s_chunk_s_lock);
+    mutex_init(&s_chunk_l_lock);
     spin_init(&s_context_lock);
     spin_init(&s_pre_context_lock);
     s_tid = thread_init(net_thread, NULL);
@@ -815,8 +821,8 @@ int net_fini(void)
     MODULE_IMPORT_SWITCH;
     spin_fini(&s_pre_context_lock);
     spin_fini(&s_context_lock);
-    spin_fini(&s_chunk_s_lock);
-    spin_fini(&s_chunk_l_lock);
+    mutex_fini(&s_chunk_s_lock);
+    mutex_fini(&s_chunk_l_lock);
     close(s_epoll);
     return 0;
 }
@@ -994,9 +1000,10 @@ void net_close(oid_t peer)
     if (peer <= 0) {
         return;
     }
-    spin_lock(&s_pre_context_lock);
-    s_pre_contexts.insert(peer);
-    spin_unlock(&s_pre_context_lock);
+    {
+        spin lock(&s_pre_context_lock);
+        s_pre_contexts.insert(peer);
+    }
 }
 
 int net_proc(void)
@@ -1070,8 +1077,8 @@ void net_stat(int flag)
 
     if (flag & NET_STAT_CONTEXTS) {
         context_map::const_iterator itr = s_contexts.begin();
+        spin lock(&s_context_lock);
 
-        spin_lock(&s_context_lock);
         for (; itr != s_contexts.end(); ++itr) {
             context_t *ctx = itr->second;
 
@@ -1083,7 +1090,6 @@ void net_stat(int flag)
                     ctx->send_data->pending_size,
                     ctx->send_data->total_size);
         }
-        spin_unlock(&s_context_lock);
     }
 }
 

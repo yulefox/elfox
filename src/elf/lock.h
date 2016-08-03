@@ -61,6 +61,20 @@ public:
 private:
     mutex_t *m_lock;
 };
+
+class spin {
+public:
+    spin(spin_t *m) :
+        m_lock(m)
+    {
+        spin_lock(m_lock);
+    }
+    ~lock(void) {
+        spin_unlock(m_lock);
+    }
+private:
+    spin_t *m_lock;
+};
 } // namespace elf
 
 #endif /* !ELF_MUTEX_H */
