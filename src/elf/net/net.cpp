@@ -36,8 +36,7 @@ static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_SIZE_L;
 static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
 static const int ENCRYPT_FLAG = 0x40000000;
-static const int MAX_WRITER_SIZE = 8;
-static const int MAX_READER_SIZE = 8;
+static const int WORKER_THREAD_SIZE = 7; // (2^n-1)
 
 struct blob_t;
 struct chunk_t;
@@ -48,7 +47,9 @@ struct stat_msg_t;
 
 typedef std::list<chunk_t *> chunk_queue;
 typedef std::map<std::string, stat_msg_t *> msg_map;
-typedef std::queue<context_t *> free_context_queue;
+typedef std::queue<context_t *> context_queue;
+typedef xqueue<context_t *> context_xqueue;
+typedef xqueue<std::pair<context_t *, blob_t *>> write_context_xqueue;
 typedef std::deque<recv_message_t *> recv_message_queue;
 typedef xqueue<recv_message_t *> recv_message_xqueue;
 
@@ -118,12 +119,8 @@ struct peer_t {
 struct context_t {
     peer_t peer;
     mutex_t lock;
-
     blob_t *recv_data;
     blob_t *send_data;
-
-    xqueue<blob_t> pending_send;
-
     cipher_t *encipher;
     cipher_t *decipher;
     epoll_event evt;
@@ -148,12 +145,11 @@ typedef std::map<oid_t, context_t *> context_map;
 typedef std::set<oid_t> context_set;
 
 static thread_t s_tid; // io thread
-static thread_t s_writer_tid[MAX_WRITER_SIZE]; // writer thread
-static thread_t s_reader_tid[MAX_READER_SIZE]; // reader thread
+static thread_t s_writer_tid[WORKER_THREAD_SIZE]; // writer thread
+static thread_t s_reader_tid[WORKER_THREAD_SIZE]; // reader thread
 static thread_t s_cid; // context thread
-static int s_writer_idx[MAX_WRITER_SIZE];
-static int s_reader_idx[MAX_READER_SIZE];
-static xqueue<oid_t> s_pending_read[MAX_READER_SIZE];
+static context_xqueue s_pending_read[WORKER_THREAD_SIZE];
+static write_context_xqueue s_pending_write[WORKER_THREAD_SIZE];
 static spin_t s_context_lock;
 static mutex_t s_chunk_s_lock;
 static mutex_t s_chunk_l_lock;
@@ -164,7 +160,7 @@ static int s_sock6;
 static recv_message_xqueue s_recv_msgs;
 static context_map s_contexts;
 static context_set s_pre_contexts;
-static free_context_queue s_free_contexts;
+static context_queue s_free_contexts;
 static std::set<std::string> s_raw_msgs;
 static chunk_queue s_chunks_s;
 static chunk_queue s_chunks_l;
@@ -236,50 +232,39 @@ static void *context_thread(void *args)
     return NULL;
 }
 
-static void *net_writer(void *args)
-{
-    int idx = *((int*)args);
-    while (true) {
-
-        xqueue<blob_t> pending;
-
-        spin_lock(&s_context_lock);
-        context_map contexts = s_contexts;
-        spin_unlock(&s_context_lock);
-
-        context_map::const_iterator itr = contexts.begin();
-        for (; itr != contexts.end(); ++itr) {
-            context_t *ctx = context_find(itr->first);
-            if (ctx != NULL && ctx->peer.id % MAX_WRITER_SIZE == idx) {
-                std::deque<blob_t> pending;
-                std::deque<blob_t>::iterator itr_p;
-                ctx->pending_send.swap(pending);
-                for (itr_p = pending.begin();itr_p != pending.end(); ++itr_p) {
-                    blob_t blob = *itr_p;
-                    append_send(ctx, &blob);
-                }
-                on_write(ctx);
-            }
-        }
-        usleep(5000);
-    }
-}
-
 static void *net_reader(void *args)
 {
-    int idx = *((int*)args);
+    context_xqueue *q = (context_xqueue *)(args);
     while (true) {
-        std::deque<oid_t> ctxs;
-        std::deque<oid_t>::iterator itr;
-        s_pending_read[idx].swap(ctxs);
+        context_queue ctxs;
+        context_xqueue::iterator itr;
+
         for (itr = ctxs.begin();itr != ctxs.end(); ++itr) {
-            context_t *ctx = context_find(*itr);
-            if (ctx != NULL) {
-                on_read(ctx);
-            }
+            on_read(*itr);
         }
         usleep(5000);
     }
+    return NULL;
+}
+
+static void *net_writer(void *args)
+{
+    write_context_xqueue *q = (write_context_xqueue *)(args);
+    while (true) {
+        for (; itr != contexts.end(); ++itr) {
+            context_t *ctx = *itr;
+            std::deque<blob_t> pending;
+            std::deque<blob_t>::iterator itr_p;
+            ctx->pending_send.swap(pending);
+            for (itr_p = pending.begin();itr_p != pending.end(); ++itr_p) {
+                blob_t blob = *itr_p;
+                append_send(ctx, &blob);
+            }
+            on_write(ctx);
+        }
+        usleep(5000);
+    }
+    return NULL;
 }
 
 static int net_update(void)
@@ -301,6 +286,8 @@ static int net_update(void)
             on_accept6(evts[i]);
         } else if (evts[i].events & EPOLLIN) {
             on_read(evts[i]);
+        } else if (evts[i].events & EPOLLOUT) {
+            on_write(evts[i]);
         } else {
             on_error(evts[i]);
         }
@@ -799,18 +786,6 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
 
 static void push_send(context_t *ctx, blob_t *msg)
 {
-    blob_t blob;
-    blob.msg_size = msg->msg_size;
-    blob.total_size = msg->total_size;
-    blob.pending_size = msg->pending_size;
-
-    chunk_queue::const_iterator itr = msg->chunks.begin();
-    for (; itr != msg->chunks.end(); ++itr) {
-        chunk_t *c = *itr;
-
-        c->data_size = c->wr_offset;
-        blob.chunks.push_back(c);
-    }
     ctx->pending_send.push(blob);
     msg->chunks.clear();
 }
@@ -871,14 +846,12 @@ int net_init(void)
     spin_init(&s_pre_context_lock);
     s_tid = thread_init(net_thread, NULL);
 
-    for (int i = 0;i < MAX_WRITER_SIZE; i++) {
-        s_writer_idx[i] = i; 
-        s_writer_tid[i] = thread_init(net_writer, s_writer_idx + i);
+    for (int i = 0; i < WORKER_THREAD_SIZE; i++) {
+        s_writer_tid[i] = thread_init(net_writer, s_pending_write + i);
     }
 
-    for (int i = 0;i < MAX_READER_SIZE; i++) {
-        s_reader_idx[i] = i; 
-        s_reader_tid[i] = thread_init(net_reader, s_reader_idx + i);
+    for (int i = 0; i < WORKER_THREAD_SIZE; i++) {
+        s_reader_tid[i] = thread_init(net_reader, s_pending_read + i);
     }
 
     s_cid = thread_init(context_thread, NULL);
@@ -1331,7 +1304,9 @@ int net_send(oid_t peer, blob_t *msg)
     assert(msg);
 
     context_t *ctx = context_find(peer);
+
     if (ctx == NULL) {
+        blob_fini(msg);
         return -1;
     }
     push_send(ctx, msg);
@@ -1343,7 +1318,6 @@ void net_send(oid_t peer, const pb_t &pb)
     blob_t *msg = net_encode(peer, pb);
 
     net_send(peer, msg);
-    blob_fini(msg);
 }
 
 void net_send(const id_set &peers, const pb_t &pb)
@@ -1358,7 +1332,6 @@ void net_send(const id_set &peers, const pb_t &pb)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(*itr, name, body);
         net_send(*itr, msg);
-        blob_fini(msg);
     }
 }
 
@@ -1374,7 +1347,6 @@ void net_send(const obj_map_id &peers, const pb_t &pb)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->first, name, body);
         net_send(itr->first, msg);
-        blob_fini(msg);
     }
 }
 
@@ -1390,7 +1362,6 @@ void net_send(const pb_map_id &peers, const pb_t &pb)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->first, name, body);
         net_send(itr->first, msg);
-        blob_fini(msg);
     }
 }
 
@@ -1406,7 +1377,6 @@ void net_send(const id_limap &peers, const pb_t &pb)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->first, name, body);
         net_send(itr->first, msg);
-        blob_fini(msg);
     }
 }
 
@@ -1422,7 +1392,6 @@ void net_send(const id_ilmap &peers, const pb_t &pb)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->second, name, body);
         net_send(itr->second, msg);
-        blob_fini(msg);
     }
 }
 
@@ -1430,7 +1399,6 @@ void net_rawsend(oid_t peer, const std::string &name, const std::string &body)
 {
     blob_t *msg = net_encode(peer, name, body);
     net_send(peer, msg);
-    blob_fini(msg);
 }
 
 static void on_accept(const epoll_event &evt)
@@ -1501,13 +1469,25 @@ static void on_accept6(const epoll_event &evt)
     }
 }
 
-
 static void on_read(const epoll_event &evt)
 {
     context_t *ctx = static_cast<context_t *>(evt.data.ptr);
+
     if (ctx != NULL) {
-        int idx = ctx->peer.id % MAX_READER_SIZE;
-        s_pending_read[idx].push(ctx->peer.id);
+        int idx = ctx->peer.sock % WORKER_THREAD_SIZE;
+
+        s_pending_read[].push(ctx);
+    }
+}
+
+static void on_write(const epoll_event &evt)
+{
+    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
+
+    if (ctx != NULL) {
+        int idx = ctx->peer.sock % WORKER_THREAD_SIZE;
+
+        s_pending_write[idx].push(ctx);
     }
 }
 
@@ -1519,7 +1499,6 @@ static void on_read(context_t *ctx)
 
     static char buf[CHUNK_SIZE_L];
     while (size > 0) {
-
         size = recv(sock, buf, sizeof(buf), 0);
 
         if (size < 0) {
