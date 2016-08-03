@@ -69,7 +69,7 @@ public:
     {
         spin_lock(m_lock);
     }
-    ~lock(void) {
+    ~spin(void) {
         spin_unlock(m_lock);
     }
 private:
