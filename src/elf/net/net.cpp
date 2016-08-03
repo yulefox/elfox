@@ -36,7 +36,8 @@ static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_SIZE_L;
 static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
 static const int ENCRYPT_FLAG = 0x40000000;
-static const int WORKER_THREAD_SIZE = 7; // (2^n-1)
+static const int WORKER_THREAD_SIZE = 8; // (2^n)
+static const int WORKER_THREAD_SIZE_MASK = WORKER_THREAD_SIZE - 1;
 
 struct blob_t;
 struct chunk_t;
@@ -797,7 +798,7 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
 
 static void push_send(context_t *ctx, blob_t *msg)
 {
-    int idx = ctx->peer.sock & WORKER_THREAD_SIZE;
+    int idx = ctx->peer.sock & WORKER_THREAD_SIZE_MASK;
     msg->ctx = ctx;
     s_pending_write[idx].push(msg);
 }
@@ -1486,7 +1487,7 @@ static void on_read(const epoll_event &evt)
     context_t *ctx = static_cast<context_t *>(evt.data.ptr);
 
     if (ctx != NULL) {
-        int idx = ctx->peer.sock % WORKER_THREAD_SIZE;
+        int idx = ctx->peer.sock & WORKER_THREAD_SIZE_MASK;
         s_pending_read[idx].push(ctx);
     }
 }
