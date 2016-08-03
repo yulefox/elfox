@@ -49,7 +49,7 @@ typedef std::list<chunk_t *> chunk_queue;
 typedef std::map<std::string, stat_msg_t *> msg_map;
 typedef std::queue<context_t *> context_queue;
 typedef xqueue<context_t *> context_xqueue;
-typedef xqueue<std::pair<context_t *, blob_t *>> write_context_xqueue;
+typedef xqueue<blob_t*> write_context_xqueue;
 typedef std::deque<recv_message_t *> recv_message_queue;
 typedef xqueue<recv_message_t *> recv_message_xqueue;
 
@@ -96,6 +96,7 @@ struct blob_t {
     int msg_size; // current recv msg size(for splicing)
     int total_size; // total send/recv msg size
     int pending_size; // pending send/recv msg size
+    context_t *ctx;
 };
 
 struct chunk_t {
@@ -182,9 +183,11 @@ static void on_accept(const epoll_event &evt);
 static void on_accept6(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
 static void on_read(context_t *ctx);
-static void on_write(context_t *ctx);
+static bool on_write(context_t *ctx);
 static void on_error(const epoll_event &evt);
 static void append_send(context_t *ctx, blob_t *msg);
+static void blob_fini(blob_t *blob);
+
 
 static bool is_raw_msg(const std::string &name)
 {
@@ -236,9 +239,9 @@ static void *net_reader(void *args)
 {
     context_xqueue *q = (context_xqueue *)(args);
     while (true) {
-        context_queue ctxs;
-        context_xqueue::iterator itr;
-
+        std::deque<context_t*> ctxs;
+        std::deque<context_t*>::iterator itr;
+        q->swap(ctxs);
         for (itr = ctxs.begin();itr != ctxs.end(); ++itr) {
             on_read(*itr);
         }
@@ -249,18 +252,28 @@ static void *net_reader(void *args)
 
 static void *net_writer(void *args)
 {
+    std::map<oid_t, context_t*> pending_ctxs;
+    std::map<oid_t, context_t*>::iterator itr_ctx;
     write_context_xqueue *q = (write_context_xqueue *)(args);
     while (true) {
-        for (; itr != contexts.end(); ++itr) {
-            context_t *ctx = *itr;
-            std::deque<blob_t> pending;
-            std::deque<blob_t>::iterator itr_p;
-            ctx->pending_send.swap(pending);
-            for (itr_p = pending.begin();itr_p != pending.end(); ++itr_p) {
-                blob_t blob = *itr_p;
-                append_send(ctx, &blob);
+        std::deque<blob_t*> reqs;
+        std::deque<blob_t*>::iterator itr;
+        q->swap(reqs);
+        for (itr = reqs.begin();itr != reqs.end(); ++itr) {
+            blob_t *msg = *itr;
+            context_t *ctx = msg->ctx;
+            append_send(ctx, msg);
+            blob_fini(msg);
+            pending_ctxs[ctx->peer.id] = ctx;
+        }
+        for (itr_ctx = pending_ctxs.begin();itr_ctx != pending_ctxs.end();) {
+            context_t *ctx = itr_ctx->second;
+            if (on_write(ctx)) {
+                // send completely
+                pending_ctxs.erase(itr_ctx++);
+            } else {
+                ++itr_ctx;
             }
-            on_write(ctx);
         }
         usleep(5000);
     }
@@ -286,8 +299,6 @@ static int net_update(void)
             on_accept6(evts[i]);
         } else if (evts[i].events & EPOLLIN) {
             on_read(evts[i]);
-        } else if (evts[i].events & EPOLLOUT) {
-            on_write(evts[i]);
         } else {
             on_error(evts[i]);
         }
@@ -786,8 +797,9 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
 
 static void push_send(context_t *ctx, blob_t *msg)
 {
-    ctx->pending_send.push(blob);
-    msg->chunks.clear();
+    int idx = ctx->peer.sock & WORKER_THREAD_SIZE;
+    msg->ctx = ctx;
+    s_pending_write[idx].push(msg);
 }
 
 static void append_send(context_t *ctx, blob_t *msg)
@@ -1475,19 +1487,7 @@ static void on_read(const epoll_event &evt)
 
     if (ctx != NULL) {
         int idx = ctx->peer.sock % WORKER_THREAD_SIZE;
-
-        s_pending_read[].push(ctx);
-    }
-}
-
-static void on_write(const epoll_event &evt)
-{
-    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
-
-    if (ctx != NULL) {
-        int idx = ctx->peer.sock % WORKER_THREAD_SIZE;
-
-        s_pending_write[idx].push(ctx);
+        s_pending_read[idx].push(ctx);
     }
 }
 
@@ -1550,7 +1550,7 @@ static void on_read(context_t *ctx)
     push_recv(ctx, chunks);
 }
 
-static void on_write(context_t *ctx)
+static bool on_write(context_t *ctx)
 {
     chunk_queue chunks;
 
@@ -1559,6 +1559,7 @@ static void on_write(context_t *ctx)
     oid_t cid = ctx->peer.id;
     int sock = ctx->peer.sock;
     int sum = 0;
+    bool done = true;
     chunk_queue::iterator itr = chunks.begin();
     while (itr != chunks.end()) {
         chunk_t *c = *itr;
@@ -1581,6 +1582,7 @@ static void on_write(context_t *ctx)
                             strerror(errno));
                 } else {
                     push_send(ctx, chunks);
+                    done = false;
                 }
                 goto stat;
             } else {
@@ -1593,12 +1595,13 @@ static void on_write(context_t *ctx)
         itr = chunks.erase(itr);
     }
     if (ctx == NULL) {
-        return;
+        return false;
     }
 stat:
     mutex_lock(&(ctx->lock));
     ctx->send_data->pending_size -= sum;
     mutex_unlock(&(ctx->lock));
+    return done;
 }
 
 static void on_error(const epoll_event &evt)
