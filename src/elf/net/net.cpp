@@ -918,9 +918,22 @@ void net_encrypt(encrypt_func encry, encrypt_func decry)
 {
 }
 
+
+static int set_reuseaddr(int fd)
+{
+    int yes = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
+        LOG_ERROR("net", "setsockopt SO_REUSEADDR: %s", strerror(errno));
+        return -1;
+    }
+    return 0;
+}
+
 int net_listen(const std::string &name, const std::string &ip, int port)
 {
     s_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    set_reuseaddr(s_sock);
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
