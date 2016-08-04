@@ -152,8 +152,6 @@ static thread_t s_cid; // context thread
 static context_xqueue s_pending_read[WORKER_THREAD_SIZE];
 static write_context_xqueue s_pending_write[WORKER_THREAD_SIZE];
 static spin_t s_context_lock;
-static mutex_t s_chunk_s_lock;
-static mutex_t s_chunk_l_lock;
 static spin_t s_pre_context_lock;
 static int s_epoll;
 static int s_sock;
@@ -163,8 +161,6 @@ static context_map s_contexts;
 static context_set s_pre_contexts;
 static context_queue s_free_contexts;
 static std::set<std::string> s_raw_msgs;
-static chunk_queue s_chunks_s;
-static chunk_queue s_chunks_l;
 
 ///
 /// Running.
@@ -376,29 +372,8 @@ static void set_nonblock(int sock)
 static chunk_t *chunk_init(size_t size)
 {
     int real_size = size;
-    chunk_t *c = NULL;
-
-    if (size <= CHUNK_SIZE_S) {
-        lock chunk_lock(&s_chunk_s_lock);
-
-        real_size = CHUNK_SIZE_S;
-        if (!s_chunks_s.empty()) {
-            c = s_chunks_s.front();
-            s_chunks_s.pop_front();
-        }
-    } else if (size <= CHUNK_SIZE_L) {
-        lock chunk_lock(&s_chunk_l_lock);
-
-        real_size = CHUNK_SIZE_L;
-        if (!s_chunks_l.empty()) {
-            c = s_chunks_l.front();
-            s_chunks_l.pop_front();
-        }
-    }
-    if (c == NULL) {
-        c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + real_size);
-        ++s_stat.chunk_size_created;
-    }
+    chunk_t *c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + real_size);
+    ++s_stat.chunk_size_created;
     c->wr_offset = 0;
     c->rd_offset = 0;
     c->data_size = size;
@@ -422,21 +397,6 @@ static void chunk_fini(chunk_t *c)
 {
     if (c == NULL) {
         return;
-    }
-    if (c->real_size == CHUNK_SIZE_S) {
-        lock chunk_lock(&s_chunk_s_lock);
-
-        if (s_chunks_s.size() < CHUNK_MAX_NUM * 10) {
-            s_chunks_s.push_back(c);
-            return;
-        }
-    } else if (c->real_size == CHUNK_SIZE_L) {
-        lock chunk_lock(&s_chunk_l_lock);
-
-        if (s_chunks_l.size() < CHUNK_MAX_NUM) {
-            s_chunks_l.push_back(c);
-            return;
-        }
     }
     E_FREE(c);
     ++s_stat.chunk_size_released;
@@ -885,8 +845,6 @@ int net_init(void)
         LOG_ERROR("net", "epoll_create FAILED: %s.", strerror(errno));
         return -1;
     }
-    mutex_init(&s_chunk_s_lock);
-    mutex_init(&s_chunk_l_lock);
     spin_init(&s_context_lock);
     spin_init(&s_pre_context_lock);
     s_tid = thread_init(net_thread, NULL);
@@ -908,8 +866,6 @@ int net_fini(void)
     MODULE_IMPORT_SWITCH;
     spin_fini(&s_pre_context_lock);
     spin_fini(&s_context_lock);
-    mutex_fini(&s_chunk_s_lock);
-    mutex_fini(&s_chunk_l_lock);
     close(s_epoll);
     return 0;
 }
@@ -1109,7 +1065,7 @@ int net_proc(void)
 
 static void net_stat_detail(int flag)
 {
-    LOG_INFO("stat", "send msg: %d(%d), recv msg: %d(%d), contexts: %d/%d, chunks: %d/%d(%d/%d)",
+    LOG_INFO("stat", "send msg: %d(%d), recv msg: %d(%d), contexts: %d/%d",
             s_stat.send_msg_num,
             s_stat.send_msg_size,
             s_stat.recv_msg_num,
@@ -1117,9 +1073,7 @@ static void net_stat_detail(int flag)
             s_stat.context_size_created,
             s_stat.context_size_released,
             s_stat.chunk_size_created,
-            s_stat.chunk_size_released,
-            s_chunks_s.size(),
-            s_chunks_l.size());
+            s_stat.chunk_size_released);
 
     stat_msg_t *sm = NULL;
     msg_map::iterator itr;
