@@ -2,7 +2,6 @@
  * Copyright (C) 2014 Yule Fox. All rights reserved.
  * http://www.yulefox.com/
  */
-
 #include <elf/elf.h>
 #include <elf/lock.h>
 #include <elf/net/net.h>
@@ -180,7 +179,6 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
 static context_t *context_find(oid_t peer);
 static void context_close(oid_t peer);
 static void context_fini(context_t *ctx);
-static void on_accept(const epoll_event &evt);
 static void on_accept6(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
 static void on_read(context_t *ctx);
@@ -188,6 +186,8 @@ static bool on_write(context_t *ctx);
 static void on_error(const epoll_event &evt);
 static void append_send(context_t *ctx, blob_t *msg);
 static void blob_fini(blob_t *blob);
+static void *net_accepter(void *args);
+static void set_nonblock(int sock);
 
 
 static bool is_raw_msg(const std::string &name)
@@ -232,6 +232,40 @@ static void *context_thread(void *args)
             s_free_contexts.pop();
         }
         usleep(500);
+    }
+    return NULL;
+}
+
+static void *net_accepter(void *args)
+{
+    struct sockaddr_in addr;
+    socklen_t len = sizeof(addr);
+    int fd;
+    while (true) {
+        len = sizeof(addr);
+        fd = accept(s_sock, (sockaddr *)&addr, &len);
+        if (fd < 0) {
+            if (errno == ECONNABORTED) {
+                continue;
+            }
+            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
+            break;
+        }
+        if (0 != getpeername(fd, (sockaddr *)&addr, &len)) {
+            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
+            continue;
+        }
+
+        // @todo ON_ACCEPT
+        set_nonblock(fd);
+
+        context_t *ctx = context_init(0, OID_NIL, fd, addr);
+        LOG_DEBUG("net", "%s", "accept new connection...");
+
+        if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
+            LOG_ERROR("net", "%s epoll_ctl FAILED: %s.", ctx->peer.info, strerror(errno));
+            net_close(ctx->peer.id);
+        }
     }
     return NULL;
 }
@@ -294,9 +328,7 @@ static int net_update(void)
         return num;
     }
     for (int i = 0; i < num; ++i) {
-        if (evts[i].data.fd == s_sock) {
-            on_accept(evts[i]);
-        } else if (evts[i].data.fd == s_sock6) {
+        if (evts[i].data.fd == s_sock6) {
             on_accept6(evts[i]);
         } else if (evts[i].events & EPOLLIN) {
             on_read(evts[i]);
@@ -889,23 +921,8 @@ void net_encrypt(encrypt_func encry, encrypt_func decry)
 int net_listen(const std::string &name, const std::string &ip, int port)
 {
     s_sock = socket(AF_INET, SOCK_STREAM, 0);
-    set_nonblock(s_sock);
-
-    epoll_event evt;
-
-    memset(&evt, 0, sizeof(evt));
-    evt.data.fd = s_sock;
-    evt.events = EPOLLIN|EPOLLET|EPOLLERR|EPOLLHUP;
-    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, s_sock, &evt)) {
-        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
-                name.c_str(), ip.c_str(), port,
-                strerror(errno));
-        close(s_sock);
-        return -1;
-    }
 
     struct sockaddr_in addr;
-
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     inet_aton(ip.c_str(), &(addr.sin_addr));
@@ -927,6 +944,7 @@ int net_listen(const std::string &name, const std::string &ip, int port)
         close(s_sock);
         return -1;
     }
+    thread_init(net_accepter, NULL);
 
     // @todo ON_LISTEN
     return 0;
@@ -1412,40 +1430,6 @@ void net_rawsend(oid_t peer, const std::string &name, const std::string &body)
 {
     blob_t *msg = net_encode(peer, name, body);
     net_send(peer, msg);
-}
-
-static void on_accept(const epoll_event &evt)
-{
-    struct sockaddr_in addr;
-    socklen_t len = sizeof(addr);
-    int fd = 0;
-    while ((fd = accept(s_sock, (sockaddr *)&addr, &len)) > 0) {
-        if (0 != getpeername(fd, (sockaddr *)&addr, &len)) {
-            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
-            close(fd);
-            return;
-        }
-
-        // @todo ON_ACCEPT
-        set_nonblock(fd);
-
-        context_t *ctx = context_init(0, OID_NIL, fd, addr);
-
-        LOG_DEBUG("net", "%s", "accept new connection...");
-
-        if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
-            LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
-                    ctx->peer.info,
-                    strerror(errno));
-            net_close(ctx->peer.id);
-        }
-        len = sizeof(addr);
-    }
-    if (fd < 0) {
-        if (errno != EINTR && errno != EAGAIN) {
-            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
-        }
-    }
 }
 
 static void on_accept6(const epoll_event &evt)
