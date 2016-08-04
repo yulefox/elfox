@@ -35,7 +35,7 @@ static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_SIZE_L;
 static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
 static const int ENCRYPT_FLAG = 0x40000000;
-static const int WORKER_THREAD_SIZE = 8; // (2^n)
+static const int WORKER_THREAD_SIZE = 4; // (2^n)
 static const int WORKER_THREAD_SIZE_MASK = WORKER_THREAD_SIZE - 1;
 
 struct blob_t;
@@ -280,7 +280,7 @@ static void *net_reader(void *args)
         for (itr = ctxs.begin();itr != ctxs.end(); ++itr) {
             on_read(*itr);
         }
-        usleep(5000);
+        usleep(500);
     }
     return NULL;
 }
@@ -310,7 +310,7 @@ static void *net_writer(void *args)
                 ++itr_ctx;
             }
         }
-        usleep(5000);
+        usleep(500);
     }
     return NULL;
 }
