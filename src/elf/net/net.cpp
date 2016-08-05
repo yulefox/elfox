@@ -227,7 +227,7 @@ static void *context_thread(void *args)
             context_fini(ctx);
             s_free_contexts.pop();
         }
-        usleep(500);
+        usleep(50000);
     }
     return NULL;
 }
@@ -276,7 +276,7 @@ static void *net_reader(void *args)
         for (itr = ctxs.begin();itr != ctxs.end(); ++itr) {
             on_read(*itr);
         }
-        usleep(500);
+        usleep(50000);
     }
     return NULL;
 }
@@ -306,7 +306,7 @@ static void *net_writer(void *args)
                 ++itr_ctx;
             }
         }
-        usleep(500);
+        usleep(50000);
     }
     return NULL;
 }
