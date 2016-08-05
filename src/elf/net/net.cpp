@@ -129,8 +129,8 @@ struct context_t {
     int close_time;
     int last_time;
     int error_times;
+    int running;
     bool internal;
-    bool running;
 
     context_t()
     {
@@ -176,14 +176,15 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
 static context_t *context_find(oid_t peer);
 static void context_close(oid_t peer);
 static void context_fini(context_t *ctx);
+static void on_accept(const epoll_event &evt);
 static void on_accept6(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
-static void on_read(context_t *ctx);
-static bool on_write(context_t *ctx);
+static void on_write(const epoll_event &evt);
+static void handle_read(context_t *ctx);
+static bool handle_write(context_t *ctx);
 static void on_error(const epoll_event &evt);
 static void append_send(context_t *ctx, blob_t *msg);
 static void blob_fini(blob_t *blob);
-static void *net_accepter(void *args);
 static void set_nonblock(int sock);
 
 
@@ -217,8 +218,7 @@ static void *context_thread(void *args)
             context_close(*itr);
         }
 
-        time_t ct = time_s();
-
+        //time_t ct = time_s();
         while (!s_free_contexts.empty()) {
             context_t *ctx = s_free_contexts.front();
             //if ((ct - ctx->close_time) < CONTEXT_CLOSE_TIME) {
@@ -232,81 +232,29 @@ static void *context_thread(void *args)
     return NULL;
 }
 
-static void *net_accepter(void *args)
-{
-    struct sockaddr_in addr;
-    socklen_t len = sizeof(addr);
-    int fd;
-    while (true) {
-        len = sizeof(addr);
-        fd = accept(s_sock, (sockaddr *)&addr, &len);
-        if (fd < 0) {
-            if (errno == ECONNABORTED) {
-                continue;
-            }
-            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
-            break;
-        }
-        if (0 != getpeername(fd, (sockaddr *)&addr, &len)) {
-            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
-            continue;
-        }
-
-        // @todo ON_ACCEPT
-        set_nonblock(fd);
-
-        context_t *ctx = context_init(0, OID_NIL, fd, addr);
-        LOG_DEBUG("net", "%s", "accept new connection...");
-
-        if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
-            LOG_ERROR("net", "%s epoll_ctl FAILED: %s.", ctx->peer.info, strerror(errno));
-            net_close(ctx->peer.id);
-        }
-    }
-    return NULL;
-}
-
 static void *net_reader(void *args)
 {
-    context_xqueue *q = (context_xqueue *)(args);
+    context_xqueue *que = (context_xqueue *)(args);
     while (true) {
-        std::deque<context_t*> ctxs;
-        std::deque<context_t*>::iterator itr;
-        q->swap(ctxs);
-        for (itr = ctxs.begin();itr != ctxs.end(); ++itr) {
-            on_read(*itr);
-        }
-        usleep(50000);
+        context_t *ctx;
+        que->pop(ctx);
+        handle_read(ctx);
     }
     return NULL;
 }
 
 static void *net_writer(void *args)
 {
-    std::map<oid_t, context_t*> pending_ctxs;
-    std::map<oid_t, context_t*>::iterator itr_ctx;
-    write_context_xqueue *q = (write_context_xqueue *)(args);
+    write_context_xqueue *que = (write_context_xqueue *)(args);
     while (true) {
-        std::deque<blob_t*> reqs;
-        std::deque<blob_t*>::iterator itr;
-        q->swap(reqs);
-        for (itr = reqs.begin();itr != reqs.end(); ++itr) {
-            blob_t *msg = *itr;
-            context_t *ctx = msg->ctx;
-            append_send(ctx, msg);
-            blob_fini(msg);
-            pending_ctxs[ctx->peer.id] = ctx;
-        }
-        for (itr_ctx = pending_ctxs.begin();itr_ctx != pending_ctxs.end();) {
-            context_t *ctx = itr_ctx->second;
-            if (on_write(ctx)) {
-                // send completely
-                pending_ctxs.erase(itr_ctx++);
-            } else {
-                ++itr_ctx;
-            }
-        }
-        usleep(50000);
+        blob_t *msg;
+        que->pop(msg);
+            
+        context_t *ctx = msg->ctx;
+        append_send(ctx, msg);
+        blob_fini(msg);
+
+        handle_write(ctx);
     }
     return NULL;
 }
@@ -324,10 +272,14 @@ static int net_update(void)
         return num;
     }
     for (int i = 0; i < num; ++i) {
-        if (evts[i].data.fd == s_sock6) {
+        if (evts[i].data.fd == s_sock) {
+            on_accept(evts[i]);
+        } else if (evts[i].data.fd == s_sock6) {
             on_accept6(evts[i]);
         } else if (evts[i].events & EPOLLIN) {
             on_read(evts[i]);
+        } else if (evts[i].events & EPOLLOUT) {
+            on_write(evts[i]);
         } else {
             on_error(evts[i]);
         }
@@ -620,7 +572,7 @@ static void event_init(context_t *ctx)
 
     memset(evt, 0, sizeof(*evt));
     evt->data.ptr = ctx;
-    evt->events = EPOLLIN|EPOLLET|EPOLLERR;
+    evt->events = EPOLLIN|EPOLLOUT|EPOLLET|EPOLLERR;
 }
 
 static context_t *context_init(int idx, oid_t peer, int fd,
@@ -858,24 +810,26 @@ void net_encrypt(encrypt_func encry, encrypt_func decry)
 {
 }
 
-
-static int set_reuseaddr(int fd)
-{
-    int yes = 1;
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
-        LOG_ERROR("net", "setsockopt SO_REUSEADDR: %s", strerror(errno));
-        return -1;
-    }
-    return 0;
-}
-
 int net_listen(const std::string &name, const std::string &ip, int port)
 {
     s_sock = socket(AF_INET, SOCK_STREAM, 0);
+    set_nonblock(s_sock);
 
-    set_reuseaddr(s_sock);
+    epoll_event evt;
+
+    memset(&evt, 0, sizeof(evt));
+    evt.data.fd = s_sock;
+    evt.events = EPOLLIN|EPOLLET|EPOLLERR|EPOLLHUP;
+    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, s_sock, &evt)) {
+        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
+        close(s_sock);
+        return -1;
+    }
 
     struct sockaddr_in addr;
+
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     inet_aton(ip.c_str(), &(addr.sin_addr));
@@ -897,11 +851,12 @@ int net_listen(const std::string &name, const std::string &ip, int port)
         close(s_sock);
         return -1;
     }
-    thread_init(net_accepter, NULL);
 
     // @todo ON_LISTEN
     return 0;
 }
+
+
 
 int net_listen6(const std::string &name, const std::string &ip, int port)
 {
@@ -1383,6 +1338,42 @@ void net_rawsend(oid_t peer, const std::string &name, const std::string &body)
     net_send(peer, msg);
 }
 
+static void on_accept(const epoll_event &evt)
+{
+    struct sockaddr_in addr;
+    socklen_t len = sizeof(addr);
+    int fd = 0;
+    while ((fd = accept(s_sock, (sockaddr *)&addr, &len)) > 0) {
+        if (0 != getpeername(fd, (sockaddr *)&addr, &len)) {
+            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
+            close(fd);
+            return;
+        }
+
+        // @todo ON_ACCEPT
+        set_nonblock(fd);
+
+        context_t *ctx = context_init(0, OID_NIL, fd, addr);
+
+        LOG_DEBUG("net", "%s", "accept new connection...");
+
+        if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
+            LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
+                    ctx->peer.info,
+                    strerror(errno));
+            net_close(ctx->peer.id);
+        }
+        len = sizeof(addr);
+    }
+    if (fd < 0) {
+        if (errno != EINTR && errno != EAGAIN) {
+            LOG_ERROR("net", "Accept FAILED: %s.", strerror(errno));
+        }
+    }
+}
+
+
+
 static void on_accept6(const epoll_event &evt)
 {
     struct sockaddr_in6 addr;
@@ -1430,7 +1421,28 @@ static void on_read(const epoll_event &evt)
     }
 }
 
-static void on_read(context_t *ctx)
+static void on_write(const epoll_event &evt)
+{
+    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
+
+    if (ctx != NULL) {
+        int idx = ctx->peer.sock & WORKER_THREAD_SIZE_MASK;
+        if (ctx->internal) {
+            idx = WORKER_THREAD_SIZE_MASK;
+        }
+        blob_t *msg = E_NEW blob_t;
+        blob_init(msg);
+        msg->ctx = ctx;
+        s_pending_write[idx].push(msg);
+    }
+}
+
+static void context_stop(context_t *ctx)
+{
+    __sync_fetch_and_and(&(ctx->running), 0x1, 0x0);
+}
+
+static void handle_read(context_t *ctx)
 {
     int size = CHUNK_SIZE_L;
     int sock = ctx->peer.sock;
@@ -1450,9 +1462,7 @@ static void on_read(context_t *ctx)
                 LOG_INFO("net", "%s recv FAILED: %s.",
                         ctx->peer.info,
                         strerror(errno));
-                spin_lock(&ctx->lock);
-                ctx->running = false;
-                spin_unlock(&ctx->lock);
+                context_stop(ctx);
                 return;
             }
             break;
@@ -1465,9 +1475,7 @@ static void on_read(context_t *ctx)
             for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
                 chunk_fini(*itr);
             }
-            spin_lock(&ctx->lock);
-            ctx->running = false;
-            spin_unlock(&ctx->lock);
+            context_stop(ctx);
             return;
         }
 
@@ -1495,16 +1503,15 @@ static void on_read(context_t *ctx)
 
 static bool context_alive(context_t *ctx)
 {
-    bool running;
-    spin_lock(&ctx->lock);
-    running = ctx->running;
-    spin_unlock(&ctx->lock);
-    return running;
+    if (__sync_fetch_and_and(&(ctx->running), 0x1, 0x1) == 0x1) {
+        return true;
+    }
+    return false;
 }
 
-static bool on_write(context_t *ctx)
+
+static bool handle_write(context_t *ctx)
 {
-    oid_t cid = ctx->peer.id;
     int sock = ctx->peer.sock;
     int sum = 0;
     chunk_queue &chunks = ctx->send_data->chunks;
@@ -1521,6 +1528,12 @@ static bool on_write(context_t *ctx)
                     LOG_ERROR("net", "%s send FAILED: %s.",
                             ctx->peer.info,
                             strerror(errno));
+                } else {
+                    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
+                        LOG_INFO("net", "%s epoll_ctl FAILED: %s.",
+                                ctx->peer.info,
+                                strerror(errno));
+                    }
                 }
                 goto stat;
             } else {
