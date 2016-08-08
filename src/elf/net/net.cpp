@@ -131,8 +131,9 @@ struct context_t {
     int last_time;
     int error_times;
     int ref_cnt;
-    int running;
-    bool internal;
+    unsigned running:1;
+    unsigned instance:1;
+    unsigned internal:1;
 
     context_t()
     {
@@ -185,6 +186,7 @@ static recv_message_xqueue s_recv_msgs;
 static context_map s_contexts;
 static context_set s_pre_contexts;
 static std::set<std::string> s_raw_msgs;
+static context_queue s_free_contexts;
 
 ///
 /// Running.
@@ -606,14 +608,22 @@ static void event_init(context_t *ctx)
     epoll_event *evt = &(ctx->evt);
 
     memset(evt, 0, sizeof(*evt));
-    evt->data.ptr = ctx;
+    evt->data.ptr = (void*)((uintptr_t)ctx | ctx->instance);
     evt->events = EPOLLIN|EPOLLOUT|EPOLLET|EPOLLERR;
 }
 
 static context_t *context_init(int idx, oid_t peer, int fd,
         const struct sockaddr_in &addr)
 {
-    context_t *ctx = E_NEW context_t;
+    context_t *ctx = NULL;
+
+    if (!s_free_contexts.empty()) {
+        ctx = s_free_contexts.front();
+        s_free_contexts.pop();
+    } else {
+        ctx = E_NEW context_t;
+        ctx->instance = 0;
+    }
 
     ctx->peer.idx = idx;
     ctx->peer.id = (peer != OID_NIL) ? peer : oid_gen();
@@ -637,6 +647,8 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     ctx->internal = false;
     ctx->running  = 1;
     ctx->ref_cnt = 0;
+    int instance = ctx->instance;
+    ctx->instance = !instance;
     blob_init(ctx->recv_data);
     blob_init(ctx->send_data);
     event_init(ctx);
@@ -755,7 +767,13 @@ static void context_fini(context_t *ctx)
     blob_fini(ctx->recv_data);
     cipher_fini(ctx->encipher);
     cipher_fini(ctx->decipher);
-    E_DELETE(ctx);
+
+    ctx->peer.sock = -1;
+    ctx->peer.id = 0;
+    //E_DELETE(ctx);
+
+    // gc
+    s_free_contexts.push(ctx);
 }
 
 static context_t *context_find(oid_t peer)
@@ -1456,7 +1474,14 @@ static void on_accept6(const epoll_event &evt)
 
 static void on_read(const epoll_event &evt)
 {
-    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
+    int instance;
+    context_t *ctx = (context_t*)(evt.data.ptr);
+    instance = (uintptr_t)ctx & 1;
+    ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
+    if (ctx->peer.sock == -1 || ctx->instance != instance) {
+        LOG_WARN("net", "%s", "expired read event...");
+        return;
+    }
 
     if (ctx != NULL && context_alive(ctx) == 1) {
         int idx = context_hash(ctx);
@@ -1468,7 +1493,15 @@ static void on_read(const epoll_event &evt)
 
 static void on_write(const epoll_event &evt)
 {
-    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
+    int instance;
+    context_t *ctx = (context_t*)(evt.data.ptr);
+    instance = (uintptr_t)ctx & 1;
+    ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
+    if (ctx->peer.sock == -1 || ctx->instance != instance) {
+        LOG_WARN("net", "%s", "expired write event...");
+        return;
+    }
+
 
     if (ctx != NULL && context_alive(ctx) == 1) {
         int idx = context_hash(ctx);
@@ -1620,7 +1653,14 @@ stat:
 
 static void on_error(const epoll_event &evt)
 {
-    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
+    int instance;
+    context_t *ctx = (context_t*)(evt.data.ptr);
+    instance = (uintptr_t)ctx & 1;
+    ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
+    if (ctx->peer.sock == -1 || ctx->instance != instance) {
+        LOG_WARN("net", "%s", "expired write event...");
+        return;
+    }
 
     LOG_ERROR("net", "%s UNKNOWN ERROR.",
             ctx->peer.info);
@@ -1648,13 +1688,13 @@ void net_internal_set(oid_t peer, bool flag)
     context_t *ctx = context_find(peer);
     if (ctx != NULL) {
         spin_lock(&(ctx->lock));
-        ctx->internal = true;
+        ctx->internal = flag ? 1 : 0;
         spin_unlock(&(ctx->lock));
     }
 }
 
 bool net_internal(const context_t &ctx)
 {
-    return ctx.internal;
+    return ctx.internal == 1;
 }
 } // namespace elf
