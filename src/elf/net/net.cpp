@@ -120,6 +120,7 @@ struct peer_t {
 struct context_t {
     peer_t peer;
     spin_t lock;
+    rwlock_t rwlock;
     blob_t *recv_data;
     blob_t *send_data;
     cipher_t *encipher;
@@ -129,8 +130,8 @@ struct context_t {
     int close_time;
     int last_time;
     int error_times;
-    int ref;
-    volatile int running;
+    int ref_cnt;
+    int running;
     bool internal;
 
     context_t()
@@ -142,22 +143,27 @@ struct context_t {
     {
         ++s_stat.context_size_released;
     }
-};
 
-struct context_ref_t {
-    context_t *ctx;
-    context_ref_t(context_t *c)
+    void inc_ref()
     {
-        ctx = c;
-        if (ctx != NULL) {
-            __sync_fetch_and_and(&(ctx->ref));
-        }
+        rwlock_wlock(&rwlock);
+        ++ref_cnt;
+        rwlock_wunlock(&rwlock);
     }
-    ~context_ref_t()
+    void dec_ref()
     {
-        if (ctx != NULL) {
-            __sync_fetch_and_sub(&(ctx->ref));
-        }
+        rwlock_wlock(&rwlock);
+        --ref_cnt;
+        rwlock_wunlock(&rwlock);
+    }
+
+    int ref()
+    {
+        int ret = 0;
+        rwlock_rlock(&rwlock);
+        ret = ref_cnt;
+        rwlock_runlock(&rwlock);
+        return ret;
     }
 };
 
@@ -178,7 +184,6 @@ static int s_sock6;
 static recv_message_xqueue s_recv_msgs;
 static context_map s_contexts;
 static context_set s_pre_contexts;
-static context_queue s_free_contexts;
 static std::set<std::string> s_raw_msgs;
 
 ///
@@ -191,7 +196,7 @@ static context_t *context_init(int idx, oid_t peer, int fd,
         const struct sockaddr_in &addr);
 static context_t *context_init6(int idx, oid_t peer, int fd,
         const struct sockaddr_in6 &addr);
-static context_ref_t context_find(oid_t peer);
+static context_t *context_find(oid_t peer);
 static void context_close(oid_t peer);
 static void context_fini(context_t *ctx);
 static void context_stop(context_t *ctx);
@@ -237,19 +242,18 @@ static void *context_thread(void *args)
         for (itr = pre_peers.begin(); itr != pre_peers.end(); ++itr) {
             context_close(*itr);
         }
-
-        //time_t ct = time_s();
-        while (!s_free_contexts.empty()) {
-            context_t *ctx = s_free_contexts.front();
-            //if ((ct - ctx->close_time) < CONTEXT_CLOSE_TIME) {
-            //    break;
-            //}
-            context_fini(ctx);
-            s_free_contexts.pop();
-        }
         usleep(50000);
     }
     return NULL;
+}
+
+static int context_hash(context_t *ctx)
+{
+    int idx = ctx->peer.sock & WORKER_THREAD_SIZE_MASK;
+    if (ctx->internal) {
+        idx = WORKER_THREAD_SIZE;
+    }
+    return idx;
 }
 
 static void *net_reader(void *args)
@@ -266,18 +270,25 @@ static void *net_reader(void *args)
 static void *net_writer(void *args)
 {
     write_context_xqueue *que = (write_context_xqueue *)(args);
+
     while (true) {
         blob_t *msg = NULL;
         que->pop(msg);
-        if (msg != NULL) {
-            context_t *ctx = msg->ctx;
-            if (context_alive(ctx)) {
+        context_t *ctx = msg->ctx;
+        if (context_alive(ctx) == 0) {
+            blob_fini(msg);
+        } else {
+            if (msg != NULL) {
                 if (msg->total_size > 0) {
                     append_send(ctx, msg);
                 }
                 blob_fini(msg);
-                handle_write(ctx);
             }
+            handle_write(ctx);
+        }
+        ctx->dec_ref();
+        if (context_alive(ctx) == 0 && ctx->ref() == 0) {
+            net_close(ctx->peer.id);
         }
     }
     return NULL;
@@ -624,12 +635,13 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     ctx->encipher = NULL;
     ctx->decipher = NULL;
     ctx->internal = false;
-    ctx->running  = true;
-    ctx->ref = 1;
+    ctx->running  = 1;
+    ctx->ref_cnt = 0;
     blob_init(ctx->recv_data);
     blob_init(ctx->send_data);
     event_init(ctx);
     spin_init(&ctx->lock);
+    rwlock_init(&ctx->rwlock);
 
     {
         spin lock(&s_context_lock);
@@ -642,17 +654,9 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
 
+    //LOG_INFO("net", "context add: id<%lld> sock<%d>", ctx->peer.id, ctx->peer.sock);
+
     return ctx;
-}
-
-static void context_ref_inc(context_t *ctx)
-{
-    __sync_fetch_and_add(&(ctx->ref), 1);
-}
-
-static void context_ref_dec(context_t *ctx)
-{
-    __sync_fetch_and_sub(&(ctx->ref), 1);
 }
 
 static context_t *context_init6(int idx, oid_t peer, int fd,
@@ -680,11 +684,13 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
     ctx->encipher = NULL;
     ctx->decipher = NULL;
     ctx->internal = false;
-    ctx->running  = true;
+    ctx->running  = 1;
+    ctx->ref_cnt = 0;
     blob_init(ctx->recv_data);
     blob_init(ctx->send_data);
     event_init(ctx);
     spin_init(&ctx->lock);
+    rwlock_init(&ctx->rwlock);
 
     {
         spin lock(&s_context_lock);
@@ -716,9 +722,8 @@ static void context_close(oid_t peer)
     if (ctx == NULL) {
         return;
     }
-    spin_lock(&ctx->lock);
-    ctx->running = false;
-    spin_unlock(&ctx->lock);
+
+    LOG_WARN("net", "context closed %lld %d", ctx->peer.id, ctx->peer.sock);
     close(ctx->peer.sock);
 
     recv_message_t *msg = recv_message_init(ctx);
@@ -728,13 +733,18 @@ static void context_close(oid_t peer)
     s_recv_msgs.push(msg);
 
     ctx->close_time = time_s();
-    s_free_contexts.push(ctx);
+
+    // destroy
+    context_fini(ctx);
 }
 
 static void context_fini(context_t *ctx)
 {
     assert(ctx);
     spin_fini(&ctx->lock);
+
+    //LOG_INFO("net", "context del: id<%lld> sock<%d>", ctx->peer.id, ctx->peer.sock);
+
     LOG_INFO("net", "%s is FREED. S: %d/%d R: %d/%d.",
             ctx->peer.info,
             ctx->send_data->pending_size,
@@ -748,7 +758,7 @@ static void context_fini(context_t *ctx)
     E_DELETE(ctx);
 }
 
-static context_ref context_find(oid_t peer)
+static context_t *context_find(oid_t peer)
 {
     context_t *ctx = NULL;
     context_map::const_iterator itr;
@@ -761,7 +771,7 @@ static context_ref context_find(oid_t peer)
             ctx = itr->second;
         }
     }
-    return context_ref(ctx);
+    return ctx;
 }
 
 static void push_recv(context_t *ctx, chunk_queue &chunks)
@@ -782,12 +792,13 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
 
 static void push_send(context_t *ctx, blob_t *msg)
 {
-    int idx = ctx->peer.sock & WORKER_THREAD_SIZE_MASK;
-    if (ctx->internal) {
-        idx = WORKER_THREAD_SIZE_MASK;
+    if (context_alive(ctx) == 1) {
+        int idx = context_hash(ctx);
+
+        msg->ctx = ctx;
+        ctx->inc_ref();
+        s_pending_write[idx].push(msg);
     }
-    msg->ctx = ctx;
-    s_pending_write[idx].push(msg);
 }
 
 static void append_send(context_t *ctx, blob_t *msg)
@@ -1145,16 +1156,16 @@ void net_stat_message(const recv_message_t &msg)
 
 void net_peer_stat(oid_t peer)
 {
-    context_ref_t ref = context_find(peer);
+    context_t *ctx = context_find(peer);
 
-    if (ref.ctx != NULL) {
+    if (ctx != NULL) {
         LOG_INFO("stat", "%d %lld: RECV %d/%d SEND %d/%d.",
-                ref.ctx->peer.idx,
-                ref.ctx->peer.id,
-                ref.ctx->recv_data->pending_size,
-                ref.ctx->recv_data->total_size,
-                ref.ctx->send_data->pending_size,
-                ref.ctx->send_data->total_size);
+                ctx->peer.idx,
+                ctx->peer.id,
+                ctx->recv_data->pending_size,
+                ctx->recv_data->total_size,
+                ctx->send_data->pending_size,
+                ctx->send_data->total_size);
     }
 }
 
@@ -1191,8 +1202,7 @@ void net_encode(const pb_t &pb, std::string &name, std::string &body)
 
 blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb_body)
 {
-    context_ref_t ref = context_find(peer);
-    context_t *ctx = ref.ctx;
+    context_t *ctx = context_find(peer);
     blob_t *msg = E_NEW blob_t;
 
     cipher_t *encipher = NULL;
@@ -1276,14 +1286,13 @@ int net_send(oid_t peer, blob_t *msg)
 {
     assert(msg);
 
-    context_ref_t ref = context_find(peer);
+    context_t *ctx = context_find(peer);
 
-    if (ref.ctx == NULL) {
+    if (ctx == NULL) {
         blob_fini(msg);
         return -1;
     }
     push_send(ctx, msg);
-    ref.retain();
     return 0;
 }
 
@@ -1449,13 +1458,10 @@ static void on_read(const epoll_event &evt)
 {
     context_t *ctx = static_cast<context_t *>(evt.data.ptr);
 
-    if (ctx != NULL) {
-        int idx = ctx->peer.sock & WORKER_THREAD_SIZE_MASK;
-        if (ctx->internal) {
-            idx = WORKER_THREAD_SIZE;
-            LOG_WARN("net", "internal: sock: %d, idx = %d, mask = %d", ctx->peer.sock, idx, WORKER_THREAD_SIZE_MASK);
-        }
-        LOG_WARN("net", "on_read: sock: %d, idx = %d, mask = %d", ctx->peer.sock, idx, WORKER_THREAD_SIZE_MASK);
+    if (ctx != NULL && context_alive(ctx) == 1) {
+        int idx = context_hash(ctx);
+
+        LOG_WARN("net", "on_read: sock: %d, internal: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
         s_pending_read[idx].push(ctx);
     }
 }
@@ -1464,24 +1470,38 @@ static void on_write(const epoll_event &evt)
 {
     context_t *ctx = static_cast<context_t *>(evt.data.ptr);
 
-    if (ctx != NULL) {
-        int idx = ctx->peer.sock & WORKER_THREAD_SIZE_MASK;
-        if (ctx->internal) {
-            idx = WORKER_THREAD_SIZE;
-            LOG_WARN("net", "internal: sock: %d, idx = %d, mask = %d", ctx->peer.sock, idx, WORKER_THREAD_SIZE_MASK);
-        }
+    if (ctx != NULL && context_alive(ctx) == 1) {
+        int idx = context_hash(ctx);
+
         blob_t *msg = E_NEW blob_t;
         blob_init(msg);
         msg->ctx = ctx;
-        LOG_WARN("net", "on_write: sock: %d, idx = %d, mask = %d", ctx->peer.sock, idx, WORKER_THREAD_SIZE_MASK);
+        ctx->inc_ref();
+        LOG_WARN("net", "on_write: sock: %d, internel: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
         s_pending_write[idx].push(msg);
     }
 }
 
 static void context_stop(context_t *ctx)
 {
+    if (context_alive(ctx) == 0) {
+        return;
+    }
+
+    //LOG_INFO("net", "context stop: %lld %d %d", ctx->peer.id, ctx->peer.sock, ctx->internal);
+
+    rwlock_wlock(&ctx->rwlock);
     ctx->running = 0;
-    //__sync_fetch_and_xor(&(ctx->running), 0x1);
+    rwlock_wunlock(&ctx->rwlock);
+
+    // do notify wthread
+    int idx = context_hash(ctx);
+
+    blob_t *msg = E_NEW blob_t;
+    blob_init(msg);
+    msg->ctx = ctx;
+    ctx->inc_ref();
+    s_pending_write[idx].push(msg);
 }
 
 static void handle_read(context_t *ctx)
@@ -1513,7 +1533,6 @@ static void handle_read(context_t *ctx)
         // client disconnect socket
         if (0 == size) {
             chunk_queue::iterator itr = chunks.begin();
-
             for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
                 chunk_fini(*itr);
             }
@@ -1545,8 +1564,12 @@ static void handle_read(context_t *ctx)
 
 static int context_alive(context_t *ctx)
 {
-    return ctx->running;
-    //return __sync_fetch_and_and(&(ctx->running), 0x1);
+    int running;
+
+    rwlock_rlock(&ctx->rwlock);
+    running = ctx->running;
+    rwlock_runlock(&ctx->rwlock);
+    return running;
 }
 
 
@@ -1558,6 +1581,7 @@ static bool handle_write(context_t *ctx)
 
     while (context_alive(ctx) && !chunks.empty()) {
         chunk_t *c = chunks.front();
+        if (c == NULL) continue;
 
         int rem = c->data_size - c->rd_offset;
         while (context_alive(ctx) && rem > 0) {
@@ -1587,10 +1611,6 @@ static bool handle_write(context_t *ctx)
 
 stat:
     ctx->send_data->pending_size -= sum;
-    if (!context_alive(ctx)) {
-        net_close(ctx->peer.id);
-        return true;
-    }
     return chunks.empty();
 }
 
@@ -1605,12 +1625,12 @@ static void on_error(const epoll_event &evt)
 
 void net_cipher_set(oid_t peer, cipher_t *encipher, cipher_t *decipher)
 {
-    context_ref_t ref = context_find(peer);
-    if (ref.ctx != NULL) {
-        spin_lock(&(ref.ctx->lock));
+    context_t *ctx = context_find(peer);
+    if (ctx != NULL) {
+        spin_lock(&(ctx->lock));
         ctx->encipher = encipher;
         ctx->decipher = decipher;
-        spin_unlock(&(ref.ctx->lock));
+        spin_unlock(&(ctx->lock));
     }
 }
 
@@ -1621,11 +1641,11 @@ void net_register_raw(const std::string &name)
 
 void net_internal_set(oid_t peer, bool flag)
 {
-    context_ref_t ref = context_find(peer);
-    if (ref.ctx != NULL) {
-        spin_lock(&(ref.ctx->lock));
+    context_t *ctx = context_find(peer);
+    if (ctx != NULL) {
+        spin_lock(&(ctx->lock));
         ctx->internal = true;
-        spin_unlock(&(ref.ctx->lock));
+        spin_unlock(&(ctx->lock));
     }
 }
 

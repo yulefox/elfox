@@ -75,6 +75,53 @@ public:
 private:
     spin_t *m_lock;
 };
+
+
+struct rwlock_t {
+	int write;
+	int read;
+};
+
+static inline void rwlock_init(struct rwlock_t *lock)
+{
+	lock->write = 0;
+	lock->read = 0;
+}
+
+static inline void rwlock_rlock(struct rwlock_t *lock)
+{
+	for (;;) {
+		while(lock->write) {
+			__sync_synchronize();
+		}
+		__sync_add_and_fetch(&lock->read,1);
+		if (lock->write) {
+			__sync_sub_and_fetch(&lock->read,1);
+		} else {
+			break;
+		}
+	}
+}
+
+static inline void rwlock_wlock(struct rwlock_t *lock) 
+{ 
+    while (__sync_lock_test_and_set(&lock->write,1)) {}
+	while(lock->read) {
+		__sync_synchronize();
+	}
+}
+
+static inline void rwlock_wunlock(struct rwlock_t *lock)
+{
+	__sync_lock_release(&lock->write);
+}
+
+static inline void rwlock_runlock(struct rwlock_t *lock)
+{
+	__sync_sub_and_fetch(&lock->read,1);
+}
+
+
 } // namespace elf
 
 #endif /* !ELF_MUTEX_H */
