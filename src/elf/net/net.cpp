@@ -276,7 +276,18 @@ static void *net_writer(void *args)
     while (true) {
         blob_t *msg = NULL;
         que->pop(msg);
-        context_t *ctx = msg->ctx;
+
+        ///
+        int instance;
+        context_t *ctx = (context_t*)(msg->ctx);
+        instance = (uintptr_t)ctx & 1;
+        ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
+        if (ctx->peer.sock == -1 || ctx->instance != instance) {
+            LOG_WARN("net", "%s", "expired send req...");
+            blob_fini(msg);
+            continue;
+        }
+
         if (context_alive(ctx) == 0) {
             blob_fini(msg);
         } else {
@@ -813,7 +824,7 @@ static void push_send(context_t *ctx, blob_t *msg)
     if (context_alive(ctx) == 1) {
         int idx = context_hash(ctx);
 
-        msg->ctx = ctx;
+        msg->ctx = (context_t*)((uintptr_t)ctx | ctx->instance);
         ctx->inc_ref();
         s_pending_write[idx].push(msg);
     }
@@ -1508,7 +1519,7 @@ static void on_write(const epoll_event &evt)
 
         blob_t *msg = E_NEW blob_t;
         blob_init(msg);
-        msg->ctx = ctx;
+        msg->ctx = (context_t*)(evt.data.ptr);
         ctx->inc_ref();
         LOG_WARN("net", "on_write: sock: %d, internel: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
         s_pending_write[idx].push(msg);
@@ -1532,7 +1543,7 @@ static void context_stop(context_t *ctx)
 
     blob_t *msg = E_NEW blob_t;
     blob_init(msg);
-    msg->ctx = ctx;
+    msg->ctx = (context_t*)((uintptr_t)ctx | ctx->instance);
     ctx->inc_ref();
     s_pending_write[idx].push(msg);
 }
