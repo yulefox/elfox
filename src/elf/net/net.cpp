@@ -1607,6 +1607,10 @@ static bool handle_write(context_t *ctx)
         }
         chunks.pop_front();
         chunk_fini(c);
+        if (sum >= 8192) {
+            LOG_INFO("net", "%s", "release resource...");
+            break;
+        }
     }
 
 stat:
