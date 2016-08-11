@@ -363,10 +363,10 @@ static void message_get(chunk_queue &chunks, void *buf, int size)
 
     while (rem > 0 && itr != chunks.end()) {
         chunk_t *c = *itr;
-
-        assert(c != NULL && c->wr_offset > c->rd_offset);
-
         int real = c->wr_offset - c->rd_offset;
+
+        assert(c != NULL && real > 0);
+
         char *src = c->data + c->rd_offset;
         char *dst = (char *)buf + offset;
 
@@ -392,10 +392,10 @@ static void message_get(chunk_queue &chunks, std::string &buf, int size)
 
     while (rem > 0 && itr != chunks.end()) {
         chunk_t *c = *itr;
-
-        assert(c != NULL && c->wr_offset > c->rd_offset);
-
         int real = c->wr_offset - c->rd_offset;
+
+        assert(c != NULL && real > 0);
+
         char *src = c->data + c->rd_offset;
 
         if (real > rem) {
