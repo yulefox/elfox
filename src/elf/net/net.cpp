@@ -29,11 +29,11 @@ static const int CONTEXT_CLOSE_TIME = 90;
 static const int SIZE_INT = sizeof(int(0));
 static const int SIZE_INTX2 = sizeof(int(0)) * 2;
 static const int MESSAGE_LITE_SIZE = 10;
-static const int CHUNK_MIN_SIZE = 256;
-static const int CHUNK_MAX_SIZE = 4096;
+static const int CHUNK_SIZE_S = 256;
+static const int CHUNK_SIZE_L = 4096;
 static const size_t CHUNK_MAX_NUM = 8192;
 static const int MESSAGE_MAX_NAME_LENGTH = 100;
-static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_MAX_SIZE;
+static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_SIZE_L;
 static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
 static const int ENCRYPT_FLAG = 0x40000000;
@@ -282,7 +282,7 @@ static void set_nonblock(int sock)
 static chunk_t *chunk_init(size_t size)
 {
     if (size == 0) {
-        size = CHUNK_MAX_SIZE;
+        size = CHUNK_SIZE_L;
     }
     chunk_t *c = (chunk_t *)E_ALLOC(sizeof(chunk_t) + size);
 
@@ -342,9 +342,9 @@ static void chunks_push(chunk_queue &chunks, const void *buf, int size)
         }
         if (c == NULL || c->wr_offset >= c->size) {
             if (size < MESSAGE_LITE_SIZE) {
-                c = chunk_init(CHUNK_MIN_SIZE);
+                c = chunk_init(CHUNK_SIZE_S);
             } else {
-                c = chunk_init(CHUNK_MAX_SIZE);
+                c = chunk_init(CHUNK_SIZE_L);
             }
             chunks.push_back(c);
         }
@@ -1384,11 +1384,11 @@ static void on_accept6(const epoll_event &evt)
 static void on_read(const epoll_event &evt)
 {
     context_t *ctx = static_cast<context_t *>(evt.data.ptr);
-    int size = CHUNK_MAX_SIZE;
+    int size = CHUNK_SIZE_L;
     int sock = ctx->peer.sock;
     chunk_queue chunks;
 
-    static char buf[CHUNK_MAX_SIZE];
+    static char buf[CHUNK_SIZE_L];
     while (size > 0) {
 
         size = recv(sock, buf, sizeof(buf), 0);

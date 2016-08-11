@@ -94,6 +94,7 @@ static void regist(int evt, callback_t *cb)
     if (itr_c != cl->end()) {
         LOG_WARN("event", "<%lld><%lld> regist event %d (%d) ALREADY.",
                 cb->oid, cb->lid, evt, cb->larg);
+        E_FREE(cb);
     } else {
         (*cl)[cb->lid] = cb;
         LOG_TRACE("event", "<%lld><%lld> regist event %d (%d).",
