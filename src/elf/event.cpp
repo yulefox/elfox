@@ -99,12 +99,16 @@ static void regist(int evt, callback_t *cb)
         (*cl)[cb->lid] = cb;
         LOG_TRACE("event", "<%lld><%lld> regist event %d (%d).",
                 cb->oid, cb->lid, evt, cb->larg);
+        LOG_ERROR("test", "<%lld><%lld> regist event %d (%d).",
+                cb->oid, cb->lid, evt, cb->larg);
     }
 }
 
 static void unregist(int evt, oid_t oid, oid_t lid)
 {
     LOG_TRACE("event", "<%lld> <%lld> unregist event %d.",
+            oid, lid, evt);
+    LOG_ERROR("test", "<%lld> <%lld> unregist event %d.",
             oid, lid, evt);
     if (evt > 0) {
         listener_map::iterator itr = s_listeners.find(evt);

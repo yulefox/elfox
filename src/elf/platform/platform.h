@@ -39,6 +39,8 @@ enum platform_type {
     PLAT_FACEBOOK   = 14,
     PLAT_QIANGUI    = 15,
     PLAT_SIFU       = 16,
+    PLAT_IOSINTMY   = 17,
+    PLAT_IOSINTSG   = 18,
 };
 
 enum platform_error {

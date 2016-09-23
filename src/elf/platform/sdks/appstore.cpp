@@ -55,7 +55,23 @@ int platform_appstore_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_PARAM_ERROR;
     }
 
-    cJSON *setting = platform_get_json(PLAT_APPSTORE);
+    int plat = PLAT_APPSTORE;
+    cJSON *ch_node = cJSON_GetObjectItem(json, "channel");
+    std::string channel;
+    if (ch_node != NULL) {
+        channel = ch_node->valuestring;
+        if (strcmp(ch_node->valuestring, "AppStore") == 0) {
+            plat = PLAT_APPSTORE;
+        } else if (strcmp(ch_node->valuestring, "iosintsg") == 0) {
+            plat = PLAT_IOSINTSG;
+        } else if (strcmp(ch_node->valuestring, "iosintmy") == 0) {
+            plat = PLAT_IOSINTMY;
+        } else {
+            LOG_ERROR("net", "invalid channel: %s", ch_node->valuestring);
+        }
+    }
+
+    cJSON *setting = platform_get_json(plat);
     if (setting == NULL) {
         return PLATFORM_SETTING_ERROR;
     }
@@ -69,6 +85,7 @@ int platform_appstore_auth(const char *param, auth_cb cb, void *args)
     if (productCode == NULL) {
         return PLATFORM_SETTING_ERROR;
     }
+
 
     //cJSON *userId = cJSON_GetObjectItem(json, "userId");
     //if (userId == NULL) {
@@ -95,8 +112,8 @@ int platform_appstore_auth(const char *param, auth_cb cb, void *args)
 
     // do post request
     plat_json_req *json_req = E_NEW plat_json_req(cb, args);
-    json_req->plat_type = PLAT_APPSTORE;
-    json_req->channel = "AppStore";
+    json_req->plat_type = plat;
+    json_req->channel = channel;
     json_req->param = std::string(param);
 
     http_json(HTTP_POST, post_url.c_str(), "", write_callback, json_req);

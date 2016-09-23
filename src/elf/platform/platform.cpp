@@ -234,6 +234,13 @@ int platform_auth(int plat_type, const char *data,
         return platform_weixin_auth(data, cb, args);
     case PLAT_APPSTORE:
         return platform_appstore_auth(data, cb, args);
+
+    case PLAT_IOSINTSG:
+        return platform_appstore_auth(data, cb, args);
+
+    case PLAT_IOSINTMY:
+        return platform_appstore_auth(data, cb, args);
+
     case PLAT_MIGU:
         return platform_migu_auth(data, cb, args);
     case PLAT_TSIXI:
