@@ -187,6 +187,8 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
             case PLAT_WEIXIN:
                 base_resp = platform_msdk_on_auth(base_req);
                 break;
+            case PLAT_IOSINTSG:
+            case PLAT_IOSINTMY:
             case PLAT_APPSTORE:
                 base_resp = platform_appstore_on_auth(base_req);
                 break;
