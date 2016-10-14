@@ -35,8 +35,7 @@ void oid_ismap_add(id_ismap &ism, int idx, oid_t id)
     id_ismap::iterator itr = ism.find(idx);
 
     if (itr == ism.end()) {
-        s = E_NEW id_set;
-        ism[idx] = s;
+        ism[idx] = s = E_NEW id_set;
     } else {
         s = itr->second;
     }
@@ -61,8 +60,7 @@ void oid_illmap_add(id_illmap &illm, int idx, oid_t k, oid_t v)
     id_illmap::iterator itr = illm.find(idx);
 
     if (itr == illm.end()) {
-        m = E_NEW id_llmap;
-        illm[idx] = m;
+        illm[idx] = m = E_NEW id_llmap;;
     } else {
         m = itr->second;
     }
@@ -78,6 +76,48 @@ void oid_illmap_del(id_illmap &illm, int idx, oid_t k)
         id_llmap *m = itr->second;
 
         m->erase(k);
+    }
+}
+
+void oid_iismap_add(id_iismap &iism, int idx, int k, oid_t v)
+{
+    id_ismap *ism = NULL;
+    id_iismap::iterator itr = iism.find(idx);
+
+    if (itr == iism.end()) {
+        iism[idx] = ism = E_NEW id_ismap;
+    } else {
+        ism = itr->second;
+    }
+    assert(ism);
+    id_ismap::iterator itr_i = ism->find(idx);
+    id_set *is = NULL;
+
+    if (itr_i == ism->end()) {
+        (*ism)[k] = is = E_NEW id_set;
+    } else {
+        is = itr_i->second;
+    }
+    assert(is);
+    is->insert(v);
+}
+
+void oid_iismap_del(id_iismap &iism, int idx, int k, oid_t v)
+{
+    id_iismap::iterator itr = iism.find(idx);
+
+    if (itr != iism.end()) {
+        id_ismap *ism = itr->second;
+
+        assert(ism);
+        id_ismap::iterator itr_i = ism->find(k);
+
+        if (itr_i != ism->end()) {
+            id_set *is = itr_i->second;
+
+            assert(is);
+            is->erase(v);
+        }
     }
 }
 } // namespace elf

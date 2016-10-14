@@ -34,6 +34,7 @@ typedef std::map< int, id_set * > id_ismap;
 typedef std::map< oid_t, id_set * > id_lsmap;
 typedef std::map< int, id_llmap * > id_illmap;
 typedef std::map< oid_t, id_llmap * > id_lllmap;
+typedef std::map< int, id_ismap * > id_iismap;
 typedef bool (*callback)(void *args);
 
 const oid_t OID_NIL = 0;
@@ -74,7 +75,7 @@ void oid_ismap_del(id_ismap &ism, int idx, oid_t id);
 
 ///
 /// Insert into `id_illmap`.
-/// @param[in out] mm `id_illmap`.
+/// @param[in out] illm `id_illmap`.
 /// @param[in] idx `id_illmap:key`.
 /// @param[in] k `id_llmap:key`.
 /// @param[in] v `id_llmap:value`.
@@ -83,11 +84,29 @@ void oid_illmap_add(id_illmap &illm, int idx, oid_t k, oid_t v);
 
 ///
 /// Remove from `id_illmap`.
-/// @param[in out] mm `id_illmap`.
+/// @param[in out] illm `id_illmap`.
 /// @param[in] idx `id_illmap:key`.
 /// @param[in] k `id_llmap:key`.
 ///
 void oid_illmap_del(id_illmap &illm, int idx, oid_t k);
+
+///
+/// Insert into `id_iismap`.
+/// @param[in out] iism `id_iismap`.
+/// @param[in] idx `id_iismap:key`.
+/// @param[in] k `id_ismap:key`.
+/// @param[in] v `id_ismap:value`.
+///
+void oid_iismap_add(id_iismap &iism, int idx, int k, oid_t v);
+
+///
+/// Remove from `id_iismap`.
+/// @param[in out] iism `id_iismap`.
+/// @param[in] idx `id_ismap:key`.
+/// @param[in] k `id_ismap:key`.
+/// @param[in] v `id_ismap:value`.
+///
+void oid_iismap_del(id_iismap &iism, int idx, int k, oid_t v);
 } // namespace elf
 
 #endif /* !ELF_OID_H */
