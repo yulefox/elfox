@@ -25,7 +25,7 @@ plat_base_resp* platform_appstore_on_auth(const plat_base_req *req)
     if (status == NULL || strcmp(status->valuestring, "false") == 0) {
         ret = PLATFORM_PARAM_ERROR;
         if (status != NULL) {
-            LOG_ERROR("platform", "appstore onAuth() falied: %d", status->valuestring);
+            LOG_ERROR("platform", "appstore onAuth() falied: %s", status->valuestring);
         }
     }
 
@@ -66,6 +66,10 @@ int platform_appstore_auth(const char *param, auth_cb cb, void *args)
             plat = PLAT_IOSINTSG;
         } else if (strcmp(ch_node->valuestring, "iosintmy") == 0) {
             plat = PLAT_IOSINTMY;
+        } else if (strcmp(ch_node->valuestring, "pjmy") == 0) {
+            plat = PLAT_PJMY;
+        } else if (strcmp(ch_node->valuestring, "pjsg") == 0) {
+            plat = PLAT_PJSG;
         } else {
             LOG_ERROR("net", "invalid channel: %s", ch_node->valuestring);
         }
