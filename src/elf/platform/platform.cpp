@@ -203,6 +203,9 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
             case PLAT_FACEBOOK:
                 base_resp = platform_facebook_on_auth(base_req);
                 break;
+            case PLAT_DAMAI:
+                base_resp = platform_damai_on_auth(base_req);
+                break;
             }
             E_DELETE base_req;
         }
@@ -252,6 +255,8 @@ int platform_auth(int plat_type, const char *data,
         return platform_facebook_auth(data, cb, args);
     case PLAT_SIFU:
         return platform_sifu_auth(data, cb, args);
+    case PLAT_DAMAI:
+        return platform_damai_auth(data, cb, args);
     default:
         return PLATFORM_TYPE_ERROR;
         break;

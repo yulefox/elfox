@@ -43,6 +43,7 @@ enum platform_type {
     PLAT_IOSINTSG   = 18,
     PLAT_PJMY       = 19,
     PLAT_PJSG       = 20,
+    PLAT_DAMAI      = 21,
 };
 
 enum platform_error {
