@@ -25,7 +25,7 @@ plat_base_resp* platform_damai_on_auth(const plat_base_req *req)
     cJSON *status = cJSON_GetObjectItem(req->resp, "status");
     cJSON *data = cJSON_GetObjectItem(req->resp, "data");
 
-    LOG_INFO("platform", "1sdk onAuth(): status(%d), data(%s)",
+    LOG_INFO("platform", "damai onAuth(): status(%d), data(%s)",
             status->valueint, data->valuestring);
 
     int ret = PLATFORM_OK;
@@ -58,7 +58,7 @@ int platform_damai_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_PARAM_ERROR;
     }
 
-    cJSON *setting = platform_get_json(PLAT_1SDK);
+    cJSON *setting = platform_get_json(PLAT_DAMAI);
     if (setting == NULL) {
         return PLATFORM_SETTING_ERROR;
     }
