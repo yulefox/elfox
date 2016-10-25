@@ -54,6 +54,31 @@ void oid_ismap_del(id_ismap &ism, int idx, oid_t id)
     }
 }
 
+void oid_lsmap_add(id_lsmap &lsm, oid_t idx, oid_t id)
+{
+    id_set *s = NULL;
+    id_lsmap::iterator itr = lsm.find(idx);
+
+    if (itr == lsm.end()) {
+        lsm[idx] = s = E_NEW id_set;
+    } else {
+        s = itr->second;
+    }
+    assert(s);
+    s->insert(id);
+}
+
+void oid_lsmap_del(id_lsmap &lsm, oid_t idx, oid_t id)
+{
+    id_lsmap::iterator itr = lsm.find(idx);
+
+    if (itr != lsm.end()) {
+        id_set *s = itr->second;
+
+        s->erase(id);
+    }
+}
+
 void oid_illmap_add(id_illmap &illm, int idx, oid_t k, oid_t v)
 {
     id_llmap *m = NULL;
@@ -89,8 +114,8 @@ void oid_iismap_add(id_iismap &iism, int idx, int k, oid_t v)
     } else {
         ism = itr->second;
     }
-    assert(ism);
-    id_ismap::iterator itr_i = ism->find(idx);
+
+    id_ismap::iterator itr_i = ism->find(k);
     id_set *is = NULL;
 
     if (itr_i == ism->end()) {
@@ -109,7 +134,6 @@ void oid_iismap_del(id_iismap &iism, int idx, int k, oid_t v)
     if (itr != iism.end()) {
         id_ismap *ism = itr->second;
 
-        assert(ism);
         id_ismap::iterator itr_i = ism->find(k);
 
         if (itr_i != ism->end()) {

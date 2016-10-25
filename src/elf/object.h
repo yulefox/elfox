@@ -42,6 +42,12 @@ public:
     inline oid_t GetID(void) const { return m_id; }
 
     ///
+    /// Get object short ID.
+    /// @return Guild short ID.
+    ///
+    inline int SID(void) const { return m_sid; }
+
+    ///
     /// Get object name.
     /// @return Object name.
     ///

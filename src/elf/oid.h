@@ -74,6 +74,22 @@ void oid_ismap_add(id_ismap &ism, int idx, oid_t id);
 void oid_ismap_del(id_ismap &ism, int idx, oid_t id);
 
 ///
+/// Insert into `id_lsmap`.
+/// @param[in out] mm `id_lsmap`.
+/// @param[in] idx `id_lsmap:key`.
+/// @param[in] id `id_lsmap:element`.
+///
+void oid_lsmap_add(id_lsmap &lsm, oid_t idx, oid_t id);
+
+///
+/// Remove from `id_lsmap`.
+/// Remove from `id_lsmap`.
+/// @param[in] idx `id_lsmap:key`.
+/// @param[in] id `id_lsmap:element`.
+///
+void oid_lsmap_del(id_lsmap &lsm, oid_t idx, oid_t id);
+
+///
 /// Insert into `id_illmap`.
 /// @param[in out] illm `id_illmap`.
 /// @param[in] idx `id_illmap:key`.
