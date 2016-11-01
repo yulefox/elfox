@@ -230,7 +230,8 @@ int platform_auth(int plat_type, const char *data,
     case PLAT_UC:
         return platform_uc_auth(data, cb, args);
     case PLAT_HUAWEI:
-        return platform_huawei_auth(data, cb, args);
+        //return platform_huawei_auth(data, cb, args);
+        return platform_huawei_auth_v2(data, cb, args);
     case PLAT_VIVO:
         return platform_vivo_auth(data, cb, args);
     case PLAT_ANZHI:

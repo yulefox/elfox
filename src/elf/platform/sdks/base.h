@@ -69,6 +69,7 @@ int platform_i4_auth(const char *param, auth_cb cb, void *args);
 int platform_lj_auth(const char *param, auth_cb cb, void *args);
 int platform_1sdk_auth(const char *param, auth_cb cb, void *args);
 int platform_huawei_auth(const char *param, auth_cb cb, void *args);
+int platform_huawei_auth_v2(const char *param, auth_cb cb, void *args);
 int platform_vivo_auth(const char *param, auth_cb cb, void *args);
 int platform_anzhi_auth(const char *param, auth_cb cb, void *args);
 int platform_qq_auth(const char *param, auth_cb cb, void *args);

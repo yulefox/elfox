@@ -14,6 +14,7 @@
 
 #include <elf/config.h>
 #include <elf/pb.h>
+#include <openssl/sha.h> 
 #include <cJSON/cJSON.h>
 
 namespace elf {

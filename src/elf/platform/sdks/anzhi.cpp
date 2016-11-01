@@ -33,7 +33,7 @@ plat_base_resp* platform_anzhi_on_auth(const plat_base_req *req)
             LOG_ERROR("platform", "%s", "anzhi onAuth() falied");
         }
     } else {
-        std::string ctx = base64_decode(msg->valuestring, strlen(msg->valuestring), false);
+        std::string ctx = base64_decode((const char*)msg->valuestring, strlen(msg->valuestring), false);
         for (size_t i = 0;i < ctx.size(); i++) {
             if (ctx[i] == '\'') {
                 ctx[i] = '\"';
