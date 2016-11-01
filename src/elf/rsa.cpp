@@ -16,7 +16,7 @@ int RSAVerify(std::string ctx, std::string sign, std::string pubkey)
     BIO* mem_bio = NULL;
     RSA *rsa = NULL;
 
-    if ((mem_bio = BIO_new_mem_buf(pubkey.c_str(), -1)) == NULL) {
+    if ((mem_bio = BIO_new_mem_buf((void*)(pubkey.c_str()), -1)) == NULL) {
         BIO_free(mem_bio);
         return -1;
     }

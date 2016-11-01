@@ -228,10 +228,13 @@ protected:
     /// object id
     oid_t m_id;
 
+    /// parent id
+    oid_t m_pid;
+
     /// short id
     int m_sid;
 
-    /// object id
+    /// object name
     std::string m_name;
 
     /// pb data

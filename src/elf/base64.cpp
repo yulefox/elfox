@@ -44,7 +44,7 @@ std::string base64_decode(const char *input, int length, bool with_new_line)
 	if(!with_new_line) {
 		BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
 	}
-	bmem = BIO_new_mem_buf(input, length);
+	bmem = BIO_new_mem_buf((void*)input, length);
 	bmem = BIO_push(b64, bmem);
 
 	BIO_read(bmem, buffer, length);
