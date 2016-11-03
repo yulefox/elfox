@@ -81,6 +81,19 @@ int platform_1sdk_auth(const char *param, auth_cb cb, void *args)
         return PLATFORM_PARAM_ERROR;
     }
 
+    cJSON *ch = cJSON_GetObjectItem(json, "channel");
+    if (ch == NULL) {
+        LOG_ERROR("net", "%s", "no found channel in the json content");
+        return PLATFORM_PARAM_ERROR;
+    }
+    if (0 == strcmp(ch ->valuestring, "1sdk2")) {
+        app = cJSON_GetObjectItem(setting, "app2");
+        if (app == NULL) {
+            LOG_ERROR("net", "%s", "no found appId2");
+            return PLATFORM_PARAM_ERROR;
+        }
+    }
+
     cJSON *token = cJSON_GetObjectItem(json, "token");
     if (token == NULL) {
         return PLATFORM_PARAM_ERROR;
