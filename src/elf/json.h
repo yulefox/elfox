@@ -52,6 +52,22 @@ pb_t *json_pb(const char *pb_type, const char *json_type, const char *data);
 /// @return Converted protobuf object if converted done, or NULL.
 ///
 pb_t *json_pb(pb_t *pb, const char *json_type, const char *data);
+
+///
+/// Convert json string to new protobuf object.
+/// @param[in] pb_type Protobuf type.
+/// @param[in] json json string.
+/// @return Created protobuf object if converted done, or NULL.
+///
+pb_t *json_pb(const std::string &pb_type, const std::string &json);
+
+///
+/// Convert json string to existed protobuf object.
+/// @param[in] json json string.
+/// @param[in] pb Protobuf object.
+/// @return 0 if converted done.
+///
+int json_pb(const std::string &json, pb_t *pb);
 } // namespace elf
 
 #endif /* !ELF_JSON_H */

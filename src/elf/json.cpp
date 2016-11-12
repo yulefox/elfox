@@ -6,6 +6,7 @@
 #include <elf/json.h>
 #include <elf/log.h>
 #include <cJSON/cJSON.h>
+#include <google/protobuf/util/json_util.h>
 #include <fstream>
 #include <map>
 
@@ -77,6 +78,27 @@ pb_t *json_pb(pb_t *pb, const char *json_type, const char *data)
     }
     cJSON_Delete(json);
     return pb;
+}
+
+pb_t *json_pb(const std::string &pb_type, const std::string &json)
+{
+    pb_t *pb = pb_create(pb_type);
+    int st = json_pb(json, pb);
+
+    if (st != 0) {
+        return pb;
+    }
+    pb_destroy(pb);
+    return NULL;
+}
+
+int json_pb(const std::string &json, pb_t *pb)
+{
+    assert(pb);
+
+    util::Status st = google::protobuf::util::JsonStringToMessage(json, pb);
+
+    return st.error_code();
 }
 } // namespace elf
 

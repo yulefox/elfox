@@ -43,15 +43,27 @@ public:
 
     ///
     /// Get object short ID.
-    /// @return Guild short ID.
+    /// @return Short ID.
     ///
     inline int SID(void) const { return m_sid; }
+
+    ///
+    /// Get object alias.
+    /// @return Alias.
+    ///
+    inline const std::string &Alias(void) const { return m_alias; }
 
     ///
     /// Get object name.
     /// @return Object name.
     ///
     inline const std::string &GetName(void) const { return m_name; }
+
+
+    ///
+    /// Set object name.
+    ///
+    void SetName(const std::string &name);
 
     ///
     /// Get protobuf data.
@@ -72,11 +84,6 @@ public:
         assert(m_pb);
         return *(static_cast<Type *>(m_pb));
     }
-
-    ///
-    /// On initialization, insert object into global map.
-    ///
-    void OnInit(void);
 
     ///
     /// Output statistics info.
@@ -225,6 +232,11 @@ protected:
     Object();
     Object(oid_t id);
 
+    ///
+    /// On initialization, insert object into global map.
+    ///
+    virtual void OnInit(void);
+
     /// object id
     oid_t m_id;
 
@@ -234,13 +246,16 @@ protected:
     /// short id
     int m_sid;
 
+    /// alias
+    std::string m_alias;
+
     /// object name
     std::string m_name;
 
     /// pb data
     pb_t *m_pb;
 
-    /// global Object map
+    /// global Object map(key: m_id)
     static obj_map_id s_objs;
 
     /// global protobuf map
