@@ -567,7 +567,7 @@ static context_t *context_init(int idx, oid_t peer, int fd,
 
     recv_message_t *msg = recv_message_init(ctx);
 
-    msg->name = "Init.Req";
+    msg->name = "msg.Init.Req";
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
 
@@ -609,7 +609,7 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
 
     recv_message_t *msg = recv_message_init(ctx);
 
-    msg->name = "Init.Req";
+    msg->name = "msg.Init.Req";
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
     return ctx;
@@ -635,7 +635,7 @@ static void context_close(oid_t peer)
 
     recv_message_t *msg = recv_message_init(ctx);
 
-    msg->name = "Fini.Req";
+    msg->name = "msg.Fini.Req";
     msg->peer = peer;
     s_recv_msgs.push(msg);
 

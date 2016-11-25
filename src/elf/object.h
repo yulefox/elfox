@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2014 Yule Fox. All rights reserved.
+ * Copyright (C) 2013-2016 Yule Fox. All rights reserved.
  * http://www.yulefox.com/
  */
 
@@ -7,7 +7,15 @@
  * @file object.h
  * @author Fox(yulefox@gmail.com)
  * @date 2013-11-01
- * Object base.
+ * Object/Container base.
+ * 3-layer general container for any objects.
+ *
+ *                   object ID
+ *                /     |     \
+ *           type A   type B   type C
+ *              /       |       \
+ *   object ID...  object ID...  object ID...
+ *
  * @warning Global object map can ONLY be used in single thread.
  */
 
@@ -25,7 +33,7 @@
 
 namespace elf {
 class Object;
-class PBRef;
+class Proto;
 
 typedef std::list<Object *> obj_list;
 typedef std::map<oid_t, Object *> obj_map_id;
@@ -36,169 +44,145 @@ typedef std::map<oid_t, pb_t *> pb_map_id;
 class Object {
 public:
     ///
-    /// Get object id.
-    /// @return Object id.
+    /// Get Object ID.
+    /// @return Object ID.
     ///
-    inline oid_t GetID(void) const { return m_id; }
+    inline oid_t ID(void) const { return m_id; }
 
     ///
-    /// Get object short ID.
+    /// Get Object short ID.
     /// @return Short ID.
     ///
     inline int SID(void) const { return m_sid; }
 
     ///
-    /// Get object alias.
+    /// Get parent ID.
+    /// @return Parent ID.
+    ///
+    inline oid_t PID(void) const { return m_pid; }
+
+    ///
+    /// Get Object type.
+    /// @return Object type.
+    ///
+    inline int Type(void) const { return m_type; }
+
+    ///
+    /// Get protobuf data.
+    /// @return Protobuf data.
+    ///
+    inline pb_t *PB(void) { return m_pb; }
+    inline const pb_t &PB(void) const { return *m_pb; }
+
+    ///
+    /// Get Object alias.
     /// @return Alias.
     ///
     inline const std::string &Alias(void) const { return m_alias; }
 
     ///
-    /// Get object name.
+    /// Get Object name.
     /// @return Object name.
     ///
-    inline const std::string &GetName(void) const { return m_name; }
-
+    inline const std::string &Name(void) const { return m_name; }
 
     ///
-    /// Set object name.
+    /// Set Object name.
     ///
     void SetName(const std::string &name);
-
-    ///
-    /// Get protobuf data.
-    /// @return Protobuf data.
-    ///
-    template<class Type>
-    inline Type *GetPB(void) {
-        assert(m_pb);
-        return static_cast<Type *>(m_pb);
-    }
-
-    ///
-    /// Get protobuf data.
-    /// @return Protobuf data.
-    ///
-    template<class Type>
-    inline const Type &GetPB(void) const {
-        assert(m_pb);
-        return *(static_cast<Type *>(m_pb));
-    }
 
     ///
     /// Output statistics info.
     ///
     static void Stat(void);
 
-
     ///
-    /// Release all Object/protobuf objects.
+    /// Release all Object/Protos.
     ///
     static void Release(void);
 
     ///
-    /// Add protobuf object.
-    /// @param pb protobuf object.
-    /// @param id protobuf object id.
+    /// Add protobuf data.
+    /// @param pb Protobuf data.
+    /// @param pid Parent ID.
+    /// @param type Protobuf data type.
+    /// @param id Protobuf data ID.
     ///
-    template<class Type>
-        static Type *AddPB(const Type &pb, oid_t id, int ref) {
-            PBRef *pr = FindRef(id);
-            Type *dst = NULL;
-
-            if (pr == NULL) {
-                pr = E_NEW PBRef;
-                pr->pb = dst = E_NEW Type(pb);
-                pr->ref = ref;
-                s_pbs[id] = pr;
-            } else {
-                dst = static_cast<Type *>(pr->pb);
-                if (dst != &pb) {
-                    dst->CopyFrom(pb);
-                }
-            }
-            return dst;
-        }
+    static pb_t *AddPB(const pb_t &pb, oid_t id, oid_t pid, int type);
 
     ///
-    /// Remove protobuf object.
-    /// @param id protobuf object id.
+    /// Clone protobuf data.
+    /// @param pb Protobuf data.
+    /// @param id Protobuf data ID.
     ///
-    static void DelPB(oid_t id);
-    ///
-    /// Clone protobuf object.
-    /// @param pb protobuf object.
-    /// @param id protobuf object id.
-    ///
-    template<class Type>
-        static bool ClonePB(pb_t *pb, oid_t id) {
-            assert(pb);
-
-            Type *src = FindPB<Type>(id);
-
-            if (src == NULL) {
-                return false;
-            }
-            pb->CopyFrom(*src);
-            return true;
-        }
+    static bool ClonePB(pb_t *pb, oid_t id);
 
     ///
-    /// Find object by id.
-    /// @param id Object id.
-    /// @return Pointer to object if found, or NULL.
+    /// Remove protobuf data.
+    /// @param id Protobuf data ID.
     ///
-    template<class Type>
-        static Type *Find(oid_t id) {
-            if (id == elf::OID_NIL) {
-                return NULL;
-            }
-
-            obj_map_id::const_iterator itr =s_objs.find(id);
-
-            if (itr != s_objs.end()) {
-                return static_cast<Type *>(itr->second);
-            }
-            return NULL;
-        }
+    static void DelPB(oid_t id, oid_t pid, int type);
 
     ///
-    /// Find object by id with dynamic_cast.
-    /// @param id Object id.
+    /// Find Object by ID.
+    /// @param id Object ID.
     /// @return Pointer to Object if found, or NULL.
     ///
-    template<class Type>
-        static Type *SafeFind(oid_t id) {
-            if (id == elf::OID_NIL) {
-                return NULL;
-            }
-
-            obj_map_id::const_iterator itr =s_objs.find(id);
-
-            if (itr != s_objs.end()) {
-                return dynamic_cast<Type *>(itr->second);
-            }
-            return NULL;
-        }
+    static Object *FindObject(oid_t id);
 
     ///
-    /// Find PB by id.
-    /// @param id Object id.
-    /// @return Pointer to pb_t object if found, or NULL.
+    /// Find protobuf data by ID.
+    /// @param id Protobuf data ID.
+    /// @return Pointer to protobuf data if found, or NULL.
     ///
-    template<class Type>
-        static Type *FindPB(oid_t id) {
-            if (id == elf::OID_NIL) {
-                return NULL;
-            }
+    static pb_t *FindPB(oid_t id);
 
-            pbref_map_id::const_iterator itr =s_pbs.find(id);
+    ///
+    /// Find children by container object ID and type in `s_containers`.
+    /// @param[in] cid Container ID.
+    /// @param[in] type Container type.
+    /// @return Pointer to container if found, or NULL.
+    ///
+    static elf::id_set *GetChildren(elf::oid_t cid, int type);
 
-            if (itr != s_pbs.end()) {
-                return static_cast<Type *>(itr->second->pb);
-            }
-            return NULL;
-        }
+    ///
+    /// Remove children from `s_containers`.
+    /// @param[in] cid Container ID.
+    /// @param[in] type Container type, clear all if type is 0.
+    ///
+    static void DelChildren(elf::oid_t cid, int type = 0);
+
+    ///
+    /// Find the last/only child object ID by container object ID and type in `s_containers`.
+    /// @param[in] cid Container ID.
+    /// @param[in] type Container type.
+    /// @return Last/Only element object ID.
+    ///
+    static elf::oid_t GetLastChild(elf::oid_t cid, int type);
+
+    ///
+    /// Set the only child object ID into `s_containers`.
+    /// @param[in] cid Container ID.
+    /// @param[in] type Container type.
+    /// @param[in] oid Object ID.
+    ///
+    static void SetChild(elf::oid_t cid, int type, elf::oid_t oid);
+
+    ///
+    /// Insert child object ID into `s_containers`.
+    /// @param[in] cid Container ID.
+    /// @param[in] type Container type.
+    /// @param[in] oid Object ID.
+    ///
+    static void AddChild(elf::oid_t cid, int type, elf::oid_t oid);
+
+    ///
+    /// Remove child object ID from `s_containers`.
+    /// @param[in] cid Container ID.
+    /// @param[in] type Container type.
+    /// @param[in] oid Object ID.
+    ///
+    static void DelChild(elf::oid_t cid, int type, elf::oid_t oid);
 
     ///
     /// Get size of object map.
@@ -210,59 +194,83 @@ public:
     /// Get size of protobuf map.
     /// @return Size of object map.
     ///
-    static int SizePB(void) { return s_pbs.size(); }
+    static int SizeProto(void) { return s_pbs.size(); }
 
     virtual ~Object(void);
 
 protected:
-    struct PBRef {
+    struct Proto {
         pb_t *pb;
+        int type;
         int ref;
     };
 
     ///
-    /// Find PBRef by id.
-    /// @param id Object id.
-    /// @return Pointer to PBRef object if found, or NULL.
+    /// Find Proto by ID.
+    /// @param[in] id Proto ID.
+    /// @return Pointer to Proto object if found, or NULL.
     ///
-    static PBRef *FindRef(oid_t id);
+    static Proto *FindProto(oid_t id);
 
-    typedef std::map<oid_t, PBRef *> pbref_map_id;
+    ///
+    /// Index Proto.
+    /// @param[in] id Proto ID.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Proto type.
+    /// @param[in] id Proto ID.
+    /// @return Pointer to Proto object if found, or NULL.
+    ///
+    static void IndexProto(elf::oid_t id, elf::oid_t pid, int type);
+
+    ///
+    /// Unindex Proto.
+    /// @param[in] id Proto ID.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Proto type.
+    /// @param[in] id Proto ID.
+    /// @return Pointer to Proto object if found, or NULL.
+    ///
+    static void UnindexProto(elf::oid_t id, elf::oid_t pid, int type);
+
+    typedef std::map<oid_t, Proto *> proto_map;
 
     Object();
     Object(oid_t id);
 
     ///
-    /// On initialization, insert object into global map.
+    /// On initialization, insert Object into global map.
     ///
     virtual void OnInit(void);
 
-    /// object id
+    /// Object ID
     oid_t m_id;
 
-    /// parent id
+    /// short ID
+    int m_sid;
+
+    /// parent ID
     oid_t m_pid;
 
-    /// short id
-    int m_sid;
+    /// Object ID
+    int m_type;
 
     /// alias
     std::string m_alias;
 
-    /// object name
+    /// Object name
     std::string m_name;
 
-    /// pb data
+    /// protobuf data
     pb_t *m_pb;
 
     /// global Object map(key: m_id)
     static obj_map_id s_objs;
 
-    /// global protobuf map
-    static pbref_map_id s_pbs;
+    /// global Proto map
+    static proto_map s_pbs;
 
-    /// global protobuf map
-    static pb_map_int s_pbs_i;
+    /// global container map
+    static elf::id_lismap s_containers;
 };
 } // namespace elf
 
