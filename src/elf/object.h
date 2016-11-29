@@ -103,86 +103,99 @@ public:
 
     ///
     /// Add protobuf data.
-    /// @param pb Protobuf data.
-    /// @param pid Parent ID.
-    /// @param type Protobuf data type.
-    /// @param id Protobuf data ID.
+    /// @param[in] pb Protobuf data.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Protobuf data type.
+    /// @param[in] id Protobuf data ID.
     ///
-    static pb_t *AddPB(const pb_t &pb, oid_t id, oid_t pid, int type);
+    template<class Type>
+        static Type *AddPB(const Type &pb, oid_t pid, int type, oid_t id) {
+            pb_t *dst = FindPB(id);
+            Proto *proto = NULL;
+            if (dst == NULL) {
+                dst = E_NEW Type(pb);
+            } else {
+                dst->CopyFrom(pb);
+            }
+            IndexProto(dst, pid, type, id);
+            return static_cast<Type *>(dst);
+        }
+
 
     ///
     /// Clone protobuf data.
-    /// @param pb Protobuf data.
-    /// @param id Protobuf data ID.
+    /// @param[out] pb Protobuf data.
+    /// @param[in] id Protobuf data ID.
     ///
     static bool ClonePB(pb_t *pb, oid_t id);
 
     ///
     /// Remove protobuf data.
-    /// @param id Protobuf data ID.
+    /// @param[in] id Protobuf data ID.
+    /// @param[in] recursive Recursive removing.
     ///
-    static void DelPB(oid_t id, oid_t pid, int type);
+    static void DelPB(oid_t id, bool recursive);
 
     ///
     /// Find Object by ID.
-    /// @param id Object ID.
+    /// @param[in] id Object ID.
     /// @return Pointer to Object if found, or NULL.
     ///
     static Object *FindObject(oid_t id);
 
     ///
     /// Find protobuf data by ID.
-    /// @param id Protobuf data ID.
+    /// @param[in] id Protobuf data ID.
     /// @return Pointer to protobuf data if found, or NULL.
     ///
     static pb_t *FindPB(oid_t id);
 
     ///
-    /// Find children by container object ID and type in `s_containers`.
-    /// @param[in] cid Container ID.
-    /// @param[in] type Container type.
+    /// Find children by parent ID and type in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
     /// @return Pointer to container if found, or NULL.
     ///
-    static elf::id_set *GetChildren(elf::oid_t cid, int type);
+    static id_set *GetChildren(oid_t pid, int type);
 
     ///
-    /// Remove children from `s_containers`.
-    /// @param[in] cid Container ID.
-    /// @param[in] type Container type, clear all if type is 0.
+    /// Remove children by parent ID and type from `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type, clear all if type is 0.
     ///
-    static void DelChildren(elf::oid_t cid, int type = 0);
+    static void DelChildren(oid_t pid, int type = 0);
 
     ///
-    /// Find the last/only child object ID by container object ID and type in `s_containers`.
-    /// @param[in] cid Container ID.
-    /// @param[in] type Container type.
+    /// Find the last/only child object ID by parent ID and type in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
     /// @return Last/Only element object ID.
     ///
-    static elf::oid_t GetLastChild(elf::oid_t cid, int type);
+    static oid_t GetLastChild(oid_t pid, int type);
 
     ///
     /// Set the only child object ID into `s_containers`.
-    /// @param[in] cid Container ID.
-    /// @param[in] type Container type.
-    /// @param[in] oid Object ID.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @param[in] id Object ID.
     ///
-    static void SetChild(elf::oid_t cid, int type, elf::oid_t oid);
+    static void SetChild(oid_t pid, int type, oid_t id);
 
     ///
     /// Insert child object ID into `s_containers`.
-    /// @param[in] cid Container ID.
-    /// @param[in] type Container type.
-    /// @param[in] oid Object ID.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @param[in] id Object ID.
     ///
-    static void AddChild(elf::oid_t cid, int type, elf::oid_t oid);
+    static void AddChild(oid_t pid, int type, oid_t id);
 
     ///
     /// Remove child object ID from `s_containers`.
-    /// @param[in] cid Container ID.
-    /// @param[in] type Container type.
-    /// @param[in] oid Object ID.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @param[in] id Object ID.
     ///
-    static void DelChild(elf::oid_t cid, int type, elf::oid_t oid);
+    static void DelChild(oid_t pid, int type, oid_t id);
 
     ///
     /// Get size of object map.
@@ -201,6 +214,7 @@ public:
 protected:
     struct Proto {
         pb_t *pb;
+        oid_t pid;
         int type;
         int ref;
     };
@@ -215,22 +229,19 @@ protected:
     ///
     /// Index Proto.
     /// @param[in] id Proto ID.
+    /// @param[in] pb Protobuf data.
     /// @param[in] pid Parent ID.
     /// @param[in] type Proto type.
     /// @param[in] id Proto ID.
-    /// @return Pointer to Proto object if found, or NULL.
     ///
-    static void IndexProto(elf::oid_t id, elf::oid_t pid, int type);
+    static void IndexProto(pb_t *pb, oid_t pid, int type, oid_t id);
 
     ///
     /// Unindex Proto.
     /// @param[in] id Proto ID.
-    /// @param[in] pid Parent ID.
-    /// @param[in] type Proto type.
-    /// @param[in] id Proto ID.
-    /// @return Pointer to Proto object if found, or NULL.
+    /// @param[in] recursive Recursive removing.
     ///
-    static void UnindexProto(elf::oid_t id, elf::oid_t pid, int type);
+    static void UnindexProto(oid_t id, bool recursive);
 
     typedef std::map<oid_t, Proto *> proto_map;
 
@@ -251,7 +262,7 @@ protected:
     /// parent ID
     oid_t m_pid;
 
-    /// Object ID
+    /// Object type
     int m_type;
 
     /// alias
@@ -270,7 +281,7 @@ protected:
     static proto_map s_pbs;
 
     /// global container map
-    static elf::id_lismap s_containers;
+    static id_lismap s_containers;
 };
 } // namespace elf
 
