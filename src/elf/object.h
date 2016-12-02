@@ -107,9 +107,10 @@ public:
     /// @param[in] pid Parent ID.
     /// @param[in] type Protobuf data type.
     /// @param[in] id Protobuf data ID.
+    /// @param[in] idx Protobuf data index.
     ///
     template<class Type>
-        static Type *AddPB(const Type &pb, oid_t pid, int type, oid_t id) {
+        static Type *AddPB(const Type &pb, oid_t pid, int type, oid_t id, int idx) {
             pb_t *dst = FindPB(id);
             Proto *proto = NULL;
             if (dst == NULL) {
@@ -117,10 +118,9 @@ public:
             } else {
                 dst->CopyFrom(pb);
             }
-            IndexProto(dst, pid, type, id);
+            IndexProto(dst, pid, type, id, idx);
             return static_cast<Type *>(dst);
         }
-
 
     ///
     /// Clone protobuf data.
@@ -159,19 +159,40 @@ public:
     static id_set *GetChildren(oid_t pid, int type);
 
     ///
-    /// Remove children by parent ID and type from `s_containers`.
-    /// @param[in] pid Parent ID.
-    /// @param[in] type Object type, clear all if type is 0.
-    ///
-    static void DelChildren(oid_t pid, int type = 0);
-
-    ///
     /// Find the last/only child object ID by parent ID and type in `s_containers`.
     /// @param[in] pid Parent ID.
     /// @param[in] type Object type.
     /// @return Last/Only element object ID.
     ///
     static oid_t GetLastChild(oid_t pid, int type);
+
+    ///
+    /// Get container item IDs by parent ID and type in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @param[in] idx Object index.
+    /// @return Container item IDs.
+    ///
+    static id_set *GetContainerItems(oid_t pid, int type, int idx);
+
+    ///
+    /// Get container item by parent ID, type, index in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @param[in] idx Object index.
+    /// @return Protobuf data if exist, or NULL.
+    ///
+    static pb_t *GetContainerItem(oid_t pid, int type, int idx);
+
+    ///
+    /// Insert container item ID into `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @param[in] idx Object index.
+    /// @param[in] id Object ID.
+    /// @return Container item ID.
+    ///
+    static void AddContainerItem(oid_t pid, int type, int idx, oid_t id);
 
     ///
     /// Set the only child object ID into `s_containers`.
@@ -198,6 +219,13 @@ public:
     static void DelChild(oid_t pid, int type, oid_t id);
 
     ///
+    /// Remove children by parent ID and type from `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type, clear all(free memory) if type is 0.
+    ///
+    static void DelChildren(oid_t pid, int type = 0);
+
+    ///
     /// Get size of object map.
     /// @return Size of object map.
     ///
@@ -209,13 +237,21 @@ public:
     ///
     static int SizeProto(void) { return s_pbs.size(); }
 
+    ///
+    /// Statistic info.
+    /// @param[in] args Current time.
+    ///
+    static bool Stat(void *args);
+
     virtual ~Object(void);
 
 protected:
     struct Proto {
         pb_t *pb;
+        oid_t id;
         oid_t pid;
         int type;
+        int idx;
         int ref;
     };
 
@@ -233,8 +269,9 @@ protected:
     /// @param[in] pid Parent ID.
     /// @param[in] type Proto type.
     /// @param[in] id Proto ID.
+    /// @param[in] idx Proto index.
     ///
-    static void IndexProto(pb_t *pb, oid_t pid, int type, oid_t id);
+    static void IndexProto(pb_t *pb, oid_t pid, int type, oid_t id, int idx);
 
     ///
     /// Unindex Proto.
@@ -246,24 +283,34 @@ protected:
     typedef std::map<oid_t, Proto *> proto_map;
 
     Object();
-    Object(oid_t id);
 
     ///
     /// On initialization, insert Object into global map.
     ///
     virtual void OnInit(void);
 
+    ///
+    /// Get container ID by parent ID and type in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @return Container ID.
+    ///
+    static oid_t GetContainer(oid_t pid, int type);
+
     /// Object ID
     oid_t m_id;
-
-    /// short ID
-    int m_sid;
 
     /// parent ID
     oid_t m_pid;
 
     /// Object type
     int m_type;
+
+    /// index
+    int m_idx;
+
+    /// short ID
+    int m_sid;
 
     /// alias
     std::string m_alias;

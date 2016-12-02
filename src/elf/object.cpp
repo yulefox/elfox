@@ -14,15 +14,11 @@ id_lismap Object::s_containers;
 
 Object::Object() :
     m_id(OID_NIL),
-    m_sid(0),
     m_pid(OID_NIL),
     m_type(0),
+    m_idx(0),
+    m_sid(0),
     m_pb(NULL)
-{
-}
-
-Object::Object(oid_t id)
-    : m_id(id)
 {
 }
 
@@ -48,15 +44,8 @@ void Object::OnInit(void)
     }
     s_objs[m_id] = this;
     if (m_pb != NULL) {
-        IndexProto(m_pb, m_pid, m_type, m_id);
+        IndexProto(m_pb, m_pid, m_type, m_id, m_idx);
     }
-}
-
-void Object::Stat(void)
-{
-    LOG_INFO("stat", "protobufs: %d, objects: %d",
-            s_pbs.size(),
-            s_objs.size());
 }
 
 void Object::Release(void)
@@ -103,9 +92,6 @@ bool Object::ClonePB(pb_t *pb, oid_t id)
     assert(pb);
 
     pb_t *src = FindPB(id);
-    if (src == NULL) {
-        return false;
-    }
     pb->CopyFrom(*src);
     return true;
 }
@@ -124,19 +110,21 @@ Object::Proto *Object::FindProto(oid_t id) {
     return NULL;
 }
 
-void Object::IndexProto(pb_t *pb, oid_t pid, int type, oid_t id)
+void Object::IndexProto(pb_t *pb, oid_t pid, int type, oid_t id, int idx)
 {
     Object::Proto *proto = FindProto(id);
     if (proto == NULL) {
         proto = E_NEW Proto;
         proto->pb = pb;
+        proto->id = id;
+        proto->idx = idx;
         proto->pid = pid;
         proto->type = type;
         proto->ref = 1;
         s_pbs[id] = proto;
         AddChild(pid, type, id);
-        if (pid != elf::OID_NIL) {
-            AddChild(elf::OID_NIL, type, id);
+        if (pid != OID_NIL) {
+            AddChild(OID_NIL, type, id);
         }
     } else {
         proto->ref++;
@@ -157,8 +145,8 @@ void Object::UnindexProto(oid_t id, bool recursive)
         proto->ref = 1;
         s_pbs.erase(id);
         DelChild(pid, type, id);
-        if (pid != elf::OID_NIL) {
-            DelChild(elf::OID_NIL, type, id);
+        if (pid != OID_NIL) {
+            DelChild(OID_NIL, type, id);
         }
         E_DELETE(proto->pb);
         E_DELETE(proto);
@@ -211,35 +199,6 @@ id_set *Object::GetChildren(oid_t pid, int type)
     return NULL;
 }
 
-void Object::DelChildren(oid_t pid, int type)
-{
-    id_lismap::iterator itr = s_containers.find(pid);
-
-    if (itr == s_containers.end()) {
-        return;
-    }
-    id_ismap *ism = itr->second;
-
-    if (ism == NULL) {
-        return;
-    }
-    if (type <= 0) {
-        id_ismap::iterator itr_i = ism->begin();
-        for (; itr_i != ism->end(); ++itr_i) {
-            S_DELETE(itr_i->second);
-        }
-        S_DELETE(ism);
-        s_containers.erase(itr);
-    } else {
-        id_ismap::iterator itr_i = ism->find(type);
-
-        if (itr_i != ism->end()) {
-            S_DELETE(itr_i->second);
-        }
-        ism->erase(itr_i);
-    }
-}
-
 oid_t Object::GetLastChild(oid_t pid, int type)
 {
     id_set *is = GetChildren(pid, type);
@@ -254,26 +213,144 @@ oid_t Object::GetLastChild(oid_t pid, int type)
     return OID_NIL;
 }
 
+oid_t Object::GetContainer(oid_t pid, int type)
+{
+    oid_t cid = GetLastChild(pid, type);
+
+    if (cid == OID_NIL) {
+        cid = oid_gen();
+        SetChild(pid, type, cid);
+    }
+    return cid;
+}
+
+id_set *Object::GetContainerItems(oid_t pid, int type, int idx)
+{
+    oid_t cid = GetContainer(pid, type);
+
+    return GetChildren(cid, idx);
+}
+
+pb_t *Object::GetContainerItem(oid_t pid, int type, int idx)
+{
+    oid_t cid = GetContainer(pid, type);
+    oid_t oid = GetLastChild(cid, idx);
+    pb_t *pb = NULL;
+
+    if (oid != OID_NIL) {
+        pb = FindPB(oid);
+        assert(pb);
+    }
+    return pb;
+}
+
+void Object::AddContainerItem(oid_t pid, int type, int idx, oid_t id)
+{
+    oid_t cid = GetContainer(pid, type);
+
+    AddChild(cid, idx, id);
+}
+
 void Object::AddChild(oid_t pid, int type, oid_t id)
 {
+    LOG_TRACE("object", "%19lld + %19lld <%d>",
+            pid, id, type);
     oid_lismap_add(s_containers, pid, type, id);
 }
 
 void Object::SetChild(oid_t pid, int type, oid_t id)
 {
-    id_set *container = GetChildren(pid, type);
-
-    if (container == NULL) {
-        oid_lismap_add(s_containers, pid, type, id);
-    } else {
-        container->clear();
-        container->insert(id);
-    }
+    DelChildren(pid, type);
+    AddChild(pid, type, id);
 }
 
 void Object::DelChild(oid_t pid, int type, oid_t id)
 {
+    LOG_TRACE("object", "%19lld - %19lld <%d>",
+            pid, id, type);
     oid_lismap_del(s_containers, pid, type, id);
+}
+
+void Object::DelChildren(oid_t pid, int type)
+{
+    id_lismap::iterator itr = s_containers.find(pid);
+
+    if (itr == s_containers.end()) {
+        return;
+    }
+    id_ismap *ism = itr->second;
+
+    if (ism == NULL) {
+        return;
+    }
+    if (type == 0) {
+        id_ismap::iterator itr_i = ism->begin();
+        for (; itr_i != ism->end(); ++itr_i) {
+            S_DELETE(itr_i->second);
+        }
+        LOG_TRACE("object", "%19lld - FREE",
+                pid);
+        S_DELETE(ism);
+        s_containers.erase(itr);
+    } else {
+        id_ismap::iterator itr_i = ism->find(type);
+
+        if (itr_i != ism->end()) {
+            id_set *ids = itr_i->second;
+
+            ids->clear();
+            LOG_TRACE("object", "%19lld - %19s <%d>",
+                    pid, "CLEAR", type);
+        }
+    }
+}
+
+bool Object::Stat(void *args)
+{
+    assert(args);
+    time_t ct = *((time_t *)args);
+    struct tm ctm;
+    char cts[20];
+
+    localtime_r(&ct, &ctm);
+    strftime(cts, 20, "%F %T", &ctm);
+    LOG_INFO("stat", "\n\n=========== %s ===========", cts);
+    LOG_INFO("stat", "protobufs: %d, objects: %d, containers: %d\n",
+            s_pbs.size(),
+            s_objs.size(),
+            s_containers.size());
+
+    id_lismap::const_iterator itr = s_containers.find(0);
+    if (itr == s_containers.end()) {
+        return true;
+    }
+
+    id_ismap *ism = itr->second;
+    id_ismap::const_iterator itr_a = ism->begin();
+    for (; itr_a != ism->end(); ++itr_a) {
+        size_t size = 0;
+        elf::id_set *is = itr_a->second;
+        if (is != NULL) {
+            size = is->size();
+            elf::id_set::const_iterator itr_i = is->begin();
+            for (; itr_i != is->end(); ++itr_i) {
+                Object::Proto *proto = FindProto(*itr_i);
+                if (proto != NULL) {
+                    LOG_TRACE("stat", "%23lld - %19lld <%d:%d>",
+                            proto->pid,
+                            proto->id,
+                            proto->idx,
+                            proto->ref);
+                } else {
+                    LOG_TRACE("stat", "%23lld",
+                            *itr_i);
+                }
+            }
+        }
+        LOG_INFO("stat", "--------- %13d (%d)\n",
+                itr_a->first, size);
+    }
+    return true;
 }
 } // namespace elf
 
