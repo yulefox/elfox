@@ -14,6 +14,7 @@ id_lismap Object::s_containers;
 
 Object::Object() :
     m_id(OID_NIL),
+    m_uid(OID_NIL),
     m_pid(OID_NIL),
     m_type(0),
     m_idx(0),
@@ -44,7 +45,7 @@ void Object::OnInit(void)
     }
     s_objs[m_id] = this;
     if (m_pb != NULL) {
-        IndexProto(m_pb, m_pid, m_type, m_id, m_idx);
+        IndexProto(m_pb, m_uid, m_pid, m_type, m_id, m_idx);
     }
 }
 
@@ -77,6 +78,15 @@ Object *Object::FindObject(oid_t id)
     return NULL;
 }
 
+Proto *Object::FindProto(oid_t id) {
+    proto_map::const_iterator itr =s_pbs.find(id);
+
+    if (itr != s_pbs.end()) {
+        return itr->second;
+    }
+    return NULL;
+}
+
 pb_t *Object::FindPB(oid_t id)
 {
     proto_map::const_iterator itr =s_pbs.find(id);
@@ -101,24 +111,23 @@ void Object::DelPB(oid_t id, bool recursive)
     UnindexProto(id, recursive);
 }
 
-Object::Proto *Object::FindProto(oid_t id) {
-    proto_map::const_iterator itr =s_pbs.find(id);
-
-    if (itr != s_pbs.end()) {
-        return itr->second;
-    }
-    return NULL;
-}
-
-void Object::IndexProto(pb_t *pb, oid_t pid, int type, oid_t id, int idx)
+void Object::IndexProto(pb_t *pb, oid_t uid, oid_t pid, int type, oid_t id, int idx)
 {
-    Object::Proto *proto = FindProto(id);
+    Proto *parent = NULL;
+    Proto *proto = FindProto(id);
+    if (pid != OID_NIL) {
+        parent = FindProto(pid);
+    }
     if (proto == NULL) {
         proto = E_NEW Proto;
         proto->pb = pb;
         proto->id = id;
+        proto->uid = uid;
         proto->idx = idx;
         proto->pid = pid;
+        if (parent != NULL) {
+            proto->ptype = parent->type;
+        }
         proto->type = type;
         proto->ref = 1;
         s_pbs[id] = proto;
@@ -133,7 +142,7 @@ void Object::IndexProto(pb_t *pb, oid_t pid, int type, oid_t id, int idx)
 
 void Object::UnindexProto(oid_t id, bool recursive)
 {
-    Object::Proto *proto = FindProto(id);
+    Proto *proto = FindProto(id);
     if (proto == NULL) {
         return;
     }
@@ -213,6 +222,30 @@ oid_t Object::GetLastChild(oid_t pid, int type)
     return OID_NIL;
 }
 
+bool Object::HasChild(oid_t pid, int type, oid_t id)
+{
+    id_set *is = GetChildren(pid, type);
+
+    if (is != NULL) {
+        id_set::const_iterator itr = is->find(id);
+
+        if (itr != is->end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+size_t Object::ChildrenSize(oid_t pid, int type)
+{
+    id_set *is = GetChildren(pid, type);
+
+    if (is != NULL) {
+        return is->size();
+    }
+    return 0;
+}
+
 oid_t Object::GetContainer(oid_t pid, int type)
 {
     oid_t cid = GetLastChild(pid, type);
@@ -249,6 +282,13 @@ void Object::AddContainerItem(oid_t pid, int type, int idx, oid_t id)
     oid_t cid = GetContainer(pid, type);
 
     AddChild(cid, idx, id);
+}
+
+void Object::DelContainerItem(oid_t pid, int type, int idx, oid_t id)
+{
+    oid_t cid = GetContainer(pid, type);
+
+    DelChild(cid, idx, id);
 }
 
 void Object::AddChild(oid_t pid, int type, oid_t id)
@@ -334,7 +374,7 @@ bool Object::Stat(void *args)
             size = is->size();
             elf::id_set::const_iterator itr_i = is->begin();
             for (; itr_i != is->end(); ++itr_i) {
-                Object::Proto *proto = FindProto(*itr_i);
+                Proto *proto = FindProto(*itr_i);
                 if (proto != NULL) {
                     LOG_TRACE("stat", "%23lld - %19lld <%d:%d>",
                             proto->pid,

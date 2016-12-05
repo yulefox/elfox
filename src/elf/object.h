@@ -33,13 +33,23 @@
 
 namespace elf {
 class Object;
-class Proto;
 
 typedef std::list<Object *> obj_list;
 typedef std::map<oid_t, Object *> obj_map_id;
 typedef std::map<int, Object *> obj_map_int;
 typedef std::map<std::string, Object *> obj_map_str;
 typedef std::map<oid_t, pb_t *> pb_map_id;
+
+struct Proto {
+    pb_t *pb;
+    oid_t id;
+    oid_t uid;
+    oid_t pid;
+    int ptype;
+    int type;
+    int idx;
+    int ref;
+};
 
 class Object {
 public:
@@ -48,12 +58,6 @@ public:
     /// @return Object ID.
     ///
     inline oid_t ID(void) const { return m_id; }
-
-    ///
-    /// Get Object short ID.
-    /// @return Short ID.
-    ///
-    inline int SID(void) const { return m_sid; }
 
     ///
     /// Get parent ID.
@@ -68,11 +72,16 @@ public:
     inline int Type(void) const { return m_type; }
 
     ///
-    /// Get protobuf data.
-    /// @return Protobuf data.
+    /// Get Object index.
+    /// @return Object index.
     ///
-    inline pb_t *PB(void) { return m_pb; }
-    inline const pb_t &PB(void) const { return *m_pb; }
+    inline int Index(void) const { return m_idx; }
+
+    ///
+    /// Get Object short ID.
+    /// @return Short ID.
+    ///
+    inline int SID(void) const { return m_sid; }
 
     ///
     /// Get Object alias.
@@ -85,6 +94,13 @@ public:
     /// @return Object name.
     ///
     inline const std::string &Name(void) const { return m_name; }
+
+    ///
+    /// Get protobuf data.
+    /// @return Protobuf data.
+    ///
+    inline pb_t *PB(void) { return m_pb; }
+    inline const pb_t &PB(void) const { return *m_pb; }
 
     ///
     /// Set Object name.
@@ -104,13 +120,14 @@ public:
     ///
     /// Add protobuf data.
     /// @param[in] pb Protobuf data.
+    /// @param[in] uid User ID.
     /// @param[in] pid Parent ID.
     /// @param[in] type Protobuf data type.
     /// @param[in] id Protobuf data ID.
     /// @param[in] idx Protobuf data index.
     ///
     template<class Type>
-        static Type *AddPB(const Type &pb, oid_t pid, int type, oid_t id, int idx) {
+        static Type *AddPB(const Type &pb, oid_t uid, oid_t pid, int type, oid_t id, int idx) {
             pb_t *dst = FindPB(id);
             Proto *proto = NULL;
             if (dst == NULL) {
@@ -118,7 +135,7 @@ public:
             } else {
                 dst->CopyFrom(pb);
             }
-            IndexProto(dst, pid, type, id, idx);
+            IndexProto(dst, uid, pid, type, id, idx);
             return static_cast<Type *>(dst);
         }
 
@@ -144,6 +161,13 @@ public:
     static Object *FindObject(oid_t id);
 
     ///
+    /// Find Proto by ID.
+    /// @param[in] id Proto ID.
+    /// @return Pointer to Proto object if found, or NULL.
+    ///
+    static Proto *FindProto(oid_t id);
+
+    ///
     /// Find protobuf data by ID.
     /// @param[in] id Protobuf data ID.
     /// @return Pointer to protobuf data if found, or NULL.
@@ -165,6 +189,23 @@ public:
     /// @return Last/Only element object ID.
     ///
     static oid_t GetLastChild(oid_t pid, int type);
+
+    ///
+    /// Check if has child object ID in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @param[in] id Object ID.
+    /// @return true if found, or false.
+    ///
+    static bool HasChild(oid_t pid, int type, oid_t id);
+
+    ///
+    /// Get size of children in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @return Size of children.
+    ///
+    static size_t ChildrenSize(oid_t pid, int type);
 
     ///
     /// Get container item IDs by parent ID and type in `s_containers`.
@@ -190,9 +231,17 @@ public:
     /// @param[in] type Object type.
     /// @param[in] idx Object index.
     /// @param[in] id Object ID.
-    /// @return Container item ID.
     ///
     static void AddContainerItem(oid_t pid, int type, int idx, oid_t id);
+
+    ///
+    /// Delete container item ID from `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @param[in] idx Object index.
+    /// @param[in] id Object ID.
+    ///
+    static void DelContainerItem(oid_t pid, int type, int idx, oid_t id);
 
     ///
     /// Set the only child object ID into `s_containers`.
@@ -246,32 +295,17 @@ public:
     virtual ~Object(void);
 
 protected:
-    struct Proto {
-        pb_t *pb;
-        oid_t id;
-        oid_t pid;
-        int type;
-        int idx;
-        int ref;
-    };
-
-    ///
-    /// Find Proto by ID.
-    /// @param[in] id Proto ID.
-    /// @return Pointer to Proto object if found, or NULL.
-    ///
-    static Proto *FindProto(oid_t id);
-
     ///
     /// Index Proto.
     /// @param[in] id Proto ID.
     /// @param[in] pb Protobuf data.
+    /// @param[in] uid User ID.
     /// @param[in] pid Parent ID.
     /// @param[in] type Proto type.
     /// @param[in] id Proto ID.
     /// @param[in] idx Proto index.
     ///
-    static void IndexProto(pb_t *pb, oid_t pid, int type, oid_t id, int idx);
+    static void IndexProto(pb_t *pb, oid_t uid, oid_t pid, int type, oid_t id, int idx);
 
     ///
     /// Unindex Proto.
@@ -299,6 +333,9 @@ protected:
 
     /// Object ID
     oid_t m_id;
+
+    /// User ID
+    oid_t m_uid;
 
     /// parent ID
     oid_t m_pid;
