@@ -64,10 +64,18 @@ pb_t *json_pb(const std::string &pb_type, const std::string &json);
 ///
 /// Convert json string to existed protobuf object.
 /// @param[in] json json string.
-/// @param[in] pb Protobuf object.
+/// @param[in out] pb Protobuf object.
 /// @return 0 if converted done.
 ///
-int json_pb(const std::string &json, pb_t *pb);
+int json2pb(const std::string &json, pb_t *pb);
+
+///
+/// Convert protobuf object to existed json string.
+/// @param[in] pb Protobuf object.
+/// @param[in out] json json string.
+/// @return 0 if converted done.
+///
+int pb2json(const pb_t &pb, std::string *json);
 } // namespace elf
 
 #endif /* !ELF_JSON_H */

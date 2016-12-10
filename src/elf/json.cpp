@@ -83,7 +83,7 @@ pb_t *json_pb(pb_t *pb, const char *json_type, const char *data)
 pb_t *json_pb(const std::string &pb_type, const std::string &json)
 {
     pb_t *pb = pb_create(pb_type);
-    int st = json_pb(json, pb);
+    int st = json2pb(json, pb);
 
     if (st != 0) {
         return pb;
@@ -92,11 +92,20 @@ pb_t *json_pb(const std::string &pb_type, const std::string &json)
     return NULL;
 }
 
-int json_pb(const std::string &json, pb_t *pb)
+int json2pb(const std::string &json, pb_t *pb)
 {
     assert(pb);
 
     util::Status st = google::protobuf::util::JsonStringToMessage(json, pb);
+
+    return st.error_code();
+}
+
+int pb2json(const pb_t &pb, std::string *json)
+{
+    assert(json);
+
+    util::Status st = google::protobuf::util::MessageToJsonString(pb, json);
 
     return st.error_code();
 }

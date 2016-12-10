@@ -175,15 +175,13 @@ void Object::UnindexProto(oid_t id, bool recursive)
 
         id_ismap::iterator itr_i = ism->begin();
         for (; itr_i != ism->end(); ++itr_i) {
-            id_set *ctner = itr_i->second;
-
-            if (ctner != NULL) {
-                id_set::iterator itr_s = ctner->begin();
-                for (; itr_s != ctner->end(); ++itr_s) {
-                    UnindexProto(*itr_s, true);
-                }
-                S_DELETE(ctner);
+            id_set ctner = *(itr_i->second); // erased while `UnindexProto`
+            id_set::iterator itr_s = ctner.begin();
+            for (; itr_s != ctner.end(); ++itr_s) {
+                UnindexProto(*itr_s, true);
             }
+
+            S_DELETE(itr_i->second);
         }
         E_DELETE(ism);
         s_containers.erase(itr);

@@ -172,6 +172,16 @@ public:
     /// @param[in] id Protobuf data ID.
     /// @return Pointer to protobuf data if found, or NULL.
     ///
+    template<class Type>
+    static Type *FindPB(oid_t id) {
+        return static_cast<Type *>(FindPB(id));
+    }
+
+    ///
+    /// Find protobuf data by ID.
+    /// @param[in] id Protobuf data ID.
+    /// @return Pointer to protobuf data if found, or NULL.
+    ///
     static pb_t *FindPB(oid_t id);
 
     ///
