@@ -27,23 +27,6 @@ int event_fini(void);
 int event_proc(void);
 
 ///
-/// Regist new event listener.
-/// @param evt Event type.
-/// @param cb Callback handle.
-/// @param lid Listener id.
-/// @param arg Listener argument.
-///
-void event_regist(int evt, callback_t *cb);
-
-///
-/// Unregist event listener.
-/// @param oid Owner id(i.e. Role ID).
-/// @param lid Listener id(i.e. Quest ID).
-/// @param evt Event type, unregist all about given listener if 0.
-///
-void event_unregist(oid_t oid,  oid_t lid = OID_NIL, int evt = 0);
-
-///
 /// Emit event.
 /// @param evt Event type.
 /// @param arg_a Event argument.

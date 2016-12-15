@@ -127,6 +127,8 @@ void Object::IndexProto(pb_t *pb, oid_t uid, oid_t pid, int type, oid_t id, int 
         proto->pid = pid;
         if (parent != NULL) {
             proto->ptype = parent->type;
+        } else {
+            proto->ptype = 0;
         }
         proto->type = type;
         proto->ref = 1;
