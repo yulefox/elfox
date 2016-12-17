@@ -190,6 +190,21 @@ void Object::UnindexProto(oid_t id, bool recursive)
     }
 }
 
+int Object::GetMaxType(oid_t pid)
+{
+    id_lismap::const_iterator itr = s_containers.find(pid);
+    if (itr == s_containers.end()) {
+        return 0;
+    }
+
+    id_ismap *ism = itr->second;
+    if (ism == NULL || ism->empty()) {
+        return 0;
+    }
+    id_ismap::const_reverse_iterator itr_i = ism->rbegin();
+    return itr_i->first;
+}
+
 id_set *Object::GetChildren(oid_t pid, int type)
 {
     id_lismap::const_iterator itr = s_containers.find(pid);

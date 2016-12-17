@@ -185,6 +185,13 @@ public:
     static pb_t *FindPB(oid_t id);
 
     ///
+    /// Get max type of parent ID in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @return Pointer to container if found, or NULL.
+    ///
+    static int GetMaxType(oid_t pid);
+
+    ///
     /// Find children by parent ID and type in `s_containers`.
     /// @param[in] pid Parent ID.
     /// @param[in] type Object type.
