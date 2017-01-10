@@ -161,9 +161,6 @@ void Object::UnindexProto(oid_t id, bool recursive)
         }
         E_DELETE(proto->pb);
         E_DELETE(proto);
-        if (!recursive) {
-            return;
-        }
 
         id_lismap::iterator itr = s_containers.find(id);
         if (itr == s_containers.end()) {
@@ -175,15 +172,17 @@ void Object::UnindexProto(oid_t id, bool recursive)
             return;
         }
 
-        id_ismap::iterator itr_i = ism->begin();
-        for (; itr_i != ism->end(); ++itr_i) {
-            id_set ctner = *(itr_i->second); // erased while `UnindexProto`
-            id_set::iterator itr_s = ctner.begin();
-            for (; itr_s != ctner.end(); ++itr_s) {
-                UnindexProto(*itr_s, true);
-            }
+        if (recursive) {
+            id_ismap::iterator itr_i = ism->begin();
+            for (; itr_i != ism->end(); ++itr_i) {
+                id_set ctner = *(itr_i->second); // erased while `UnindexProto`
+                id_set::iterator itr_s = ctner.begin();
+                for (; itr_s != ctner.end(); ++itr_s) {
+                    UnindexProto(*itr_s, true);
+                }
 
-            S_DELETE(itr_i->second);
+                S_DELETE(itr_i->second);
+            }
         }
         E_DELETE(ism);
         s_containers.erase(itr);
@@ -203,6 +202,13 @@ int Object::GetMaxType(oid_t pid)
     }
     id_ismap::const_reverse_iterator itr_i = ism->rbegin();
     return itr_i->first;
+}
+
+int Object::GetMaxIndex(oid_t pid, int type)
+{
+    oid_t cid = GetContainer(pid, type);
+
+    return GetMaxType(cid);
 }
 
 id_set *Object::GetChildren(oid_t pid, int type)
@@ -270,6 +276,17 @@ oid_t Object::GetContainer(oid_t pid, int type)
         SetChild(pid, type, cid);
     }
     return cid;
+}
+
+id_ismap *Object::GetContainerItems(oid_t pid, int type)
+{
+    oid_t cid = GetContainer(pid, type);
+    id_lismap::const_iterator itr = s_containers.find(cid);
+
+    if (itr != s_containers.end()) {
+        return itr->second;
+    }
+    return NULL;
 }
 
 id_set *Object::GetContainerItems(oid_t pid, int type, int idx)

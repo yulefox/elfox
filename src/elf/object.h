@@ -192,6 +192,14 @@ public:
     static int GetMaxType(oid_t pid);
 
     ///
+    /// Get max index of parent ID in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @return Pointer to container if found, or NULL.
+    ///
+    static int GetMaxIndex(oid_t pid, int type);
+
+    ///
     /// Find children by parent ID and type in `s_containers`.
     /// @param[in] pid Parent ID.
     /// @param[in] type Object type.
@@ -225,7 +233,15 @@ public:
     static size_t ChildrenSize(oid_t pid, int type);
 
     ///
-    /// Get container item IDs by parent ID and type in `s_containers`.
+    /// Get whole container by parent ID and type in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @return Whole Container.
+    ///
+    static id_ismap *GetContainerItems(oid_t pid, int type);
+
+    ///
+    /// Get container item IDs by parent ID and type/index in `s_containers`.
     /// @param[in] pid Parent ID.
     /// @param[in] type Object type.
     /// @param[in] idx Object index.
