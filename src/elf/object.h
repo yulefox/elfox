@@ -128,7 +128,7 @@ public:
     ///
     template<class Type>
         static Type *AddPB(const Type &pb, oid_t uid, oid_t pid, int type, oid_t id, int idx) {
-            pb_t *dst = FindPB(id);
+            pb_t *dst = FindPB(id, type);
             Proto *proto = NULL;
             if (dst == NULL) {
                 dst = E_NEW Type(pb);
@@ -143,8 +143,9 @@ public:
     /// Clone protobuf data.
     /// @param[out] pb Protobuf data.
     /// @param[in] id Protobuf data ID.
+    /// @param[in] type Protobuf data type.
     ///
-    static bool ClonePB(pb_t *pb, oid_t id);
+    static bool ClonePB(pb_t *pb, oid_t id, int type);
 
     ///
     /// Remove protobuf data.
@@ -161,6 +162,13 @@ public:
     static Object *FindObject(oid_t id);
 
     ///
+    /// Get parent ID.
+    /// @param[in] id Proto ID.
+    /// @return Parent ID.
+    ///
+    static oid_t GetPID(oid_t id);
+
+    ///
     /// Find Proto by ID.
     /// @param[in] id Proto ID.
     /// @return Pointer to Proto object if found, or NULL.
@@ -170,19 +178,36 @@ public:
     ///
     /// Find protobuf data by ID.
     /// @param[in] id Protobuf data ID.
+    /// @param[in] type Protobuf data type.
     /// @return Pointer to protobuf data if found, or NULL.
     ///
     template<class Type>
-    static Type *FindPB(oid_t id) {
-        return static_cast<Type *>(FindPB(id));
+    static Type *FindPB(oid_t id, int type) {
+        return static_cast<Type *>(FindPB(id, type));
     }
 
     ///
     /// Find protobuf data by ID.
     /// @param[in] id Protobuf data ID.
+    /// @param[in] type Protobuf data type.
     /// @return Pointer to protobuf data if found, or NULL.
     ///
-    static pb_t *FindPB(oid_t id);
+    static pb_t *FindPB(oid_t id, int type);
+
+    ///
+    /// Get max type of parent ID in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @return Pointer to container if found, or NULL.
+    ///
+    static int GetMaxType(oid_t pid);
+
+    ///
+    /// Get max index of parent ID in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @return Pointer to container if found, or NULL.
+    ///
+    static int GetMaxIndex(oid_t pid, int type);
 
     ///
     /// Find children by parent ID and type in `s_containers`.
@@ -218,7 +243,15 @@ public:
     static size_t ChildrenSize(oid_t pid, int type);
 
     ///
-    /// Get container item IDs by parent ID and type in `s_containers`.
+    /// Get whole container by parent ID and type in `s_containers`.
+    /// @param[in] pid Parent ID.
+    /// @param[in] type Object type.
+    /// @return Whole Container.
+    ///
+    static id_ismap *GetContainerItems(oid_t pid, int type);
+
+    ///
+    /// Get container item IDs by parent ID and type/index in `s_containers`.
     /// @param[in] pid Parent ID.
     /// @param[in] type Object type.
     /// @param[in] idx Object index.

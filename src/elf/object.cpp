@@ -78,6 +78,16 @@ Object *Object::FindObject(oid_t id)
     return NULL;
 }
 
+oid_t Object::GetPID(oid_t id)
+{
+    Proto *proto = FindProto(id);
+
+    if (proto != NULL) {
+        return proto->pid;
+    }
+    return 0;
+}
+
 Proto *Object::FindProto(oid_t id) {
     proto_map::const_iterator itr =s_pbs.find(id);
 
@@ -87,21 +97,30 @@ Proto *Object::FindProto(oid_t id) {
     return NULL;
 }
 
-pb_t *Object::FindPB(oid_t id)
+pb_t *Object::FindPB(oid_t id, int type)
 {
     proto_map::const_iterator itr =s_pbs.find(id);
 
     if (itr != s_pbs.end()) {
-        return itr->second->pb;
+        Proto *proto = itr->second;
+
+        if (type == 0 || proto->type == type) {
+            return proto->pb;
+        } else {
+            LOG_WARN("object", "%19lld - %19lld INVALID TYPE: %d vs %d",
+                    proto->pid, id,
+                    proto->type,
+                    type);
+        }
     }
     return NULL;
 }
 
-bool Object::ClonePB(pb_t *pb, oid_t id)
+bool Object::ClonePB(pb_t *pb, oid_t id, int type)
 {
     assert(pb);
 
-    pb_t *src = FindPB(id);
+    pb_t *src = FindPB(id, type);
     pb->CopyFrom(*src);
     return true;
 }
@@ -161,9 +180,6 @@ void Object::UnindexProto(oid_t id, bool recursive)
         }
         E_DELETE(proto->pb);
         E_DELETE(proto);
-        if (!recursive) {
-            return;
-        }
 
         id_lismap::iterator itr = s_containers.find(id);
         if (itr == s_containers.end()) {
@@ -175,19 +191,43 @@ void Object::UnindexProto(oid_t id, bool recursive)
             return;
         }
 
-        id_ismap::iterator itr_i = ism->begin();
-        for (; itr_i != ism->end(); ++itr_i) {
-            id_set ctner = *(itr_i->second); // erased while `UnindexProto`
-            id_set::iterator itr_s = ctner.begin();
-            for (; itr_s != ctner.end(); ++itr_s) {
-                UnindexProto(*itr_s, true);
-            }
+        if (recursive) {
+            id_ismap::iterator itr_i = ism->begin();
+            for (; itr_i != ism->end(); ++itr_i) {
+                id_set ctner = *(itr_i->second); // erased while `UnindexProto`
+                id_set::iterator itr_s = ctner.begin();
+                for (; itr_s != ctner.end(); ++itr_s) {
+                    UnindexProto(*itr_s, true);
+                }
 
-            S_DELETE(itr_i->second);
+                S_DELETE(itr_i->second);
+            }
         }
         E_DELETE(ism);
         s_containers.erase(itr);
     }
+}
+
+int Object::GetMaxType(oid_t pid)
+{
+    id_lismap::const_iterator itr = s_containers.find(pid);
+    if (itr == s_containers.end()) {
+        return 0;
+    }
+
+    id_ismap *ism = itr->second;
+    if (ism == NULL || ism->empty()) {
+        return 0;
+    }
+    id_ismap::const_reverse_iterator itr_i = ism->rbegin();
+    return itr_i->first;
+}
+
+int Object::GetMaxIndex(oid_t pid, int type)
+{
+    oid_t cid = GetContainer(pid, type);
+
+    return GetMaxType(cid);
 }
 
 id_set *Object::GetChildren(oid_t pid, int type)
@@ -257,6 +297,17 @@ oid_t Object::GetContainer(oid_t pid, int type)
     return cid;
 }
 
+id_ismap *Object::GetContainerItems(oid_t pid, int type)
+{
+    oid_t cid = GetContainer(pid, type);
+    id_lismap::const_iterator itr = s_containers.find(cid);
+
+    if (itr != s_containers.end()) {
+        return itr->second;
+    }
+    return NULL;
+}
+
 id_set *Object::GetContainerItems(oid_t pid, int type, int idx)
 {
     oid_t cid = GetContainer(pid, type);
@@ -271,7 +322,7 @@ pb_t *Object::GetContainerItem(oid_t pid, int type, int idx)
     pb_t *pb = NULL;
 
     if (oid != OID_NIL) {
-        pb = FindPB(oid);
+        pb = FindPB(oid, 0);
         assert(pb);
     }
     return pb;
@@ -293,8 +344,6 @@ void Object::DelContainerItem(oid_t pid, int type, int idx, oid_t id)
 
 void Object::AddChild(oid_t pid, int type, oid_t id)
 {
-    LOG_TRACE("object", "%19lld + %19lld <%d>",
-            pid, id, type);
     oid_lismap_add(s_containers, pid, type, id);
 }
 
@@ -306,8 +355,6 @@ void Object::SetChild(oid_t pid, int type, oid_t id)
 
 void Object::DelChild(oid_t pid, int type, oid_t id)
 {
-    LOG_TRACE("object", "%19lld - %19lld <%d>",
-            pid, id, type);
     oid_lismap_del(s_containers, pid, type, id);
 }
 
