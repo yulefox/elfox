@@ -86,7 +86,7 @@ install: all
 		tar -czf $(TAR_OBJ) $(INCS); \
 		tar -xzf $(TAR_OBJ) -C $(INSTINCDIR); \
 		$(RM) $(TAR_OBJ)
-	@ldconfig
+	@sudo ldconfig
 	@echo
 	@echo Install '$(TARGET)' ... OK
 	@echo
