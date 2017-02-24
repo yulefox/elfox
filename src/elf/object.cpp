@@ -78,6 +78,16 @@ Object *Object::FindObject(oid_t id)
     return NULL;
 }
 
+oid_t Object::GetPID(oid_t id)
+{
+    Proto *proto = FindProto(id);
+
+    if (proto != NULL) {
+        return proto->pid;
+    }
+    return 0;
+}
+
 Proto *Object::FindProto(oid_t id) {
     proto_map::const_iterator itr =s_pbs.find(id);
 
@@ -87,21 +97,30 @@ Proto *Object::FindProto(oid_t id) {
     return NULL;
 }
 
-pb_t *Object::FindPB(oid_t id)
+pb_t *Object::FindPB(oid_t id, int type)
 {
     proto_map::const_iterator itr =s_pbs.find(id);
 
     if (itr != s_pbs.end()) {
-        return itr->second->pb;
+        Proto *proto = itr->second;
+
+        if (type == 0 || proto->type == type) {
+            return proto->pb;
+        } else {
+            LOG_WARN("object", "%19lld - %19lld INVALID TYPE: %d vs %d",
+                    proto->pid, id,
+                    proto->type,
+                    type);
+        }
     }
     return NULL;
 }
 
-bool Object::ClonePB(pb_t *pb, oid_t id)
+bool Object::ClonePB(pb_t *pb, oid_t id, int type)
 {
     assert(pb);
 
-    pb_t *src = FindPB(id);
+    pb_t *src = FindPB(id, type);
     pb->CopyFrom(*src);
     return true;
 }
@@ -303,7 +322,7 @@ pb_t *Object::GetContainerItem(oid_t pid, int type, int idx)
     pb_t *pb = NULL;
 
     if (oid != OID_NIL) {
-        pb = FindPB(oid);
+        pb = FindPB(oid, 0);
         assert(pb);
     }
     return pb;
@@ -325,8 +344,6 @@ void Object::DelContainerItem(oid_t pid, int type, int idx, oid_t id)
 
 void Object::AddChild(oid_t pid, int type, oid_t id)
 {
-    LOG_TRACE("object", "%19lld + %19lld <%d>",
-            pid, id, type);
     oid_lismap_add(s_containers, pid, type, id);
 }
 
@@ -338,8 +355,6 @@ void Object::SetChild(oid_t pid, int type, oid_t id)
 
 void Object::DelChild(oid_t pid, int type, oid_t id)
 {
-    LOG_TRACE("object", "%19lld - %19lld <%d>",
-            pid, id, type);
     oid_lismap_del(s_containers, pid, type, id);
 }
 

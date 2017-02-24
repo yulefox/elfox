@@ -170,6 +170,7 @@ void timer_run(void)
         assert(frame >= 0);
         return;
     }
+
     // while processors is busy
     if (frame > 5) {
         LOG_WARN("timer", "(%u)%08X: %llu - %llu(%d).",
