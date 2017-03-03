@@ -21,10 +21,11 @@ PROFILE		:= NO
 CFLAGS		:= \
 	-I/opt/local/include \
 	-I/opt/local/include/mysql55 \
-	-I/usr/include/lua \
 	-I/usr/include/libxml2 \
 	-I$(INCDIR) \
-	-I$(ENV_PATH)/usr/local/include
+	-I$(ENV_PATH)/usr/local/include/lua \
+	-I$(ENV_PATH)/usr/local/include \
+	-fPIC 
 CPPFLAGS	:= \
 	-DELF_HAVE_PRAGMA_ONCE
 LIBS		:=
