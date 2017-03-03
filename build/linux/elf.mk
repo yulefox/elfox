@@ -23,7 +23,8 @@ CFLAGS		:= \
 	-I/opt/local/include/mysql55 \
 	-I/usr/include/lua \
 	-I/usr/include/libxml2 \
-	-I$(INCDIR)
+	-I$(INCDIR) \
+	-I$(ENV_PATH)/usr/local/include
 CPPFLAGS	:= \
 	-DELF_HAVE_PRAGMA_ONCE
 LIBS		:=
