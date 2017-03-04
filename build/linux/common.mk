@@ -78,6 +78,8 @@ tags:
 
 ifeq (YES, $(LIBRARY))
 install: all
+	@echo $(INSTINCDIR)
+	@echo $(INSTLIBDIR)
 	@rm -rf $(INSTINCDIR)/$(PROJECT)
 	@mkdir -p $(INSTLIBDIR) $(INSTINCDIR)/$(PROJECT)
 	@cp $(TARGET) $(INSTLIBDIR) -f
