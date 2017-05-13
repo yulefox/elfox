@@ -19,6 +19,7 @@ LIBRARY		:= YES
 SHARED		:= NO
 PROFILE		:= NO
 CFLAGS		:= \
+	-I$(SRCDIR)/elf/net \
 	-I/opt/local/include \
 	-I/opt/local/include/mysql55 \
 	-I/usr/include/libxml2 \

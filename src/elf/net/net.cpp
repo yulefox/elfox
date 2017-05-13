@@ -319,6 +319,7 @@ static recv_message_t *recv_message_init(context_t *ctx)
     msg->peer = OID_NIL;
     msg->pb = NULL;
     msg->ctx = ctx;
+    msg->rpc = false;
     return msg;
 }
 
