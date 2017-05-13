@@ -31,8 +31,7 @@ CFLAGS		:= \
 else
 CFLAGS		:= \
 	-I$(SRCDIR)/elf/net \
-	-I/opt/local/include \
-	-I/opt/local/include/mysql55 \
+	-I/include/mysql \
 	-I/usr/include/libxml2 \
 	-I$(INCDIR) \
 	-I$(ENV_PATH)/include/lua \

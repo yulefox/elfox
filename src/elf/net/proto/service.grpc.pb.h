@@ -28,9 +28,6 @@ namespace proto {
 
 class GameService final {
  public:
-  static constexpr char const* service_full_name() {
-    return "proto.GameService";
-  }
   class StubInterface {
    public:
     virtual ~StubInterface() {}

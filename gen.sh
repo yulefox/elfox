@@ -8,7 +8,9 @@ if [ ! -n "$ENV_PATH" ]; then
     PROTOC=protoc
 else
     PROTOC=$ENV_PATH/bin/protoc
+    export PATH=$PATH:$ENV_PATH/bin
 fi
+echo ${PROTOC}
 ${PROTOC} -I . --cpp_out=$OUTPUT_PATH $INPUT_PATH/*.proto
 ${PROTOC} -I . --grpc_out=$OUTPUT_PATH --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` $INPUT_PATH/*.proto
 

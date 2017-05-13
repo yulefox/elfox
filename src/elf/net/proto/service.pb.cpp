@@ -30,26 +30,11 @@ namespace {
 
 }  // namespace
 
-PROTOBUF_CONSTEXPR_VAR ::google::protobuf::internal::ParseTableField
-    const TableStruct::entries[] = {
-  {0, 0, 0, ::google::protobuf::internal::kInvalidMask, 0, 0},
-};
-
-PROTOBUF_CONSTEXPR_VAR ::google::protobuf::internal::AuxillaryParseTableField
-    const TableStruct::aux[] = {
-  ::google::protobuf::internal::AuxillaryParseTableField(),
-};
-PROTOBUF_CONSTEXPR_VAR ::google::protobuf::internal::ParseTable const
-    TableStruct::schema[] = {
-  { NULL, NULL, 0, -1, -1, false },
-};
-
 const ::google::protobuf::uint32 TableStruct::offsets[] = {
   ~0u,  // no _has_bits_
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Packet, _internal_metadata_),
   ~0u,  // no _extensions_
   ~0u,  // no _oneof_case_
-  ~0u,  // no _weak_field_map_
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Packet, type_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Packet, payload_),
 };
@@ -184,7 +169,7 @@ void Packet::SetCachedSize(int size) const {
 }
 const ::google::protobuf::Descriptor* Packet::descriptor() {
   protobuf_proto_2fservice_2eproto::protobuf_AssignDescriptorsOnce();
-  return protobuf_proto_2fservice_2eproto::file_level_metadata[kIndexInFileMessages].descriptor;
+  return protobuf_proto_2fservice_2eproto::file_level_metadata[0].descriptor;
 }
 
 const Packet& Packet::default_instance() {
@@ -218,8 +203,7 @@ bool Packet::MergePartialFromCodedStream(
     switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
       // string type = 1;
       case 1: {
-        if (static_cast< ::google::protobuf::uint8>(tag) ==
-            static_cast< ::google::protobuf::uint8>(10u)) {
+        if (tag == 10u) {
           DO_(::google::protobuf::internal::WireFormatLite::ReadString(
                 input, this->mutable_type()));
           DO_(::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -234,8 +218,7 @@ bool Packet::MergePartialFromCodedStream(
 
       // bytes payload = 2;
       case 2: {
-        if (static_cast< ::google::protobuf::uint8>(tag) ==
-            static_cast< ::google::protobuf::uint8>(18u)) {
+        if (tag == 18u) {
           DO_(::google::protobuf::internal::WireFormatLite::ReadBytes(
                 input, this->mutable_payload()));
         } else {
@@ -268,9 +251,6 @@ failure:
 void Packet::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // @@protoc_insertion_point(serialize_start:proto.Packet)
-  ::google::protobuf::uint32 cached_has_bits = 0;
-  (void) cached_has_bits;
-
   // string type = 1;
   if (this->type().size() > 0) {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -292,10 +272,8 @@ void Packet::SerializeWithCachedSizes(
 
 ::google::protobuf::uint8* Packet::InternalSerializeWithCachedSizesToArray(
     bool deterministic, ::google::protobuf::uint8* target) const {
+  (void)deterministic;  // Unused
   // @@protoc_insertion_point(serialize_to_array_start:proto.Packet)
-  ::google::protobuf::uint32 cached_has_bits = 0;
-  (void) cached_has_bits;
-
   // string type = 1;
   if (this->type().size() > 0) {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -362,9 +340,6 @@ void Packet::MergeFrom(const Packet& from) {
 // @@protoc_insertion_point(class_specific_merge_from_start:proto.Packet)
   GOOGLE_DCHECK_NE(&from, this);
   _internal_metadata_.MergeFrom(from._internal_metadata_);
-  ::google::protobuf::uint32 cached_has_bits = 0;
-  (void) cached_has_bits;
-
   if (from.type().size() > 0) {
 
     type_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.type_);
@@ -405,7 +380,7 @@ void Packet::InternalSwap(Packet* other) {
 
 ::google::protobuf::Metadata Packet::GetMetadata() const {
   protobuf_proto_2fservice_2eproto::protobuf_AssignDescriptorsOnce();
-  return protobuf_proto_2fservice_2eproto::file_level_metadata[kIndexInFileMessages];
+  return protobuf_proto_2fservice_2eproto::file_level_metadata[0];
 }
 
 #if PROTOBUF_INLINE_NOT_IN_HEADERS
@@ -428,12 +403,11 @@ void Packet::set_type(const ::std::string& value) {
 void Packet::set_type(::std::string&& value) {
   
   type_.SetNoArena(
-    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
+    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), std::move(value));
   // @@protoc_insertion_point(field_set_rvalue:proto.Packet.type)
 }
 #endif
 void Packet::set_type(const char* value) {
-  GOOGLE_DCHECK(value != NULL);
   
   type_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:proto.Packet.type)
@@ -481,12 +455,11 @@ void Packet::set_payload(const ::std::string& value) {
 void Packet::set_payload(::std::string&& value) {
   
   payload_.SetNoArena(
-    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
+    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), std::move(value));
   // @@protoc_insertion_point(field_set_rvalue:proto.Packet.payload)
 }
 #endif
 void Packet::set_payload(const char* value) {
-  GOOGLE_DCHECK(value != NULL);
   
   payload_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:proto.Packet.payload)

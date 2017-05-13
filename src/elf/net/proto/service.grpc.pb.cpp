@@ -33,7 +33,7 @@ GameService::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& channe
 }
 
 ::grpc::ClientAsyncReaderWriter< ::proto::Packet, ::proto::Packet>* GameService::Stub::AsyncTunnelRaw(::grpc::ClientContext* context, ::grpc::CompletionQueue* cq, void* tag) {
-  return ::grpc::ClientAsyncReaderWriter< ::proto::Packet, ::proto::Packet>::Create(channel_.get(), cq, rpcmethod_Tunnel_, context, tag);
+  return new ::grpc::ClientAsyncReaderWriter< ::proto::Packet, ::proto::Packet>(channel_.get(), cq, rpcmethod_Tunnel_, context, tag);
 }
 
 GameService::Service::Service() {
