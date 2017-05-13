@@ -18,15 +18,15 @@ INSTALLDIR	:=
 LIBRARY		:= YES
 SHARED		:= NO
 PROFILE		:= NO
-ifneq ($(ENV_PATH),)
+ifndef ENV_PATH
 CFLAGS		:= \
 	-I$(SRCDIR)/elf/net \
 	-I/opt/local/include \
 	-I/opt/local/include/mysql55 \
 	-I/usr/include/libxml2 \
 	-I$(INCDIR) \
-	-I$(ENV_PATH)/usr/local/include/lua \
-	-I$(ENV_PATH)/usr/local/include \
+	-I/usr/local/include/lua \
+	-I/usr/local/include \
 	-fPIC 
 else
 CFLAGS		:= \
