@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <algorithm>
@@ -276,6 +277,9 @@ static void set_nonblock(int sock)
         LOG_ERROR("net", "fcntl FAILED: %s.", strerror(errno));
         return;
     }
+
+    int enable = 1;
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable));
 }
 
 static chunk_t *chunk_init(size_t size)
