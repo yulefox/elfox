@@ -58,6 +58,7 @@ public:
             const std::string &serverId) {
         std::shared_ptr<Client> client = std::make_shared<Client>(name, peer, ip, port, ca, key, cert, serverId);
         s_clients.insert(make_pair(peer, client));
+        s_name_ids.insert(make_pair(name, peer));
         return client;
     }
 
@@ -67,6 +68,14 @@ public:
             return NULL;
         }
         return itr->second;
+    }
+
+    static std::shared_ptr<Client> Find(const std::string &name) {
+        std::map< std::string, oid_t >::iterator itr = s_name_ids.find(name);
+        if (itr == s_name_ids.end()) {
+            return NULL;
+        }
+        return Find(itr->second);
     }
 
     Client(const std::string &name, oid_t peer, const std::string &ip, int port,
@@ -156,6 +165,7 @@ public:
 
 private:
     static std::map<oid_t, std::shared_ptr<Client> > s_clients;
+    static std::map< std::string, oid_t> s_name_ids;
     static xqueue<recv_message_t*> s_recv_msgs;
 
 private:
@@ -177,6 +187,7 @@ private:
 
 //
 std::map<oid_t, std::shared_ptr<Client> > Client::s_clients;
+std::map< std::string, oid_t> Client::s_name_ids;
 xqueue<recv_message_t*> Client::s_recv_msgs;
 
 ///
@@ -198,6 +209,16 @@ int open(const std::string &name, oid_t peer, const std::string &ip, int port,
 
     std::shared_ptr<Client> client = Client::Create(name, peer, ip, port, ca_cert, key, cert, serverId);
     client->Start();
+    return 0;
+}
+
+int send(const std::string &name, const pb_t &pb)
+{
+    std::shared_ptr<Client> client = Client::Find(name);
+    if (client == NULL) {
+        return -1;
+    }
+    client->Send(pb);
     return 0;
 }
 
