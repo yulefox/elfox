@@ -33,6 +33,7 @@
 #   define ELF_USE_PIKE
 #   define ELF_USE_PLATFORM
 #   define ELF_USE_RAND
+#   define ELF_USE_RPC
 #   define ELF_USE_SCRIPT
 #   define ELF_USE_SHM_ALLOC
 #   define ELF_USE_SINGLETON
@@ -120,6 +121,10 @@
 #if defined(ELF_USE_RAND)
 #   include <elf/rand.h>
 #endif /* ELF_USE_RAND */
+
+#if defined(ELF_USE_RPC)
+#   include <elf/net/rpc.h>
+#endif /* ELF_USE_RPC */
 
 #if defined(ELF_USE_OID)
 #   include <elf/oid.h>

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package proto;
+
+message Packet {
+	string type		= 1;
+	bytes payload	= 2;
+}
+
+service GameService {
+	rpc Tunnel(stream Packet) returns (stream Packet);
+}

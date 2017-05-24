@@ -8,14 +8,14 @@ while getopts "a:c:i:r:d:" opt ; do
             ;;
         i)
             make -f $OPTARG -j8 DEBUG=NO
-            if [ ! -n $ENV_PATH ]; then
+            if [ ! -n "$ENV_PATH" ]; then
                 sudo make -f $OPTARG -j8 install DEBUG=NO
             else
                 sudo make -f $OPTARG -j8 install DEBUG=NO ENV_PATH=$ENV_PATH
             fi
 
             make -f $OPTARG -j8 DEBUG=YES
-            if [ ! -n $ENV_PATH ]; then
+            if [ ! -n "$ENV_PATH" ]; then
                 sudo make -f $OPTARG -j8 install DEBUG=YES
             else
                 sudo make -f $OPTARG -j8 install DEBUG=YES ENV_PATH=$ENV_PATH
