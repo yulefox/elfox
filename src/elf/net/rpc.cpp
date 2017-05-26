@@ -20,6 +20,7 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 
 #include <grpc/grpc.h>
 #include <grpc++/channel.h>
@@ -34,7 +35,101 @@ namespace elf {
 namespace rpc {
 
 
-void read(const std::string& filename, std::string& data)
+struct RpcSession {
+    std::deque<proto::Packet*> wque;
+    std::mutex mutex;
+    std::shared_ptr<grpc::Channel>  channel;
+    std::thread *watcher;
+    std::thread *reader;
+    std::thread *writer;
+    std::string name;
+    std::string serverId;
+    std::string ip;
+    int port;
+    oid_t peer;
+
+    ///
+    void send(const pb_t &pb) {
+        std::string name = pb.GetTypeName();
+        std::string payload;
+        pb.SerializeToString(&payload);
+        proto::Packet *pkt = E_NEW proto::Packet;
+        pkt->set_type(name);
+        pkt->set_payload(payload);
+
+        std::unique_lock<std::mutex> lock(mutex);
+        wque.push_back(pkt);
+    }
+};
+
+
+
+static std::map<oid_t, std::shared_ptr<struct RpcSession> > s_sessions;
+static std::map< std::string, oid_t> s_name_ids;
+static xqueue<recv_message_t*> s_recv_msgs;
+static std::mutex s_lock_id;
+static std::mutex s_lock_name;
+
+
+std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
+        oid_t peer,
+        const std::string &ip, int port,
+        const std::string &ca,
+        const std::string &key,
+        const std::string &cert,
+        const std::string &serverId)
+{
+
+    std::shared_ptr<struct RpcSession> s = std::make_shared<struct RpcSession>();
+
+    char raddr[128];
+    sprintf(raddr, "%s:%d", ip.c_str(), port);
+
+    grpc::SslCredentialsOptions ssl_opts = {ca, key, cert};
+    auto ssl_creds = grpc::SslCredentials(ssl_opts);
+
+    s->wque.clear();
+    s->channel = grpc::CreateChannel(raddr, ssl_creds);
+    s->watcher = NULL;
+    s->reader = NULL;
+    s->writer = NULL;
+    s->name = name;
+    s->serverId = serverId;
+    s->ip = ip;
+    s->port = port;
+    s->peer = peer;
+
+    std::unique_lock<std::mutex> lock1(s_lock_id);
+    std::unique_lock<std::mutex> lock2(s_lock_name);
+    s_sessions.insert(make_pair(peer, s));
+    s_name_ids.insert(make_pair(name, peer));
+
+    return s;
+}
+
+std::shared_ptr<struct RpcSession> RpcSessionFind(oid_t peer)
+{
+    std::unique_lock<std::mutex> lock(s_lock_id);
+
+    std::map<oid_t, std::shared_ptr<struct RpcSession> >::iterator itr = s_sessions.find(peer);
+    if (itr == s_sessions.end()) {
+        return NULL;
+    }
+    return itr->second;
+}
+
+std::shared_ptr<struct RpcSession> RpcSessionFind(const std::string &name)
+{
+    std::unique_lock<std::mutex> lock(s_lock_name);
+
+    std::map< std::string, oid_t >::iterator itr = s_name_ids.find(name);
+    if (itr == s_name_ids.end()) {
+        return NULL;
+    }
+    return RpcSessionFind(itr->second);
+}
+
+static void readCfg(const std::string& filename, std::string& data)
 {
     std::ifstream file (filename.c_str(), std::ios::in);
 	if (file.is_open()) {
@@ -46,152 +141,119 @@ void read(const std::string& filename, std::string& data)
 	}
 }
 
-class Client {
-public:
-    static std::shared_ptr<Client> Create(const std::string &name,
-            oid_t peer,
-            const std::string &ip,
-            int port,
-            const std::string &ca,
-            const std::string &key,
-            const std::string &cert,
-            const std::string &serverId) {
-        std::shared_ptr<Client> client = std::make_shared<Client>(name, peer, ip, port, ca, key, cert, serverId);
-        s_clients.insert(make_pair(peer, client));
-        s_name_ids.insert(make_pair(name, peer));
-        return client;
-    }
 
-    static std::shared_ptr<Client> Find(oid_t peer) {
-        std::map<oid_t, std::shared_ptr<Client> >::iterator itr = s_clients.find(peer);
-        if (itr == s_clients.end()) {
-            return NULL;
+static void read_routine (std::shared_ptr<struct RpcSession> s,
+        std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> > stream)
+{
+    while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
+        proto::Packet pkt;
+        while (stream->Read(&pkt)) {
+            recv_message_t *msg = E_NEW recv_message_t;
+            msg->name = pkt.type();
+            msg->body = pkt.payload();
+            msg->peer = s->peer,
+            msg->ctx = (elf::context_t*)((void*)s.get());
+            msg->pb = NULL;
+            msg->rpc = true;
+            s_recv_msgs.push(msg);
         }
-        return itr->second;
+        usleep(500000);
     }
+    LOG_ERROR("net", "rpc reader quit: %lld ", s->peer);
+}
 
-    static std::shared_ptr<Client> Find(const std::string &name) {
-        std::map< std::string, oid_t >::iterator itr = s_name_ids.find(name);
-        if (itr == s_name_ids.end()) {
-            return NULL;
-        }
-        return Find(itr->second);
-    }
 
-    Client(const std::string &name, oid_t peer, const std::string &ip, int port,
-            const std::string &ca, const std::string &key, const std::string &cert,
-            const std::string &serverId) 
-        : name_(name)
-        , peer_(peer)
-        , ip_(ip)
-        , port_(port)
-        , server_id_(serverId) {
-        char raddr[128];
-        sprintf(raddr, "%s:%d", ip.c_str(), port);
-
-        grpc::SslCredentialsOptions ssl_opts = {ca, key, cert};
-        auto ssl_creds = grpc::SslCredentials(ssl_opts);
-
-        channel_ = grpc::CreateChannel(raddr, ssl_creds);
-    }
-
-    ~Client() {}
-
-    void Start() {
-        stub_ = proto::GameService::NewStub(channel_);
-        ctx_.AddMetadata("server_id", server_id_);
-
-        stream_ = std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> >(stub_->Tunnel(&ctx_));
-        writer_ = std::thread([this]() {
-            for (;;) {
-                std::deque<proto::Packet*>  packets;
-                std::deque<proto::Packet*>::iterator itr;
-                this->wque_.swap(packets);
-                for (itr = packets.begin(); itr != packets.end(); ++itr) {
-                    proto::Packet *pkt = *itr;
-                    this->stream_->Write(*pkt);
-                    E_DELETE pkt;
-                }
-                usleep(500000);
+static void write_routine (std::shared_ptr<struct RpcSession> s,
+        std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> > stream)
+{
+    while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
+        std::unique_lock<std::mutex> lock(s->mutex);
+        if (!s->wque.empty()) {
+            proto::Packet *pkt = s->wque.front();
+            if (pkt == NULL || stream->Write(*pkt)) {
+                s->wque.pop_front();
+                E_DELETE pkt;
             }
-            LOG_ERROR("net", "rpc writer quit: %lld ", this->peer_);
-        });
-        reader_ = std::thread([this]() {
-            for (;;) {
-                int st = this->channel_->GetState(true);
-                LOG_ERROR("net", "rpc connection state: %d", st);
-                if (st == GRPC_CHANNEL_READY) {
-                    proto::Packet pkt;
-                    while (this->stream_->Read(&pkt)) {
-                        LOG_ERROR("net", "rpc<%lld><%s> type<%s>", this->peer_, this->name_.c_str(), pkt.type().c_str());
-                        recv_message_t *msg = E_NEW recv_message_t;
-                        msg->name = pkt.type();
-                        msg->body = pkt.payload();
-                        msg->peer = this->peer_;
-                        msg->ctx = (elf::context_t*)((void*)this);
-                        msg->pb = NULL;
-                        msg->rpc = true;
-                        s_recv_msgs.push(msg);
-                    }
-                }
-                usleep(500000);
-            }
-            LOG_ERROR("net", "rpc reader quit: %lld ", this->peer_);
-        });
-    }
-
-    void Send(const pb_t &pb) {
-        std::string name = pb.GetTypeName();
-        std::string payload;
-        pb.SerializeToString(&payload);
-        proto::Packet *pkt = E_NEW proto::Packet;
-        pkt->set_type(name);
-        pkt->set_payload(payload);
-        wque_.push(pkt);
-    }
-
-    static int Proc() {
-        std::deque<recv_message_t*> msgs;
-        std::deque<recv_message_t*>::iterator itr;
-        s_recv_msgs.swap(msgs);
-        for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
-             recv_message_t *msg = *itr;
-             message_handle(msg);
-             S_DELETE(msg->pb);
-             S_DELETE(msg);
         }
-        return 0;
+        lock.unlock();
+        usleep(500000);
     }
+    LOG_ERROR("net", "rpc writer quit: %lld ", s->peer);
+}
 
-private:
-    static std::map<oid_t, std::shared_ptr<Client> > s_clients;
-    static std::map< std::string, oid_t> s_name_ids;
-    static xqueue<recv_message_t*> s_recv_msgs;
+static void watch_routine (std::shared_ptr<struct RpcSession> s)
+{
+    std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> > stream = NULL;
+    std::thread *reader = NULL;
+    std::thread *writer = NULL;
+    grpc::ClientContext *context = NULL;
+    for (;;) {
+        if (s->channel->GetState(true) == GRPC_CHANNEL_CONNECTING) {
+            if (stream) {
+                stream->Finish();
+            }
 
-private:
-    xqueue<proto::Packet*> wque_;
-    std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> > stream_;
-    std::shared_ptr<grpc::Channel>  channel_;
-    std::thread reader_;
-    std::thread writer_;
-    grpc::ClientContext ctx_;
-    std::unique_ptr<proto::GameService::Stub> stub_;
+            s->channel->WaitForConnected(
+                    gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(30, GPR_TIMESPAN)));
 
-    std::string name_;
-    oid_t peer_;
-    std::string ip_;
-    int port_;
-    std::string server_id_;
-};
+            if (context != NULL) {
+                delete context;
+                context = NULL;
+            }
 
+            if (reader != NULL) {
+                reader->join();
+                delete reader;
+            }
 
-//
-std::map<oid_t, std::shared_ptr<Client> > Client::s_clients;
-std::map< std::string, oid_t> Client::s_name_ids;
-xqueue<recv_message_t*> Client::s_recv_msgs;
+            if (writer != NULL) {
+                writer->join();
+                delete writer;
+            }
+
+            std::unique_ptr<proto::GameService::Stub> stub = proto::GameService::NewStub(s->channel);
+            if (context == NULL) {
+                context = new grpc::ClientContext();
+                context->AddMetadata("server_id", s->serverId);
+                context->set_wait_for_ready(false);
+            }
+            stream = std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> >(stub->Tunnel(context));
+            reader = new std::thread(read_routine, s, stream);
+            writer = new std::thread(write_routine, s, stream);
+        }
+        usleep(500000);
+    }
+}
+
+static void RpcSessionStart(std::shared_ptr<struct RpcSession> s)
+{
+    s->watcher = new std::thread(watch_routine, s);
+}
+
+static void RpcSessionStop(std::shared_ptr<struct RpcSession> s)
+{
+}
+
+static int Proc()
+{
+    std::deque<recv_message_t*> msgs;
+    std::deque<recv_message_t*>::iterator itr;
+    s_recv_msgs.swap(msgs);
+    for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
+        recv_message_t *msg = *itr;
+        message_handle(msg);
+        S_DELETE(msg->pb);
+        S_DELETE(msg);
+    }
+    return 0;
+}
+
 
 ///
-int open(const std::string &name, oid_t peer, const std::string &ip, int port,
+int open(const std::string &name,
+        oid_t peer,
+        const std::string &ip,
+        int port,
         const std::string &caFile,
         const std::string &privKeyFile,
         const std::string &certFile,
@@ -202,39 +264,41 @@ int open(const std::string &name, oid_t peer, const std::string &ip, int port,
     std::string cert;
 
     if (caFile != "" && privKeyFile != "" && certFile != "") {
-        read(caFile, ca_cert);
-        read(privKeyFile, key);
-        read(certFile, cert);
+        readCfg(caFile, ca_cert);
+        readCfg(privKeyFile, key);
+        readCfg(certFile, cert);
     }
 
-    std::shared_ptr<Client> client = Client::Create(name, peer, ip, port, ca_cert, key, cert, serverId);
-    client->Start();
+    std::shared_ptr<struct RpcSession> s = RpcSessionInit(name, peer, ip, port, ca_cert, key, cert, serverId);
+    RpcSessionStart(s);
     return 0;
 }
 
 int send(const std::string &name, const pb_t &pb)
 {
-    std::shared_ptr<Client> client = Client::Find(name);
-    if (client == NULL) {
+    std::shared_ptr<struct RpcSession> s = RpcSessionFind(name);
+    if (s == NULL) {
         return -1;
     }
-    client->Send(pb);
+
+    s->send(pb);
     return 0;
 }
 
 int send(oid_t peer, const pb_t &pb)
 {
-    std::shared_ptr<Client> client = Client::Find(peer);
-    if (client == NULL) {
+    std::shared_ptr<struct RpcSession> s = RpcSessionFind(peer);
+    if (s == NULL) {
         return -1;
     }
-    client->Send(pb);
+
+    s->send(pb);
     return 0;
 }
 
 int proc(void)
 {
-    return Client::Proc();
+    return Proc();
 }
 
 } // namespace rpc
