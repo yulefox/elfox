@@ -18,14 +18,26 @@ INSTALLDIR	:=
 LIBRARY		:= YES
 SHARED		:= NO
 PROFILE		:= NO
+ifndef ENV_PATH
 CFLAGS		:= \
+	-I$(SRCDIR)/elf/net \
 	-I/opt/local/include \
 	-I/opt/local/include/mysql55 \
 	-I/usr/include/libxml2 \
 	-I$(INCDIR) \
-	-I$(ENV_PATH)/usr/local/include/lua \
-	-I$(ENV_PATH)/usr/local/include \
+	-I/usr/local/include/lua \
+	-I/usr/local/include \
 	-fPIC 
+else
+CFLAGS		:= \
+	-I$(SRCDIR)/elf/net \
+	-I/include/mysql \
+	-I/usr/include/libxml2 \
+	-I$(INCDIR) \
+	-I$(ENV_PATH)/include/lua \
+	-I$(ENV_PATH)/include \
+	-fPIC 
+endif
 CPPFLAGS	:= \
 	-DELF_HAVE_PRAGMA_ONCE
 LIBS		:=

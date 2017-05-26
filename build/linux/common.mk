@@ -12,10 +12,10 @@ RANLIB		:= ranlib
 DEPDIR		:= .dep/$(PROJECT)
 ifeq (YES, $(DEBUG))
 	TARGET		:= $(TARGET)_d
-	CPPFLAGS	+= -Wall -Wno-format -g -D_DEBUG
+	CPPFLAGS	+= -std=c++11 -Wall -Wno-format -g -D_DEBUG
 	OBJDIR		:= .obj/$(PROJECT)/debug
 else
-	CPPFLAGS	+= -Wall -Wno-unknown-pragmas -Wno-format -O3
+	CPPFLAGS	+= -std=c++11 -Wall -Wno-unknown-pragmas -Wno-format -O3
 	OBJDIR		:= .obj/$(PROJECT)/release
 endif
 
