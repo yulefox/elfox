@@ -89,7 +89,8 @@ std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
     auto ssl_creds = grpc::SslCredentials(ssl_opts);
 
     s->wque.clear();
-    s->channel = grpc::CreateChannel(raddr, ssl_creds);
+    //s->channel = grpc::CreateChannel(raddr, ssl_creds);
+    s->channel = grpc::CreateChannel(raddr, grpc::InsecureChannelCredentials());
     s->watcher = NULL;
     s->reader = NULL;
     s->writer = NULL;
