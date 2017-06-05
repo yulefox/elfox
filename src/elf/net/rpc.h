@@ -19,7 +19,8 @@ int open(const std::string &name, oid_t peer, const std::string &ip, int port,
         const std::string &caFile,
         const std::string &privKeyFile,
         const std::string &certFile,
-        const std::string &serverId);
+        int serverId,
+        int scope);
 int send(const std::string &name, const pb_t &pb);
 int send(oid_t peer, const pb_t &pb);
 int proc(void);

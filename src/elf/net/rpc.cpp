@@ -43,8 +43,9 @@ struct RpcSession {
     std::thread *reader;
     std::thread *writer;
     std::string name;
-    std::string serverId;
     std::string ip;
+    int serverId;
+    int scope;
     int port;
     oid_t peer;
 
@@ -77,7 +78,8 @@ std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
         const std::string &ca,
         const std::string &key,
         const std::string &cert,
-        const std::string &serverId)
+        int serverId,
+        int scope)
 {
 
     std::shared_ptr<struct RpcSession> s = std::make_shared<struct RpcSession>();
@@ -95,6 +97,7 @@ std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
     s->writer = NULL;
     s->name = name;
     s->serverId = serverId;
+    s->scope = scope;
     s->ip = ip;
     s->port = port;
     s->peer = peer;
@@ -214,7 +217,10 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
             std::unique_ptr<proto::GameService::Stub> stub = proto::GameService::NewStub(s->channel);
             if (context == NULL) {
                 context = new grpc::ClientContext();
-                context->AddMetadata("server_id", s->serverId);
+
+                // metadata
+                context->AddMetadata("server_id", std::to_string(s->serverId));
+                context->AddMetadata("scope", std::to_string(s->scope));
                 context->set_wait_for_ready(false);
             }
             stream = std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> >(stub->Tunnel(context));
@@ -257,7 +263,8 @@ int open(const std::string &name,
         const std::string &caFile,
         const std::string &privKeyFile,
         const std::string &certFile,
-        const std::string &serverId)
+        int serverId,
+        int scope)
 {
     std::string ca_cert;
     std::string key;
@@ -269,7 +276,7 @@ int open(const std::string &name,
         readCfg(certFile, cert);
     }
 
-    std::shared_ptr<struct RpcSession> s = RpcSessionInit(name, peer, ip, port, ca_cert, key, cert, serverId);
+    std::shared_ptr<struct RpcSession> s = RpcSessionInit(name, peer, ip, port, ca_cert, key, cert, serverId, scope);
     RpcSessionStart(s);
     return 0;
 }
