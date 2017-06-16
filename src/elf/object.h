@@ -129,7 +129,6 @@ public:
     template<class Type>
         static Type *AddPB(const Type &pb, oid_t uid, oid_t pid, int type, oid_t id, int idx) {
             pb_t *dst = FindPB(id, type);
-            Proto *proto = NULL;
             if (dst == NULL) {
                 dst = E_NEW Type(pb);
             } else {

@@ -106,11 +106,6 @@ pb_t *Object::FindPB(oid_t id, int type)
 
         if (type == 0 || proto->type == type) {
             return proto->pb;
-        } else {
-            LOG_WARN("object", "%19lld - %19lld INVALID TYPE: %d vs %d",
-                    proto->pid, id,
-                    proto->type,
-                    type);
         }
     }
     return NULL;
