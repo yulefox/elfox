@@ -1,6 +1,7 @@
 #include <elf/elf.h>
 #include <elf/lock.h>
 #include <elf/net/net.h>
+#include <elf/net/rpc.h>
 #include <elf/net/message.h>
 #include <elf/pc.h>
 #include <elf/thread.h>
@@ -44,9 +45,8 @@ struct RpcSession {
     std::thread *writer;
     std::string name;
     std::string ip;
-    int serverId;
-    int scope;
     int port;
+    std::vector<MetaData> metaList;
     oid_t peer;
 
     ///
@@ -78,8 +78,7 @@ std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
         const std::string &ca,
         const std::string &key,
         const std::string &cert,
-        int serverId,
-        int scope)
+        const std::vector<MetaData> &metaList)
 {
 
     std::shared_ptr<struct RpcSession> s = std::make_shared<struct RpcSession>();
@@ -87,20 +86,23 @@ std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
     char raddr[128];
     sprintf(raddr, "%s:%d", ip.c_str(), port);
 
-    grpc::SslCredentialsOptions ssl_opts = {ca, key, cert};
-    auto ssl_creds = grpc::SslCredentials(ssl_opts);
+    if (ca != "" && key != "" && cert != "") {
+        grpc::SslCredentialsOptions ssl_opts = {ca, key, cert};
+        auto ssl_creds = grpc::SslCredentials(ssl_opts);
+        s->channel = grpc::CreateChannel(raddr, ssl_creds);
+    } else {
+        s->channel = grpc::CreateChannel(raddr, grpc::InsecureChannelCredentials());
+    }
 
     s->wque.clear();
-    s->channel = grpc::CreateChannel(raddr, ssl_creds);
     s->watcher = NULL;
     s->reader = NULL;
     s->writer = NULL;
     s->name = name;
-    s->serverId = serverId;
-    s->scope = scope;
     s->ip = ip;
     s->port = port;
     s->peer = peer;
+    s->metaList = metaList;
 
     std::unique_lock<std::mutex> lock1(s_lock_id);
     std::unique_lock<std::mutex> lock2(s_lock_name);
@@ -219,8 +221,9 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
                 context = new grpc::ClientContext();
 
                 // metadata
-                context->AddMetadata("server_id", std::to_string(s->serverId));
-                context->AddMetadata("scope", std::to_string(s->scope));
+                for (size_t i = 0; i < s->metaList.size(); i++) {
+                    context->AddMetadata(s->metaList[i].key, s->metaList[i].val);
+                }
                 context->set_wait_for_ready(false);
             }
             stream = std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> >(stub->Tunnel(context));
@@ -260,11 +263,10 @@ int open(const std::string &name,
         oid_t peer,
         const std::string &ip,
         int port,
+        const std::vector<MetaData> &metaList,
         const std::string &caFile,
         const std::string &privKeyFile,
-        const std::string &certFile,
-        int serverId,
-        int scope)
+        const std::string &certFile)
 {
     std::string ca_cert;
     std::string key;
@@ -276,7 +278,7 @@ int open(const std::string &name,
         readCfg(certFile, cert);
     }
 
-    std::shared_ptr<struct RpcSession> s = RpcSessionInit(name, peer, ip, port, ca_cert, key, cert, serverId, scope);
+    std::shared_ptr<struct RpcSession> s = RpcSessionInit(name, peer, ip, port, ca_cert, key, cert, metaList);
     RpcSessionStart(s);
     return 0;
 }
