@@ -1189,7 +1189,13 @@ bool net_decode(recv_message_t *msg)
     }
 
     if (!is_raw_msg(msg->name)) {
-        msg->pb->ParseFromString(msg->body);
+        bool flag = msg->pb->ParseFromString(msg->body);
+        if (flag == false) {
+            LOG_WARN("net", "Protobuf parsing FAILED: %s %s.",
+                    net_peer_info(ctx),
+                    msg->name.c_str());
+            return false;
+        }
         if (!(msg->pb->IsInitialized())) {
             LOG_WARN("net", "INVALID request: %s %s.",
                     net_peer_info(ctx),
