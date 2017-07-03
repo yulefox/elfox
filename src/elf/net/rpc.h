@@ -20,18 +20,13 @@ struct MetaData {
     std::string key;
     std::string val;
 
-    //
-    MetaData(const std::string &_key, const std::string &_val) : key(_key), val(_val) {}
-    MetaData(const std::string &_key, int _val) {
-        key = _key;
-        val = std::to_string(_val);
-    }
+    MetaData(const std::string &_key, const std::string &_val);
 
-    MetaData(const std::string &_key, int64_t _val) {
-        key = _key;
-        val = std::to_string(_val);
-    }
-    ~MetaData() {}
+    MetaData(const std::string &_key, int _val);
+
+    MetaData(const std::string &_key, int64_t _val);
+
+    ~MetaData();
 };
 
 int open(const std::string &name, oid_t peer, const std::string &ip, int port,

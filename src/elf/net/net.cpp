@@ -320,7 +320,7 @@ static recv_message_t *recv_message_init(context_t *ctx)
 {
     recv_message_t *msg = E_NEW recv_message_t;
 
-    msg->peer = OID_NIL;
+    msg->peer = 0;
     msg->pb = NULL;
     msg->ctx = ctx;
     msg->rpc = false;
@@ -543,7 +543,7 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     context_t *ctx = E_NEW context_t;
 
     ctx->peer.idx = idx;
-    ctx->peer.id = (peer != OID_NIL) ? peer : oid_gen();
+    ctx->peer.id = (peer != 0) ? peer : oid_gen();
     ctx->peer.sock = fd;
     strcpy(ctx->peer.ip, inet_ntoa(addr.sin_addr));
     ctx->peer.port = ntohs(addr.sin_port);
@@ -585,7 +585,7 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
     context_t *ctx = E_NEW context_t;
 
     ctx->peer.idx = idx;
-    ctx->peer.id = (peer != OID_NIL) ? peer : oid_gen();
+    ctx->peer.id = (peer != 0) ? peer : oid_gen();
     ctx->peer.sock = fd;
     inet_ntop(AF_INET6, &addr.sin6_addr, ctx->peer.ipv6, sizeof(addr));
     ctx->peer.port = ntohs(addr.sin6_port);
@@ -1327,7 +1327,7 @@ static void on_accept(const epoll_event &evt)
         // @todo ON_ACCEPT
         set_nonblock(fd);
 
-        context_t *ctx = context_init(0, OID_NIL, fd, addr);
+        context_t *ctx = context_init(0, 0, fd, addr);
 
         LOG_DEBUG("net", "%s", "accept new connection...");
 
@@ -1361,7 +1361,7 @@ static void on_accept6(const epoll_event &evt)
         // @todo ON_ACCEPT
         set_nonblock(fd);
 
-        context_t *ctx = context_init6(0, OID_NIL, fd, addr);
+        context_t *ctx = context_init6(0, 0, fd, addr);
 
         LOG_DEBUG("net", "%s", "accept new connection...");
 

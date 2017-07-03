@@ -323,7 +323,7 @@ void db_req(int idx, const char *cmd, bool parallel, db_callback proc,
     q->field = field;
     q->proc = proc;
     q->data = NULL;
-    if (parallel && oid != elf::OID_NIL) {
+    if (parallel && oid != 0) {
         tidx = oid % (th_list->num - 1) + 1;
     }
     mysql_thread_t *th = th_list->threads + tidx;

@@ -13,9 +13,9 @@ Object::proto_map Object::s_pbs;
 id_lismap Object::s_containers;
 
 Object::Object() :
-    m_id(OID_NIL),
-    m_uid(OID_NIL),
-    m_pid(OID_NIL),
+    m_id(0),
+    m_uid(0),
+    m_pid(0),
     m_type(0),
     m_idx(0),
     m_sid(0),
@@ -129,7 +129,7 @@ void Object::IndexProto(pb_t *pb, oid_t uid, oid_t pid, int type, oid_t id, int 
 {
     Proto *parent = NULL;
     Proto *proto = FindProto(id);
-    if (pid != OID_NIL) {
+    if (pid != 0) {
         parent = FindProto(pid);
     }
     if (proto == NULL) {
@@ -148,8 +148,8 @@ void Object::IndexProto(pb_t *pb, oid_t uid, oid_t pid, int type, oid_t id, int 
         proto->ref = 1;
         s_pbs[id] = proto;
         AddChild(pid, type, id);
-        if (pid != OID_NIL) {
-            AddChild(OID_NIL, type, id);
+        if (pid != 0) {
+            AddChild(0, type, id);
         }
     } else {
         proto->ref++;
@@ -170,8 +170,8 @@ void Object::UnindexProto(oid_t id, bool recursive)
         proto->ref = 1;
         s_pbs.erase(id);
         DelChild(pid, type, id);
-        if (pid != OID_NIL) {
-            DelChild(OID_NIL, type, id);
+        if (pid != 0) {
+            DelChild(0, type, id);
         }
         E_DELETE(proto->pb);
         E_DELETE(proto);
@@ -254,7 +254,7 @@ oid_t Object::GetLastChild(oid_t pid, int type)
             return *itr_s;
         }
     }
-    return OID_NIL;
+    return 0;
 }
 
 bool Object::HasChild(oid_t pid, int type, oid_t id)
@@ -285,7 +285,7 @@ oid_t Object::GetContainer(oid_t pid, int type)
 {
     oid_t cid = GetLastChild(pid, type);
 
-    if (cid == OID_NIL) {
+    if (cid == 0) {
         cid = oid_gen();
         SetChild(pid, type, cid);
     }
@@ -316,7 +316,7 @@ pb_t *Object::GetContainerItem(oid_t pid, int type, int idx)
     oid_t oid = GetLastChild(cid, idx);
     pb_t *pb = NULL;
 
-    if (oid != OID_NIL) {
+    if (oid != 0) {
         pb = FindPB(oid, 0);
         assert(pb);
     }

@@ -26,6 +26,18 @@ typedef std::map<int, int> roll_req; // map<val, rate>
 typedef std::map<int, int> roll_res; // map<val, num>
 
 ///
+/// Set seed for a new sequence of pseudo-random integers to be returned by rand().
+/// @param seed pseudo-random seed.
+///
+void srand(int seed);
+
+///
+/// Generate a pseudo-random intege in rthe mathematical range [0, RAND_MAX].
+/// @return A pseudo-random integer.
+///
+int rand();
+
+///
 /// Generate float random number in [min, max].
 /// @param min Minimum number.
 /// @param max Maximum number.
@@ -92,7 +104,7 @@ void roll_pb(const roll_req &req, roll_res &res, int times,
 /// @param times Roll times.
 /// @param weight With weight if true.
 ///
-void roll_rm(const roll_req &req, roll_res &res, int times,
+void roll_rm(roll_req &req, roll_res &res, int times,
         bool weight = false);
 
 ///

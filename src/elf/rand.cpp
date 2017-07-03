@@ -7,11 +7,23 @@
 #include <math.h>
 
 namespace elf {
+static int s_seed = 1;
+
+void srand(int seed)
+{
+    s_seed = seed;
+}
+
+int rand()
+{
+    return (((s_seed = s_seed * 1103515245L + 12345L) >> 16) & 0x7fff);
+}
+
 float frand(float min, float max)
 {
     float factor = fabs(max - min) / RAND_MAX;
 
-    return (min + ::rand() * factor);
+    return (min + rand() * factor);
 }
 
 int rand(int min, int max)
@@ -22,7 +34,7 @@ int rand(int min, int max)
 
     int range = abs(max - min) + 1;
 
-    return (min + ::rand() % range);
+    return (min + rand() % range);
 }
 
 int rand_hit(int range, int times)
@@ -135,7 +147,7 @@ void roll_pb(const roll_req &req, roll_res &res, int times, bool weight)
     }
 }
 
-void roll_rm(const roll_req &req, roll_res &res, int times, bool weight)
+void roll_rm(roll_req &req, roll_res &res, int times, bool weight)
 {
     roll_req::const_iterator itr_c = req.begin();
     roll_res::iterator itr_d;
@@ -156,12 +168,11 @@ void roll_rm(const roll_req &req, roll_res &res, int times, bool weight)
 
         for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
             if (rnd <= itr_c->second) { // hit
-                itr_d = res.find(itr_c->first);
-                if (itr_d == res.end()) {
-                    res[itr_c->first] = 1;
-                    --times;
-                    break;
-                }
+                res[itr_c->first] = 1;
+                --times;
+                weight_sum -= itr_c->second;
+                req.erase(itr_c->first);
+                break;
             }
             rnd -= itr_c->second;
         }
@@ -174,7 +185,7 @@ void rand_str(char *rnds, int len)
     static const char BASE[64] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
     for (int i = 0; i < len; ++i) {
-        rnds[i] = BASE[::rand() % BASE_LEN];
+        rnds[i] = BASE[rand() % BASE_LEN];
     }
     rnds[len] = '\0';
 }
