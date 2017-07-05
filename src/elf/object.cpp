@@ -197,9 +197,9 @@ void Object::UnindexProto(oid_t id, bool recursive)
 
                 S_DELETE(itr_i->second);
             }
+            E_DELETE(ism);
+            s_containers.erase(itr);
         }
-        E_DELETE(ism);
-        s_containers.erase(itr);
     }
 }
 
