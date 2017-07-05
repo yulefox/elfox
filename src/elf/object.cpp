@@ -25,7 +25,7 @@ Object::Object() :
 
 Object::~Object(void)
 {
-    DelPB(m_id, true);
+    DelPB(m_id, false);
     s_objs.erase(m_id);
 }
 
