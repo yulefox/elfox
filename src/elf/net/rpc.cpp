@@ -223,6 +223,7 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
                 // metadata
                 for (size_t i = 0; i < s->metaList.size(); i++) {
                     context->AddMetadata(s->metaList[i].key, s->metaList[i].val);
+                    LOG_INFO("net", "add metadata %s %s", s->metaList[i].key.c_str(), s->metaList[i].val.c_str());
                 }
                 context->set_wait_for_ready(false);
             }
