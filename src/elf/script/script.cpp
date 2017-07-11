@@ -136,6 +136,9 @@ int script_func_exec(const char *func, const char *sig, ...)
         case 'i': /* integer */
             lua_pushnumber(L, va_arg(args, int));
             break;
+        case 'l': /* long integer */
+            tolua_pushusertype(L, va_arg(args, void *), "elf::oid_t");
+            break;
         case 's': /* string */
             lua_pushstring(L, va_arg(args, char *));
             break;

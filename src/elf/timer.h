@@ -42,7 +42,7 @@ int timer_size(void);
 /// @param func Script function name bound to the timer.
 /// @return id of the timer.
 ///
-const oid_t &timer_add(time64_t life, const char *func);
+oid_t timer_add(time64_t life, const char *func);
 
 ///
 /// Create a new timer.
@@ -52,7 +52,7 @@ const oid_t &timer_add(time64_t life, const char *func);
 /// @param manual Manual destroy args.
 /// @return id of the timer.
 ///
-const oid_t &timer_add(time64_t life, callback func, void *args, bool manual);
+oid_t timer_add(time64_t life, callback func, void *args, bool manual);
 
 ///
 /// Add cycle timer, period of one minte.
@@ -64,7 +64,7 @@ void timer_cycle(callback func);
 /// Cancel timer with given tid.
 /// @param tid Timer identification.
 ///
-void timer_cancel(const oid_t &tid);
+void timer_cancel(oid_t tid);
 
 ///
 /// Pause all running timers.
@@ -82,13 +82,13 @@ void timer_resume(void);
 /// Pause timer with given tid.
 /// @param tid Timer identification.
 ///
-void timer_pause(const oid_t &tid);
+void timer_pause(oid_t tid);
 
 ///
 /// Resume timer with given tid.
 /// @param tid Timer identification.
 ///
-void timer_resume(const oid_t &tid);
+void timer_resume(oid_t tid);
 
 ///
 /// Set timer interval for running timers.

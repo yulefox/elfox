@@ -178,7 +178,7 @@ void object::test<1>() {
 
     set_test_name("Initialize network environment");
     elf::net_listen("test_server", "localhost", 6670);
-    elf::net_connect(0, elf::OID_NIL, "test_client", "localhost", 6670);
+    elf::net_connect(0, 0, "test_client", "localhost", 6670);
 
     while (true) {
         elf::net_proc();

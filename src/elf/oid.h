@@ -45,8 +45,6 @@ typedef std::map< oid_t, id_lsmap * > id_llsmap;
 
 typedef bool (*callback)(void *args);
 
-const oid_t OID_NIL = 0;
-
 struct callback_t {
     oid_t tid; // trigger id
     int evt; // trigger event

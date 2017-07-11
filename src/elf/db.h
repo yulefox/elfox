@@ -86,7 +86,7 @@ int db_ping(void);
 /// @param[in] field pb field.
 ///
 void db_req(int idx, const char *cmd, bool parallel = false, db_callback proc = NULL,
-        oid_t oid = OID_NIL, pb_t *out = NULL,
+        oid_t oid = 0, pb_t *out = NULL,
         const std::string &field = "");
 
 ///

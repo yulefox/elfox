@@ -214,13 +214,13 @@ int timer_size(void)
     return s_mgr.timer_remain;
 }
 
-const oid_t &timer_add(time64_t life, const char *func)
+oid_t timer_add(time64_t life, const char *func)
 {
     if (life < 0 || life >= MAX_LIFE) {
         LOG_WARN("timer",
                 "Timer added FAILED: invalid timer life(%lld) [0, %lld).",
                 life, MAX_LIFE);
-        return OID_NIL;
+        return 0;
     }
 
     timer_t *t = E_NEW timer_t;
@@ -241,18 +241,18 @@ const oid_t &timer_add(time64_t life, const char *func)
     return t->id;
 }
 
-const oid_t &timer_add(time64_t life, callback func, void *args, bool manual)
+oid_t timer_add(time64_t life, callback func, void *args, bool manual)
 {
     if (life < 0 || life >= MAX_LIFE) {
         LOG_WARN("timer",
                 "Timer added FAILED: invalid timer life(%lld) [0, %lld).",
                 life, MAX_LIFE);
-        return OID_NIL;
+        return 0;
     }
     if (life == 0) {
         func(args);
         E_FREE(args);
-        return OID_NIL;
+        return 0;
     }
 
     timer_t *t = E_NEW timer_t;
@@ -293,11 +293,11 @@ void timer_resume(void)
     }
 }
 
-void timer_pause(const oid_t &tid)
+void timer_pause(oid_t tid)
 {
 }
 
-void timer_resume(const oid_t &tid)
+void timer_resume(oid_t tid)
 {
 }
 
@@ -327,7 +327,7 @@ void timer_bucket(unsigned char no, int l)
     _reset();
 }
 
-void timer_cancel(const oid_t &tid)
+void timer_cancel(oid_t tid)
 {
     timer_map::iterator itr = s_timers.find(tid);
     if (itr != s_timers.end()) {

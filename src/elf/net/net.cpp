@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <algorithm>
@@ -276,6 +277,9 @@ static void set_nonblock(int sock)
         LOG_ERROR("net", "fcntl FAILED: %s.", strerror(errno));
         return;
     }
+
+    int enable = 1;
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable));
 }
 
 static chunk_t *chunk_init(size_t size)
@@ -316,7 +320,7 @@ static recv_message_t *recv_message_init(context_t *ctx)
 {
     recv_message_t *msg = E_NEW recv_message_t;
 
-    msg->peer = OID_NIL;
+    msg->peer = 0;
     msg->pb = NULL;
     msg->ctx = ctx;
     msg->rpc = false;
@@ -539,7 +543,7 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     context_t *ctx = E_NEW context_t;
 
     ctx->peer.idx = idx;
-    ctx->peer.id = (peer != OID_NIL) ? peer : oid_gen();
+    ctx->peer.id = (peer != 0) ? peer : oid_gen();
     ctx->peer.sock = fd;
     strcpy(ctx->peer.ip, inet_ntoa(addr.sin_addr));
     ctx->peer.port = ntohs(addr.sin_port);
@@ -581,7 +585,7 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
     context_t *ctx = E_NEW context_t;
 
     ctx->peer.idx = idx;
-    ctx->peer.id = (peer != OID_NIL) ? peer : oid_gen();
+    ctx->peer.id = (peer != 0) ? peer : oid_gen();
     ctx->peer.sock = fd;
     inet_ntop(AF_INET6, &addr.sin6_addr, ctx->peer.ipv6, sizeof(addr));
     ctx->peer.port = ntohs(addr.sin6_port);
@@ -1185,7 +1189,13 @@ bool net_decode(recv_message_t *msg)
     }
 
     if (!is_raw_msg(msg->name)) {
-        msg->pb->ParseFromString(msg->body);
+        bool flag = msg->pb->ParseFromString(msg->body);
+        if (flag == false) {
+            LOG_WARN("net", "Protobuf parsing FAILED: %s %s.",
+                    net_peer_info(ctx),
+                    msg->name.c_str());
+            return false;
+        }
         if (!(msg->pb->IsInitialized())) {
             LOG_WARN("net", "INVALID request: %s %s.",
                     net_peer_info(ctx),
@@ -1323,7 +1333,7 @@ static void on_accept(const epoll_event &evt)
         // @todo ON_ACCEPT
         set_nonblock(fd);
 
-        context_t *ctx = context_init(0, OID_NIL, fd, addr);
+        context_t *ctx = context_init(0, 0, fd, addr);
 
         LOG_DEBUG("net", "%s", "accept new connection...");
 
@@ -1357,7 +1367,7 @@ static void on_accept6(const epoll_event &evt)
         // @todo ON_ACCEPT
         set_nonblock(fd);
 
-        context_t *ctx = context_init6(0, OID_NIL, fd, addr);
+        context_t *ctx = context_init6(0, 0, fd, addr);
 
         LOG_DEBUG("net", "%s", "accept new connection...");
 

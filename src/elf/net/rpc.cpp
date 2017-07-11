@@ -34,7 +34,20 @@
 
 namespace elf {
 namespace rpc {
+MetaData::MetaData(const std::string &_key, const std::string &_val) : key(_key), val(_val)
+    {}
 
+MetaData::MetaData(const std::string &_key, int _val) {
+    key = _key;
+    val = std::to_string(_val);
+}
+
+MetaData::MetaData(const std::string &_key, int64_t _val) {
+    key = _key;
+    val = std::to_string(_val);
+}
+
+MetaData::~MetaData() {}
 
 struct RpcSession {
     std::deque<proto::Packet*> wque;
