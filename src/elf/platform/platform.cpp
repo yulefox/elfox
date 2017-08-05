@@ -9,284 +9,111 @@
 #include <elf/pc.h>
 #include <elf/platform/platform.h>
 #include <elf/platform/sdks/base.h>
-#include <cJSON/cJSON.h>
 #include <fstream>
 #include <string>
 #include <map>
 #include <deque>
+#include <jansson.h>
+#include <jwt.h>
+#include <errno.h>
 
 namespace elf {
 
-static std::map<int, cJSON*> s_jsons;
-static xqueue<plat_base_resp*> s_resps;
+static json_t *s_platform_setting;
 
-int platform_init()
+int platform_init(const char *configfile)
 {
-    s_jsons.clear();
-    return 0;
-}
 
-int platform_fini()
-{
-    std::map<int, cJSON*>::iterator itr;
-    for (itr = s_jsons.begin();itr != s_jsons.end(); ++itr) {
-        cJSON_Delete(itr->second);
-    }
-    return 0;
-}
-
-int platform_load(int type, const char *proto)
-{
-    assert(proto);
-
-    std::fstream fs(proto, std::ios::in | std::ios::binary);
+    std::fstream fs(configfile, std::ios::in | std::ios::binary);
 
     if (!fs) {
-        LOG_ERROR("json",
-                "Can NOT open file %s.", proto);
+        LOG_ERROR("json", "Can NOT open file %s.", configfile);
         return -1;
     }
 
     std::stringstream iss;
 
     iss << fs.rdbuf();
-    cJSON *json = cJSON_Parse(iss.str().c_str());
-    if (json == NULL) {
-        LOG_ERROR("json",
-                "Can NOT parse json file %s.", proto);
+
+    s_platform_setting = json_loads(iss.str().c_str(), 0, NULL);
+    if (s_platform_setting == NULL) {
+        LOG_ERROR("json", "Can NOT parse json file %s.", configfile);
         return -1;
     }
 
-    std::map<int, cJSON*>::iterator itr = s_jsons.find(type);
-    if (itr != s_jsons.end() && itr->second != NULL) {
-        cJSON_Delete(itr->second);
-    }
-    s_jsons[type] = json;
     return 0;
 }
 
-int get_channel(cJSON *setting, const char *code, std::string &channel)
+int platform_fini()
 {
-    cJSON *channels = cJSON_GetObjectItem(setting, "channels");
-    if (channels == NULL) {
-        return -1;
+    if (s_platform_setting != NULL) {
+        json_decref(s_platform_setting);
     }
-    int size = cJSON_GetArraySize(channels);
-    for (int i = 0;i < size; i++) {
-        cJSON *item = cJSON_GetArrayItem(channels, i);
-        if (item == NULL) {
-            continue;
-        }
-        cJSON *ch = cJSON_GetObjectItem(item, "channel");
-        cJSON *co = cJSON_GetObjectItem(item, "code");
-        if (ch == NULL || co == NULL) {
-            continue;
-        }
-        if (strcmp(co->valuestring, code) == 0) {
-            channel = std::string(ch->valuestring);
-            return 0;
-        }
-    }
-    return -1;
+    return 0;
 }
 
-cJSON* platform_get_json(int type)
+int platform_auth(const char *token, platform_user_t &puser)
 {
-    std::map<int, cJSON*>::iterator itr = s_jsons.find(type);
-    if (itr == s_jsons.end()) {
-        return NULL;
+    jwt_t *jwt = NULL;
+    int ret;
+
+    json_t *key = json_object_get(s_platform_setting, "public_key");
+    if (key == NULL) {
+        return PLATFORM_SETTING_ERROR;
     }
-    return itr->second;
-}
-
-void platform_push_resp(plat_base_resp* resp);
-
-size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
-{
-    size_t realsize = size * nmemb;
-    plat_base_req *base_req = static_cast<plat_base_req*>(userdata);
-    if (base_req == NULL) {
-        return 0;
+    json_t *app_id_node = json_object_get(s_platform_setting, "app_id");
+    if (app_id_node == NULL) {
+        return PLATFORM_SETTING_ERROR;
     }
 
-    LOG_DEBUG("net", "on cb userdata: %p", base_req->args);
-
-    if (ptr == NULL || realsize == 0) {
-        /*
-        plat_base_resp *resp = E_NEW plat_base_resp;
-
-        resp->code = PLATFORM_RESPONSE_FAILED;
-        resp->plat_type = base_req->plat_type;
-        resp->resp = NULL;
-        resp->cb = base_req->cb;
-        resp->args = base_req->args;
-
-        E_DELETE base_req;
-
-        // push resp
-        s_resps.push(resp);
-        */
-        return realsize;
+    const char *key_str = json_string_value(key);
+    size_t key_len = json_string_length(key);
+    if (key_str == NULL || key_len <= 0) {
+        return PLATFORM_SETTING_ERROR;
     }
 
-    plat_base_resp *base_resp = NULL;
-
-    if (base_req->plat_type == PLAT_LJ) {
-        cJSON *resp = cJSON_Parse(base_req->param.c_str());
-        std::string st((char*)ptr, realsize);
-        cJSON_AddStringToObject(resp, "status", st.c_str());
-
-        base_req->resp = resp;
-        base_resp = platform_lj_on_auth(base_req);
-        E_DELETE base_req;
-        if (strcmp((char*)ptr, "true") != 0 || strcmp((char*)ptr, "false") != 0) {
-            realsize = 0;
-        }
-    } else if (base_req->plat_type == PLAT_SIFU) {
-        cJSON *resp = cJSON_Parse(base_req->param.c_str());
-        std::string st((char*)ptr, realsize);
-        cJSON_AddStringToObject(resp, "status", st.c_str());
-
-        base_req->resp = resp;
-        base_resp = platform_sifu_on_auth(base_req);
-        E_DELETE base_req;
-    } else if (base_req->plat_type == PLAT_1SDK) {
-        cJSON *resp = cJSON_Parse(base_req->param.c_str());
-        std::string st((char*)ptr, realsize);
-        cJSON_AddStringToObject(resp, "status", st.c_str());
-
-        base_req->resp = resp;
-        base_resp = platform_1sdk_on_auth(base_req);
-        E_DELETE base_req;
-    } else {
-        bool unquote = false;
-        if (base_req->plat_type == PLAT_ANZHI) {
-            unquote = true;
-        }
-        if (base_req->push_resp(ptr, realsize, unquote)) {
-            switch (base_req->plat_type) {
-            case PLAT_PP:
-                base_resp = platform_pp_on_auth(base_req);
-                break;
-            case PLAT_UC:
-                base_resp = platform_uc_on_auth(base_req);
-                break;
-            case PLAT_I4:
-                base_resp = platform_i4_on_auth(base_req);
-                break;
-            case PLAT_HUAWEI:
-                base_resp = platform_huawei_on_auth(base_req);
-                break;
-            case PLAT_VIVO:
-                base_resp = platform_vivo_on_auth(base_req);
-                break;
-            case PLAT_ANZHI:
-                base_resp = platform_anzhi_on_auth(base_req);
-                break;
-            case PLAT_QQ:
-            case PLAT_WEIXIN:
-                base_resp = platform_msdk_on_auth(base_req);
-                break;
-            case PLAT_APPSTORE:
-            case PLAT_IOSINTSG:
-            case PLAT_IOSINTMY:
-            case PLAT_PJMY:
-            case PLAT_PJSG:
-                base_resp = platform_appstore_on_auth(base_req);
-                break;
-            case PLAT_MIGU:
-                base_resp = platform_migu_on_auth(base_req);
-                break;
-            case PLAT_TSIXI:
-                base_resp = platform_tsdk_on_auth(base_req);
-                break;
-            case PLAT_FACEBOOK:
-                base_resp = platform_facebook_on_auth(base_req);
-                break;
-            case PLAT_DAMAI:
-                base_resp = platform_damai_on_auth(base_req);
-                break;
-            }
-            E_DELETE base_req;
-        }
+    ret = jwt_decode(&jwt, token, (const unsigned char*)key_str, (int)key_len);
+    if (ret != 0) {
+        LOG_ERROR("json", "jwt decode failed: %d %d", ret, errno);
+        return PLATFORM_TOKEN_INVALID;
     }
-    if (base_resp != NULL) {
-        platform_push_resp(base_resp);
+
+    if (json_integer_value(app_id_node) != jwt_get_grant_int(jwt, "app_id")) {
+        jwt_free(jwt);
+        return PLATFORM_TOKEN_INVALID;
     }
-    return realsize;
-}
 
-int platform_auth(int plat_type, const char *data,
-        auth_cb cb, void *args) {
-    switch (plat_type) {
-    case PLAT_PP:
-        return platform_pp_auth(data, cb, args);
-    case PLAT_I4:
-        return platform_i4_auth(data, cb, args);
-    case PLAT_LJ:
-        return platform_lj_auth(data, cb, args);
-    case PLAT_1SDK:
-        return platform_1sdk_auth(data, cb, args);
-    case PLAT_UC:
-        return platform_uc_auth(data, cb, args);
-    case PLAT_HUAWEI:
-        //return platform_huawei_auth(data, cb, args);
-        return platform_huawei_auth_v2(data, cb, args);
-    case PLAT_VIVO:
-        return platform_vivo_auth(data, cb, args);
-    case PLAT_ANZHI:
-        return platform_anzhi_auth(data, cb, args);
-    case PLAT_QQ:
-        return platform_qq_auth(data, cb, args);
-    case PLAT_WEIXIN:
-        return platform_weixin_auth(data, cb, args);
-
-    case PLAT_APPSTORE:
-    case PLAT_IOSINTSG:
-    case PLAT_IOSINTMY:
-    case PLAT_PJMY:
-    case PLAT_PJSG:
-        return platform_appstore_auth(data, cb, args);
-
-    case PLAT_MIGU:
-        return platform_migu_auth(data, cb, args);
-    case PLAT_TSIXI:
-        return platform_tsdk_auth(data, cb, args);
-    case PLAT_FACEBOOK:
-        return platform_facebook_auth(data, cb, args);
-    case PLAT_SIFU:
-        return platform_sifu_auth(data, cb, args);
-    case PLAT_DAMAI:
-        return platform_damai_auth(data, cb, args);
-    default:
-        return PLATFORM_TYPE_ERROR;
-        break;
+    /*
+    if (time_s() > jwt_get_grant_int(jwt, "exp")) {
+        jwt_free(jwt);
+        return PLATFORM_TOKEN_EXPIRED;
     }
+    */
+
+    char *account_id_str = jwt_get_grants_json(jwt, "account_id");
+    const char *platform = jwt_get_grant(jwt, "platform");
+    const char *channel = jwt_get_grant(jwt, "channel");
+    const char *sdk = jwt_get_grant(jwt, "sdk");
+    if (account_id_str == NULL || platform == NULL || channel == NULL || sdk == NULL) {
+        jwt_free(jwt);
+        return PLATFORM_TOKEN_INVALID;
+    }
+
+    int64_t acc_id = strtoll(account_id_str, NULL, 10);
+    if (errno == EINVAL || errno == ERANGE) {
+        jwt_free(jwt);
+        return PLATFORM_TOKEN_INVALID;
+    }
+
+    puser.uid = acc_id;
+    puser.platform = std::string(platform);
+    puser.channel = std::string(channel);
+    puser.sdk = std::string(sdk);
+            
+    //
+    free(account_id_str);
+    jwt_free(jwt);
     return PLATFORM_OK;
-}
-
-void platform_push_resp(plat_base_resp* resp)
-{
-    s_resps.push(resp);
-}
-
-int platform_proc() {
-    std::deque<plat_base_resp*>::iterator itr;
-    std::deque<plat_base_resp*> resps;
-
-    s_resps.swap(resps);
-    for (itr = resps.begin();itr != resps.end(); ++itr) {
-        plat_base_resp *resp = *itr;
-        if (resp->cb != NULL) {
-            resp->cb(resp->plat_type, resp->channel, resp->code, resp->resp, resp->args);
-        }
-
-        if (resp->resp != NULL) {
-            cJSON_Delete(resp->resp);
-        }
-        E_DELETE resp;
-    }
-    return 0;
 }
 
 } // namespace elf

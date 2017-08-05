@@ -5,7 +5,7 @@
 
 #include <elf/json.h>
 #include <elf/log.h>
-#include <cJSON/cJSON.h>
+#include <jansson.h>
 #include <google/protobuf/util/json_util.h>
 #include <fstream>
 #include <map>
@@ -13,7 +13,7 @@
 using namespace google::protobuf;
 
 namespace elf {
-static cJSON *s_json;
+static json_t *s_json;
 
 bool json_bind(const char *path)
 {
@@ -31,13 +31,13 @@ bool json_bind(const char *path)
     std::stringstream iss;
 
     iss << fs.rdbuf();
-    s_json = cJSON_Parse(iss.str().c_str());
+    s_json = json_loads(iss.str().c_str(), JSON_REJECT_DUPLICATES, NULL);
     return true;
 }
 
 bool json_unbind(const char *path)
 {
-    cJSON_Delete(s_json);
+    json_decref(s_json);
     return true;
 }
 
@@ -52,31 +52,33 @@ pb_t *json_pb(pb_t *pb, const char *json_type, const char *data)
 {
     assert(pb);
 
-    cJSON *json = cJSON_Parse(data);
+    json_t *json = json_loads(data, JSON_REJECT_DUPLICATES, NULL);
 
     if (json == NULL) {
         return NULL;
     }
 
     const Descriptor *des = pb->GetDescriptor();
-    cJSON *ref = cJSON_GetObjectItem(s_json, json_type);
+    json_t *ref = json_object_get(s_json, json_type);    
 
     assert(ref);
-    cJSON *item = json->child;
-    for (; item; item = item->next) {
-        if (item->type != cJSON_String) continue;
-        if (strlen(item->valuestring) <= 0) continue;
+    json_t *item;
+    const char *key;
+    json_object_foreach(json, key, item) {
+        if (!json_is_string(item)) continue;
+        if (json_string_length(item) <= 0) continue;
 
-        cJSON *ofd = cJSON_GetObjectItem(ref, item->string);
+        json_t *ofd = json_object_get(ref, key);
+        if (!ofd) {
+            continue;
+        }
 
-        if (!ofd) continue;
-
-        const FieldDescriptor *fd = des->FindFieldByName(ofd->valuestring);
-
+        const FieldDescriptor *fd = des->FindFieldByName(json_string_value(ofd));
         if (!fd) continue;
-        pb_set_field(pb, fd, item->valuestring);
+
+        pb_set_field(pb, fd, json_string_value(item));
     }
-    cJSON_Delete(json);
+    json_decref(json);
     return pb;
 }
 

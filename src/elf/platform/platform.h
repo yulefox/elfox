@@ -15,70 +15,26 @@
 #include <elf/config.h>
 #include <elf/pb.h>
 #include <openssl/sha.h> 
-#include <cJSON/cJSON.h>
 
 namespace elf {
 
-typedef int (*auth_cb)(int plat_type, const std::string &channel,
-        int code, cJSON *resp, void *args);
-
-enum platform_type {
-    PLAT_INVALID    = -1,
-    PLAT_PP         = 1,
-    PLAT_I4         = 2,
-    PLAT_LJ         = 3,
-    PLAT_1SDK       = 4,
-    PLAT_UC         = 5,
-    PLAT_HUAWEI     = 6,
-    PLAT_VIVO       = 7,
-    PLAT_ANZHI      = 8,
-    PLAT_QQ         = 9,
-    PLAT_WEIXIN     = 10,
-    PLAT_APPSTORE   = 11,
-    PLAT_MIGU       = 12,
-    PLAT_TSIXI      = 13,
-    PLAT_FACEBOOK   = 14,
-    PLAT_QIANGUI    = 15,
-    PLAT_SIFU       = 16,
-    PLAT_IOSINTMY   = 17,
-    PLAT_IOSINTSG   = 18,
-    PLAT_PJMY       = 19,
-    PLAT_PJSG       = 20,
-    PLAT_DAMAI      = 21,
-};
-
 enum platform_error {
     PLATFORM_OK                 = 0,
-    PLATFORM_TYPE_ERROR         = -1,
-    PLATFORM_SETTING_ERROR      = -2,
-    PLATFORM_PARAM_ERROR        = -3,
-    PLATFORM_RESPONSE_FAILED    = -4,
-    PLATFORM_USER_NOT_LOGININ   = -5,
-    PLATFORM_USER_NOT_EXIEST    = -6,
-    PLATFORM_UNKOWN_ERROR       = -7,
+    PLATFORM_SETTING_ERROR      = 1000,
+    PLATFORM_TOKEN_INVALID      = 1001,
+    PLATFORM_TOKEN_EXPIRED      = 1002,
 };
 
-/*
-cJSON* platform_get_json(int type);
-size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata);
-int get_channel(cJSON *setting, const char *code, std::string &channel);
-*/
+typedef struct platform_user_s {
+    int64_t uid;
+    std::string platform;
+    std::string channel;
+    std::string sdk;
+} platform_user_t;
 
-int platform_init();
+int platform_init(const char *configfile);
 int platform_fini();
-int platform_load(int type, const char *proto);
-int platform_auth(int plat_type, const char *data, auth_cb cb, void *args);
-int platform_proc();
-
-
-int qg_stat_login(const std::string &userId, int server, int64_t loginTime);
-int qg_stat_create(const std::string &userId, int server, int64_t roleId, int64_t createTime);
-int qg_stat_online_5m(int server, int total, int64_t time);
-int qg_stat_logout(const std::string &userId, int server,
-        int64_t roleId, const std::string &roleName,
-        int roleLevel, int roleCareer, int roleFightPower,
-        int64_t offlineTime);
-
+int platform_auth(const char *token, platform_user_t &puser);
 
 } // namespace elf
 
