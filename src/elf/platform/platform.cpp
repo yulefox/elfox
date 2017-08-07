@@ -83,12 +83,10 @@ int platform_auth(const char *token, platform_user_t &puser)
         return PLATFORM_TOKEN_INVALID;
     }
 
-    /*
     if (time_s() > jwt_get_grant_int(jwt, "exp")) {
         jwt_free(jwt);
         return PLATFORM_TOKEN_EXPIRED;
     }
-    */
 
     char *account_id_str = jwt_get_grants_json(jwt, "account_id");
     const char *platform = jwt_get_grant(jwt, "platform");
