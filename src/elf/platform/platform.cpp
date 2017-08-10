@@ -8,7 +8,6 @@
 #include <elf/log.h>
 #include <elf/pc.h>
 #include <elf/platform/platform.h>
-#include <elf/platform/sdks/base.h>
 #include <fstream>
 #include <string>
 #include <map>
