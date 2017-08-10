@@ -82,35 +82,33 @@ int platform_auth(const char *token, platform_user_t &puser)
         return PLATFORM_TOKEN_INVALID;
     }
 
-    /*
     if (time_s() > jwt_get_grant_int(jwt, "exp")) {
         jwt_free(jwt);
         return PLATFORM_TOKEN_EXPIRED;
     }
-    */
 
-    char *account_id_str = jwt_get_grants_json(jwt, "account_id");
+    char *uid_str = jwt_get_grants_json(jwt, "uid");
     const char *platform = jwt_get_grant(jwt, "platform");
     const char *channel = jwt_get_grant(jwt, "channel");
     const char *sdk = jwt_get_grant(jwt, "sdk");
-    if (account_id_str == NULL || platform == NULL || channel == NULL || sdk == NULL) {
+    if (uid_str == NULL || platform == NULL || channel == NULL || sdk == NULL) {
         jwt_free(jwt);
         return PLATFORM_TOKEN_INVALID;
     }
 
-    int64_t acc_id = strtoll(account_id_str, NULL, 10);
+    int64_t uid = strtoll(uid_str, NULL, 10);
     if (errno == EINVAL || errno == ERANGE) {
         jwt_free(jwt);
         return PLATFORM_TOKEN_INVALID;
     }
 
-    puser.uid = acc_id;
+    puser.uid = uid;
     puser.platform = std::string(platform);
     puser.channel = std::string(channel);
     puser.sdk = std::string(sdk);
             
     //
-    free(account_id_str);
+    free(uid_str);
     jwt_free(jwt);
     return PLATFORM_OK;
 }
