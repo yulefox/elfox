@@ -58,6 +58,8 @@ struct RpcSession {
     std::thread *writer;
     std::string name;
     std::string ip;
+    grpc::SslCredentialsOptions ssl_opts;
+    bool enable_ssl;
     int port;
     std::vector<MetaData> metaList;
     oid_t peer;
@@ -74,6 +76,21 @@ struct RpcSession {
         std::unique_lock<std::mutex> lock(mutex);
         wque.push_back(pkt);
     }
+
+    void open()
+    {
+        
+        char raddr[128];
+        sprintf(raddr, "%s:%d", ip.c_str(), port);
+
+        if (enable_ssl) {
+            auto ssl_creds = grpc::SslCredentials(ssl_opts);
+            channel = grpc::CreateChannel(raddr, ssl_creds);
+        } else {
+            channel = grpc::CreateChannel(raddr, grpc::InsecureChannelCredentials());
+        }
+    }
+
 };
 
 
@@ -96,15 +113,9 @@ std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
 
     std::shared_ptr<struct RpcSession> s = std::make_shared<struct RpcSession>();
 
-    char raddr[128];
-    sprintf(raddr, "%s:%d", ip.c_str(), port);
-
-    if (ca != "" && key != "" && cert != "") {
-        grpc::SslCredentialsOptions ssl_opts = {ca, key, cert};
-        auto ssl_creds = grpc::SslCredentials(ssl_opts);
-        s->channel = grpc::CreateChannel(raddr, ssl_creds);
-    } else {
-        s->channel = grpc::CreateChannel(raddr, grpc::InsecureChannelCredentials());
+        if (ca != "" && key != "" && cert != "") {
+        s->enable_ssl = true;
+        s->ssl_opts = {ca, key, cert};
     }
 
     s->wque.clear();
@@ -122,8 +133,11 @@ std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
     s_sessions.insert(make_pair(peer, s));
     s_name_ids.insert(make_pair(name, peer));
 
+    s->open();
+
     return s;
 }
+
 
 std::shared_ptr<struct RpcSession> RpcSessionFind(oid_t peer)
 {
@@ -206,43 +220,47 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
     std::thread *writer = NULL;
     grpc::ClientContext *context = NULL;
     for (;;) {
-        if (s->channel->GetState(true) == GRPC_CHANNEL_CONNECTING) {
-            if (stream) {
-                stream->Finish();
-            }
-
-            s->channel->WaitForConnected(
-                    gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(30, GPR_TIMESPAN)));
-
-            if (context != NULL) {
-                delete context;
-                context = NULL;
-            }
-
-            if (reader != NULL) {
-                reader->join();
-                delete reader;
-            }
-
-            if (writer != NULL) {
-                writer->join();
-                delete writer;
-            }
-
-            std::unique_ptr<proto::GameService::Stub> stub = proto::GameService::NewStub(s->channel);
-            if (context == NULL) {
-                context = new grpc::ClientContext();
-
-                // metadata
-                for (size_t i = 0; i < s->metaList.size(); i++) {
-                    context->AddMetadata(s->metaList[i].key, s->metaList[i].val);
-                    LOG_INFO("net", "add metadata %s %s", s->metaList[i].key.c_str(), s->metaList[i].val.c_str());
+        int stat = s->channel->GetState(true);
+        if (stat == GRPC_CHANNEL_TRANSIENT_FAILURE) {
+            s->open();
+            LOG_INFO("net", "rpc reopen<%s><%s:%d>", s->name.c_str(), s->ip.c_str(), s->port);
+        } else if (stat == GRPC_CHANNEL_CONNECTING) {
+            LOG_INFO("net", "wait rpc <%s><%s:%d> to be connected", s->name.c_str(), s->ip.c_str(), s->port);
+            gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(5, GPR_TIMESPAN));
+            if (!s->channel->WaitForConnected(deadline)) {
+                LOG_INFO("net", "rpc <%s><%s:%d> do not be connected", s->name.c_str(), s->ip.c_str(), s->port);
+            } else {
+                if (context != NULL) {
+                    delete context;
+                    context = NULL;
                 }
-                context->set_wait_for_ready(false);
+
+                if (reader != NULL) {
+                    reader->join();
+                    delete reader;
+                }
+
+                if (writer != NULL) {
+                    writer->join();
+                    delete writer;
+                }
+
+                std::unique_ptr<proto::GameService::Stub> stub = proto::GameService::NewStub(s->channel);
+                if (context == NULL) {
+                    context = new grpc::ClientContext();
+
+                    // metadata
+                    for (size_t i = 0; i < s->metaList.size(); i++) {
+                        context->AddMetadata(s->metaList[i].key, s->metaList[i].val);
+                        LOG_INFO("net", "add metadata %s %s", s->metaList[i].key.c_str(), s->metaList[i].val.c_str());
+                    }
+                    context->set_wait_for_ready(false);
+                }
+                stream = std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> >(stub->Tunnel(context));
+                reader = new std::thread(read_routine, s, stream);
+                writer = new std::thread(write_routine, s, stream);
+                LOG_INFO("net", "rpc <%s><%s:%d> established.", s->name.c_str(), s->ip.c_str(), s->port);
             }
-            stream = std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> >(stub->Tunnel(context));
-            reader = new std::thread(read_routine, s, stream);
-            writer = new std::thread(write_routine, s, stream);
         }
         usleep(500000);
     }
