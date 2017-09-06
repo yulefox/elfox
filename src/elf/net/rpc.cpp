@@ -29,8 +29,8 @@
 #include <grpc++/create_channel.h>
 #include <grpc++/security/credentials.h>
 
-#include <elf/net/proto/service.pb.h>
-#include <elf/net/proto/service.grpc.pb.h>
+#include <elf/net/proto/dbus.pb.h>
+#include <elf/net/proto/dbus.grpc.pb.h>
 
 namespace elf {
 namespace rpc {
@@ -50,7 +50,7 @@ MetaData::MetaData(const std::string &_key, int64_t _val) {
 MetaData::~MetaData() {}
 
 struct RpcSession {
-    std::deque<proto::Packet*> wque;
+    std::deque<pb::Packet*> wque;
     std::mutex mutex;
     std::shared_ptr<grpc::Channel>  channel;
     std::thread *watcher;
@@ -61,6 +61,7 @@ struct RpcSession {
     grpc::SslCredentialsOptions ssl_opts;
     bool enable_ssl;
     int port;
+    int id;
     std::vector<MetaData> metaList;
     oid_t peer;
 
@@ -69,7 +70,11 @@ struct RpcSession {
         std::string name = pb.GetTypeName();
         std::string payload;
         pb.SerializeToString(&payload);
-        proto::Packet *pkt = E_NEW proto::Packet;
+        pb::Packet *pkt = E_NEW pb::Packet;
+
+        pb::Peer *peer = pkt->mutable_peer();
+        peer->set_name("gs");
+        peer->add_peers(id);
         pkt->set_type(name);
         pkt->set_payload(payload);
 
@@ -102,7 +107,7 @@ static std::mutex s_lock_id;
 static std::mutex s_lock_name;
 
 
-std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
+std::shared_ptr<struct RpcSession> RpcSessionInit(int id, const std::string &name,
         oid_t peer,
         const std::string &ip, int port,
         const std::string &ca,
@@ -118,6 +123,7 @@ std::shared_ptr<struct RpcSession> RpcSessionInit(const std::string &name,
         s->ssl_opts = {ca, key, cert};
     }
 
+    s->id = id;
     s->wque.clear();
     s->watcher = NULL;
     s->reader = NULL;
@@ -175,10 +181,10 @@ static void readCfg(const std::string& filename, std::string& data)
 
 
 static void read_routine (std::shared_ptr<struct RpcSession> s,
-        std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> > stream)
+        std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream)
 {
     while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
-        proto::Packet pkt;
+        pb::Packet pkt;
         while (stream->Read(&pkt)) {
             recv_message_t *msg = E_NEW recv_message_t;
             msg->name = pkt.type();
@@ -196,12 +202,12 @@ static void read_routine (std::shared_ptr<struct RpcSession> s,
 
 
 static void write_routine (std::shared_ptr<struct RpcSession> s,
-        std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> > stream)
+        std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream)
 {
     while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
         std::unique_lock<std::mutex> lock(s->mutex);
         if (!s->wque.empty()) {
-            proto::Packet *pkt = s->wque.front();
+            pb::Packet *pkt = s->wque.front();
             if (pkt == NULL || stream->Write(*pkt)) {
                 s->wque.pop_front();
                 E_DELETE pkt;
@@ -215,7 +221,7 @@ static void write_routine (std::shared_ptr<struct RpcSession> s,
 
 static void watch_routine (std::shared_ptr<struct RpcSession> s)
 {
-    std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> > stream = NULL;
+    std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream = NULL;
     std::thread *reader = NULL;
     std::thread *writer = NULL;
     grpc::ClientContext *context = NULL;
@@ -245,7 +251,7 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
                     delete writer;
                 }
 
-                std::unique_ptr<proto::GameService::Stub> stub = proto::GameService::NewStub(s->channel);
+                std::unique_ptr<pb::DBus::Stub> stub = pb::DBus::NewStub(s->channel);
                 if (context == NULL) {
                     context = new grpc::ClientContext();
 
@@ -256,7 +262,7 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
                     }
                     context->set_wait_for_ready(false);
                 }
-                stream = std::shared_ptr<grpc::ClientReaderWriter<proto::Packet, proto::Packet> >(stub->Tunnel(context));
+                stream = std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> >(stub->Stream(context));
                 reader = new std::thread(read_routine, s, stream);
                 writer = new std::thread(write_routine, s, stream);
                 LOG_INFO("net", "rpc <%s><%s:%d> established.", s->name.c_str(), s->ip.c_str(), s->port);
@@ -291,7 +297,7 @@ static int Proc()
 
 
 ///
-int open(const std::string &name,
+int open(int id, const std::string &name,
         oid_t peer,
         const std::string &ip,
         int port,
@@ -310,7 +316,7 @@ int open(const std::string &name,
         readCfg(certFile, cert);
     }
 
-    std::shared_ptr<struct RpcSession> s = RpcSessionInit(name, peer, ip, port, ca_cert, key, cert, metaList);
+    std::shared_ptr<struct RpcSession> s = RpcSessionInit(id, name, peer, ip, port, ca_cert, key, cert, metaList);
     RpcSessionStart(s);
     return 0;
 }

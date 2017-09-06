@@ -29,7 +29,7 @@ struct MetaData {
     ~MetaData();
 };
 
-int open(const std::string &name, oid_t peer, const std::string &ip, int port,
+int open(int id, const std::string &name, oid_t peer, const std::string &ip, int port,
         const std::vector<MetaData> &metaList,
         const std::string &caFile = "",
         const std::string &privKeyFile = "",
