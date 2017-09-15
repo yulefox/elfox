@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package pb;
+
+message Peer {
+    string name                     = 1;
+    repeated int64 peers            = 2;
+}
+
+message Packet {
+    Peer peer                       = 1;
+    string type                     = 8;
+    bytes payload                   = 9;
+}
+
+service DBus {
+	rpc Stream(stream Packet) returns (stream Packet);
+}
+
