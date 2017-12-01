@@ -323,7 +323,7 @@ static recv_message_t *recv_message_init(context_t *ctx)
     msg->peer = 0;
     msg->pb = NULL;
     msg->ctx = ctx;
-    msg->rpc = false;
+    msg->rpc_ctx = NULL;
     return msg;
 }
 
