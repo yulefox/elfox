@@ -42,7 +42,7 @@ struct recv_message_t {
     std::string name;
     std::string body;
     oid_t peer;
-    bool rpc;
+    void *rpc_ctx;
     context_t *ctx;
     pb_t *pb;
 };

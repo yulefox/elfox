@@ -66,15 +66,20 @@ struct RpcSession {
     oid_t peer;
 
     ///
-    void send(const pb_t &pb) {
+    void send(const pb_t &pb, void *ctx) {
         std::string name = pb.GetTypeName();
         std::string payload;
         pb.SerializeToString(&payload);
-        pb::Packet *pkt = E_NEW pb::Packet;
 
+        pb::Packet *pkt = E_NEW pb::Packet;
         pb::Peer *peer = pkt->mutable_peer();
-        peer->set_name("gs");
-        peer->add_peers(id);
+        pb::Peer *to = static_cast<pb::Peer*>(ctx);
+        if (to == NULL) {
+            peer->set_name("gs");
+            peer->add_peers(id);
+        } else {
+            peer->CopyFrom(*to);
+        }
         pkt->set_type(name);
         pkt->set_payload(payload);
 
@@ -186,13 +191,17 @@ static void read_routine (std::shared_ptr<struct RpcSession> s,
     while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
         pb::Packet pkt;
         while (stream->Read(&pkt)) {
+            // message source
+            pb::Peer *from = E_NEW pb::Peer;
+            from->CopyFrom(pkt.peer());
+
             recv_message_t *msg = E_NEW recv_message_t;
             msg->name = pkt.type();
             msg->body = pkt.payload();
             msg->peer = s->peer,
             msg->ctx = (elf::context_t*)((void*)s.get());
             msg->pb = NULL;
-            msg->rpc = true;
+            msg->rpc_ctx = (void*)from;
             s_recv_msgs.push(msg);
         }
         usleep(500000);
@@ -289,6 +298,9 @@ static int Proc()
     for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
         recv_message_t *msg = *itr;
         message_handle(msg);
+
+        pb::Peer *peer = static_cast<pb::Peer*>(msg->rpc_ctx);
+        S_DELETE(peer);
         S_DELETE(msg->pb);
         S_DELETE(msg);
     }
@@ -321,25 +333,25 @@ int open(int id, const std::string &name,
     return 0;
 }
 
-int send(const std::string &name, const pb_t &pb)
+int send(const std::string &name, const pb_t &pb, void *ctx)
 {
     std::shared_ptr<struct RpcSession> s = RpcSessionFind(name);
     if (s == NULL) {
         return -1;
     }
 
-    s->send(pb);
+    s->send(pb, ctx);
     return 0;
 }
 
-int send(oid_t peer, const pb_t &pb)
+int send(oid_t peer, const pb_t &pb, void *ctx)
 {
     std::shared_ptr<struct RpcSession> s = RpcSessionFind(peer);
     if (s == NULL) {
         return -1;
     }
 
-    s->send(pb);
+    s->send(pb, ctx);
     return 0;
 }
 

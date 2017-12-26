@@ -34,8 +34,8 @@ int open(int id, const std::string &name, oid_t peer, const std::string &ip, int
         const std::string &caFile = "",
         const std::string &privKeyFile = "",
         const std::string &certFile = "");
-int send(const std::string &name, const pb_t &pb);
-int send(oid_t peer, const pb_t &pb);
+int send(const std::string &name, const pb_t &pb, void *ctx = NULL);
+int send(oid_t peer, const pb_t &pb, void *ctx = NULL);
 int proc(void);
 
 } // namespace rpc
