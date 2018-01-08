@@ -91,6 +91,9 @@ int platform_auth(const char *token, platform_user_t &puser)
     const char *platform = jwt_get_grant(jwt, "platform");
     const char *channel = jwt_get_grant(jwt, "channel");
     const char *sdk = jwt_get_grant(jwt, "sdk");
+    const char *account = jwt_get_grant(jwt, "account");
+    const char *reg_time = jwt_get_grant(jwt, "reg_time");
+    const char *reg_time_s = jwt_get_grant(jwt, "reg_time_s");
     if (uid_str == NULL || platform == NULL || channel == NULL || sdk == NULL) {
         jwt_free(jwt);
         return PLATFORM_TOKEN_INVALID;
@@ -106,6 +109,15 @@ int platform_auth(const char *token, platform_user_t &puser)
     puser.platform = std::string(platform);
     puser.channel = std::string(channel);
     puser.sdk = std::string(sdk);
+    if (account != NULL) {
+        puser.account = std::string(account);
+    }
+    if (reg_time != NULL) {
+        puser.reg_time = atoi(reg_time);
+    }
+    if (reg_time_s != NULL) {
+        puser.reg_time_s = std::string(reg_time_s);
+    }
             
     //
     free(uid_str);

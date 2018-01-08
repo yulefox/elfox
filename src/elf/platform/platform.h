@@ -30,6 +30,9 @@ typedef struct platform_user_s {
     std::string platform;
     std::string channel;
     std::string sdk;
+    std::string account;
+    std::string reg_time_s;
+    int32_t reg_time;
 } platform_user_t;
 
 int platform_init(const char *configfile);
