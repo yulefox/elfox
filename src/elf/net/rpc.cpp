@@ -213,16 +213,25 @@ static void read_routine (std::shared_ptr<struct RpcSession> s,
 static void write_routine (std::shared_ptr<struct RpcSession> s,
         std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream)
 {
+    std::deque<pb::Packet*> pending;
     while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
+        // get cached pkts
         std::unique_lock<std::mutex> lock(s->mutex);
-        if (!s->wque.empty()) {
+        while(!s->wque.empty()) {
             pb::Packet *pkt = s->wque.front();
+            pending.push_back(pkt);
+            s->wque.pop_front();
+        }
+        lock.unlock();
+
+        // try to send
+        if (!pending.empty()) {
+            pb::Packet *pkt = pending.front();
             if (pkt == NULL || stream->Write(*pkt)) {
-                s->wque.pop_front();
+                pending.pop_front();
                 E_DELETE pkt;
             }
         }
-        lock.unlock();
         usleep(500000);
     }
     LOG_ERROR("net", "rpc writer quit: %lld ", s->peer);
