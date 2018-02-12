@@ -58,10 +58,12 @@ int platform_auth(const char *token, platform_user_t &puser)
 
     json_t *key = json_object_get(s_platform_setting, "public_key");
     if (key == NULL) {
+        LOG_ERROR("json", "load public key failed: %s", token);
         return PLATFORM_SETTING_ERROR;
     }
     json_t *app_id_node = json_object_get(s_platform_setting, "app_id");
     if (app_id_node == NULL) {
+        LOG_ERROR("json", "get app id failed: %s", token);
         return PLATFORM_SETTING_ERROR;
     }
 
@@ -73,16 +75,18 @@ int platform_auth(const char *token, platform_user_t &puser)
 
     ret = jwt_decode(&jwt, token, (const unsigned char*)key_str, (int)key_len);
     if (ret != 0) {
-        LOG_ERROR("json", "jwt decode failed: %d %d", ret, errno);
+        LOG_ERROR("json", "jwt decode failed: %d %d %s", ret, errno, token);
         return PLATFORM_TOKEN_INVALID;
     }
 
     if (json_integer_value(app_id_node) != jwt_get_grant_int(jwt, "app_id")) {
+        LOG_ERROR("json", "invalid app id: %s", token);
         jwt_free(jwt);
         return PLATFORM_TOKEN_INVALID;
     }
 
     if (time_s() > jwt_get_grant_int(jwt, "exp")) {
+        LOG_ERROR("json", "token has expired: %s", token);
         jwt_free(jwt);
         return PLATFORM_TOKEN_EXPIRED;
     }
@@ -96,12 +100,14 @@ int platform_auth(const char *token, platform_user_t &puser)
     const char *reg_time_s = jwt_get_grant(jwt, "reg_time_s");
     if (uid_str == NULL || platform == NULL || channel == NULL || sdk == NULL) {
         jwt_free(jwt);
+        LOG_ERROR("json", "invalid token: %s", token);
         return PLATFORM_TOKEN_INVALID;
     }
 
     int64_t uid = strtoll(uid_str, NULL, 10);
     if (errno == EINVAL || errno == ERANGE) {
         jwt_free(jwt);
+        LOG_ERROR("json", "parse uid failed: %s", token);
         return PLATFORM_TOKEN_INVALID;
     }
 
