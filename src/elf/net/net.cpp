@@ -36,7 +36,14 @@ static const int MESSAGE_MAX_NAME_LENGTH = 100;
 static const int MESSAGE_MAX_VALID_SIZE = CHUNK_MAX_NUM * CHUNK_SIZE_L;
 static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
-static const int ENCRYPT_FLAG = 0x40000000;
+static const int NAME_SIZE_MASK = 0xFFFFFF;
+static const int NAME_SIZE_BITS = 24;
+
+enum MSG_FLAG {
+    ENCRYPT_FLAG    = 0x1,
+    RAW_FLAG        = 0x2,
+};
+
 
 struct blob_t;
 struct chunk_t;
@@ -172,6 +179,7 @@ static void on_read(const epoll_event &evt);
 static void on_write(const epoll_event &evt);
 static void on_error(const epoll_event &evt);
 
+
 static bool is_raw_msg(const std::string &name)
 {
     return s_raw_msgs.find(name) != s_raw_msgs.end();
@@ -279,7 +287,11 @@ static void set_nonblock(int sock)
     }
 
     int enable = 1;
-    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable));
+    rc = setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable));
+    if (rc != 0) {
+        LOG_ERROR("net", "setsockopt(TCP_NODELAY) FAILED: %s.", strerror(errno));
+        return;
+    }
 }
 
 static chunk_t *chunk_init(size_t size)
@@ -321,9 +333,11 @@ static recv_message_t *recv_message_init(context_t *ctx)
     recv_message_t *msg = E_NEW recv_message_t;
 
     msg->peer = 0;
+    msg->dest = 0;
     msg->pb = NULL;
     msg->ctx = ctx;
     msg->rpc_ctx = NULL;
+    msg->is_raw = false;
     return msg;
 }
 
@@ -331,7 +345,7 @@ static void recv_message_fini(recv_message_t *msg)
 {
     assert(msg);
 
-    E_DELETE msg->pb;
+    S_DELETE(msg->pb);
     E_DELETE msg;
 }
 
@@ -432,7 +446,6 @@ static bool message_splice(context_t *ctx)
     }
 
     int &msg_size = ctx->recv_data->msg_size;
-
     if (msg_size == 0) {
         message_get(ctx->recv_data->chunks, &msg_size, SIZE_INT);
     }
@@ -450,10 +463,9 @@ static bool message_splice(context_t *ctx)
     int name_len = 0;
     int flag = 0;
     message_get(ctx->recv_data->chunks, &name_len, SIZE_INT);
-    flag = ((name_len & ENCRYPT_FLAG) >> 30) & 0x1;
-    if (flag == 1) {
-        name_len ^= ENCRYPT_FLAG;
-    }
+
+    flag = name_len >> NAME_SIZE_BITS;
+    name_len = name_len & NAME_SIZE_MASK;
 
     if (name_len < 0 || name_len > msg_size) {
         LOG_TRACE("net", "%s INVALID name length: %d:%d.",
@@ -464,6 +476,9 @@ static bool message_splice(context_t *ctx)
     }
 
     int body_len = msg_size - SIZE_INTX2 - name_len;
+    if (flag & RAW_FLAG) {
+        body_len -= sizeof(oid_t);
+    }
     if (body_len < 0) {
         LOG_TRACE("net", "%s INVALID message size %d:%d:%d.",
                 ctx->peer.info,
@@ -473,7 +488,7 @@ static bool message_splice(context_t *ctx)
     }
 
     recv_message_t *msg = recv_message_init(ctx);
-    if (flag == 1)  {// encrypt
+    if (flag & ENCRYPT_FLAG) {// encrypt
         char *name = (char *)E_ALLOC(name_len + 1);
         char *body = (char *)E_ALLOC(body_len + 1);
         memset(name, 0, name_len + 1);
@@ -496,6 +511,14 @@ static bool message_splice(context_t *ctx)
         message_get(ctx->recv_data->chunks, msg->body, body_len);
     }
 
+    if (flag & RAW_FLAG) {
+        oid_t cid = 0;
+        message_get(ctx->recv_data->chunks, &cid, sizeof(oid_t));
+
+        msg->dest = cid;
+    }
+
+    msg->is_raw = is_raw_msg(msg->name);
     msg->peer = ctx->peer.id;
     s_recv_msgs.push(msg);
 
@@ -1123,7 +1146,7 @@ void net_encode(const pb_t &pb, std::string &name, std::string &body)
     pb.SerializeToString(&body);
 }
 
-blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb_body)
+blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb_body, oid_t dest)
 {
     context_t *ctx = context_find(peer);
     blob_t *msg = E_NEW blob_t;
@@ -1137,16 +1160,28 @@ blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb
 
     int name_len = pb_name.size();
     int body_len = pb_body.size();
+    int flag = 0;
+
+    if (dest > 0) {
+        flag |= RAW_FLAG;
+    }
+    if (encipher != NULL) {
+        flag |= ENCRYPT_FLAG;
+    }
 
     msg->total_size = name_len + body_len + SIZE_INTX2;
-    chunks_push(msg->chunks, &(msg->total_size), SIZE_INT);
-    if (encipher != NULL) {
-        int len = name_len | ENCRYPT_FLAG;
-        chunks_push(msg->chunks, &len, SIZE_INT);
-    } else {
-        chunks_push(msg->chunks, &name_len, SIZE_INT);
+    if (flag & RAW_FLAG) {
+        msg->total_size += sizeof(dest);
     }
-    if (encipher != NULL) { // encrypt
+
+    // msg total size
+    chunks_push(msg->chunks, &(msg->total_size), SIZE_INT);
+
+    // namesize + flag
+    int val = (flag << NAME_SIZE_BITS) | name_len;
+    chunks_push(msg->chunks, &val, SIZE_INT);
+
+    if (flag & ENCRYPT_FLAG) { // encrypt
         char *name = (char *)E_ALLOC(name_len);
         char *body = (char *)E_ALLOC(body_len);
 
@@ -1163,24 +1198,30 @@ blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb
         chunks_push(msg->chunks, name, name_len);
         chunks_push(msg->chunks, pb_body.data(), body_len);
     }
+
+    // push cid
+    if (flag & RAW_FLAG) {
+        chunks_push(msg->chunks, &dest, sizeof(dest));
+    }
     LOG_TRACE("net", "<- %s.",
             pb_name.c_str());
     return msg;
 }
 
-blob_t *net_encode(oid_t peer, const pb_t &pb)
+blob_t *net_encode(oid_t peer, const pb_t &pb, oid_t dest)
 {
 
     std::string name;
     std::string body;
 
     net_encode(pb, name, body);
-    return net_encode(peer, name, body);
+    return net_encode(peer, name, body, dest);
 }
 
 bool net_decode(recv_message_t *msg)
 {
-    assert(msg && msg->pb);
+    //assert(msg && msg->pb);
+    assert(msg);
 
     context_t *ctx = msg->ctx;
 
@@ -1188,7 +1229,7 @@ bool net_decode(recv_message_t *msg)
         return false;
     }
 
-    if (!is_raw_msg(msg->name)) {
+    if (!msg->is_raw) {
         bool flag = msg->pb->ParseFromString(msg->body);
         if (flag == false) {
             LOG_WARN("net", "Protobuf parsing FAILED: %s %s.",
@@ -1223,15 +1264,15 @@ int net_send(oid_t peer, blob_t *msg)
     return 0;
 }
 
-void net_send(oid_t peer, const pb_t &pb)
+void net_send(oid_t peer, const pb_t &pb, oid_t dest)
 {
-    blob_t *msg = net_encode(peer, pb);
+    blob_t *msg = net_encode(peer, pb, dest);
 
     net_send(peer, msg);
     blob_fini(msg);
 }
 
-void net_send(const id_set &peers, const pb_t &pb)
+void net_send(const id_set &peers, const pb_t &pb, oid_t dest)
 {
     if (peers.empty()) return;
 
@@ -1241,13 +1282,13 @@ void net_send(const id_set &peers, const pb_t &pb)
 
     id_set::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(*itr, name, body);
+        blob_t *msg = net_encode(*itr, name, body, dest);
         net_send(*itr, msg);
         blob_fini(msg);
     }
 }
 
-void net_send(const obj_map_id &peers, const pb_t &pb)
+void net_send(const obj_map_id &peers, const pb_t &pb, oid_t dest)
 {
     if (peers.empty()) return;
 
@@ -1257,13 +1298,13 @@ void net_send(const obj_map_id &peers, const pb_t &pb)
 
     obj_map_id::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(itr->first, name, body);
+        blob_t *msg = net_encode(itr->first, name, body, dest);
         net_send(itr->first, msg);
         blob_fini(msg);
     }
 }
 
-void net_send(const pb_map_id &peers, const pb_t &pb)
+void net_send(const pb_map_id &peers, const pb_t &pb, oid_t dest)
 {
     if (peers.empty()) return;
 
@@ -1273,13 +1314,13 @@ void net_send(const pb_map_id &peers, const pb_t &pb)
 
     pb_map_id::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(itr->first, name, body);
+        blob_t *msg = net_encode(itr->first, name, body, dest);
         net_send(itr->first, msg);
         blob_fini(msg);
     }
 }
 
-void net_send(const id_limap &peers, const pb_t &pb)
+void net_send(const id_limap &peers, const pb_t &pb, oid_t dest)
 {
     if (peers.empty()) return;
 
@@ -1289,13 +1330,13 @@ void net_send(const id_limap &peers, const pb_t &pb)
 
     id_limap::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(itr->first, name, body);
+        blob_t *msg = net_encode(itr->first, name, body, dest);
         net_send(itr->first, msg);
         blob_fini(msg);
     }
 }
 
-void net_send(const id_ilmap &peers, const pb_t &pb)
+void net_send(const id_ilmap &peers, const pb_t &pb, oid_t dest)
 {
     if (peers.empty()) return;
 
@@ -1305,17 +1346,27 @@ void net_send(const id_ilmap &peers, const pb_t &pb)
 
     id_ilmap::const_iterator itr = peers.begin();
     for (; itr != peers.end(); ++itr) {
-        blob_t *msg = net_encode(itr->second, name, body);
+        blob_t *msg = net_encode(itr->second, name, body, dest);
         net_send(itr->second, msg);
         blob_fini(msg);
     }
 }
 
-void net_rawsend(oid_t peer, const std::string &name, const std::string &body)
+void net_rawsend(oid_t peer, const std::string &name, const std::string &body, oid_t dest)
 {
-    blob_t *msg = net_encode(peer, name, body);
+    blob_t *msg = net_encode(peer, name, body, dest);
     net_send(peer, msg);
     blob_fini(msg);
+}
+
+void net_rawsend(const id_set &peers, const std::string &name, const std::string &body, oid_t dest)
+{
+    if (peers.empty()) return;
+
+    id_set::const_iterator itr = peers.begin();
+    for (; itr != peers.end(); ++itr) {
+        net_rawsend(*itr, name, body, dest);
+    }
 }
 
 static void on_accept(const epoll_event &evt)

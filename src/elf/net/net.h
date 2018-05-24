@@ -42,11 +42,13 @@ struct recv_message_t {
     std::string name;
     std::string body;
     oid_t peer;
+    oid_t dest;
     void *rpc_ctx;
     context_t *ctx;
     pb_t *pb;
+    bool is_raw;
 };
-
+ 
 ///
 /// Initialize the network module.
 /// @return (0).
@@ -187,51 +189,46 @@ int net_send(oid_t peer, blob_t *msg);
 /// @param[in] peer Peer id.
 /// @param[in] pb Message.
 ///
-void net_send(oid_t peer, const pb_t &pb);
+void net_send(oid_t peer, const pb_t &pb, oid_t dest = 0);
 
 ///
 /// Multicast to given peers.
 /// @param[in] peers Peers list.
 /// @param[in] pb Message.
 ///
-void net_send(const id_set &peers, const pb_t &pb);
+void net_send(const id_set &peers, const pb_t &pb, oid_t dest = 0);
 
 ///
 /// Multicast to given peers.
 /// @param[in] peers Peers list.
 /// @param[in] pb Message.
 ///
-void net_send(const obj_map_id &peers, const pb_t &pb);
+void net_send(const obj_map_id &peers, const pb_t &pb, oid_t dest = 0);
 
 ///
 /// Multicast to given peers.
 /// @param[in] peers Peers list.
 /// @param[in] pb Message.
 ///
-void net_send(const pb_map_id &peers, const pb_t &pb);
+void net_send(const pb_map_id &peers, const pb_t &pb, oid_t dest = 0);
 
 ///
 /// Multicast to given peers.
 /// @param[in] peers Peers list.
 /// @param[in] pb Message.
 ///
-void net_send(const id_limap &peers, const pb_t &pb);
+void net_send(const id_limap &peers, const pb_t &pb, oid_t dest = 0);
 
 ///
 /// Multicast to given peers.
 /// @param[in] peers Peers list.
 /// @param[in] pb Message.
 ///
-void net_send(const id_ilmap &peers, const pb_t &pb);
+void net_send(const id_ilmap &peers, const pb_t &pb, oid_t dest = 0);
 
-///
-/// Multicast to given peers.
-/// @param[in] peers Peers list.
-/// @param[in] pb Message.
-///
-void net_send(const obj_map_id &peers, const pb_t &pb);
+void net_rawsend(oid_t peer, const std::string &name, const std::string &body, oid_t dest = 0);
 
-void net_rawsend(oid_t peer, const std::string &name, const std::string &body);
+void net_rawsend(const id_set &peers, const std::string &name, const std::string &body, oid_t dest = 0);
 
 void net_cipher_set(oid_t peer, cipher_t *encipher, cipher_t *decipher);
 

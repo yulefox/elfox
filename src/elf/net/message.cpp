@@ -45,7 +45,9 @@ void message_handle(recv_message_t *msg)
     if (itr != s_regs.end()) {
         message_handler_t *hdl = itr->second;
 
-        msg->pb = hdl->init();
+        if (!msg->is_raw) {
+            msg->pb = hdl->init();
+        }
         if (net_decode(msg)) {
             net_stat_message(*msg);
             hdl->proc(*msg);
