@@ -809,19 +809,6 @@ int net_listen(const std::string &name, const std::string &ip, int port)
     s_sock = socket(AF_INET, SOCK_STREAM, 0);
     set_nonblock(s_sock);
 
-    epoll_event evt;
-
-    memset(&evt, 0, sizeof(evt));
-    evt.data.fd = s_sock;
-    evt.events = EPOLLIN|EPOLLET|EPOLLERR|EPOLLHUP;
-    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, s_sock, &evt)) {
-        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
-                name.c_str(), ip.c_str(), port,
-                strerror(errno));
-        close(s_sock);
-        return -1;
-    }
-
     struct sockaddr_in addr;
 
     memset(&addr, 0, sizeof(addr));
@@ -846,6 +833,19 @@ int net_listen(const std::string &name, const std::string &ip, int port)
         return -1;
     }
 
+    epoll_event evt;
+
+    memset(&evt, 0, sizeof(evt));
+    evt.data.fd = s_sock;
+    evt.events = EPOLLIN|EPOLLET|EPOLLERR|EPOLLHUP;
+    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, s_sock, &evt)) {
+        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
+        close(s_sock);
+        return -1;
+    }
+
     // @todo ON_LISTEN
     return 0;
 }
@@ -854,19 +854,6 @@ int net_listen6(const std::string &name, const std::string &ip, int port)
 {
     s_sock6 = socket(AF_INET6, SOCK_STREAM, 0);
     set_nonblock(s_sock6);
-
-    epoll_event evt;
-
-    memset(&evt, 0, sizeof(evt));
-    evt.data.fd = s_sock6;
-    evt.events = EPOLLIN|EPOLLET|EPOLLERR|EPOLLHUP;
-    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, s_sock6, &evt)) {
-        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
-                name.c_str(), ip.c_str(), port,
-                strerror(errno));
-        close(s_sock6);
-        return -1;
-    }
 
     struct sockaddr_in6 addr;
 
@@ -886,6 +873,19 @@ int net_listen6(const std::string &name, const std::string &ip, int port)
     // backlog: size of pending queue waiting to be accepted
     if (0 != listen(s_sock6, BACKLOG)) {
         LOG_ERROR("net", "[%s] (%s:%d) listen FAILED: %s.",
+                name.c_str(), ip.c_str(), port,
+                strerror(errno));
+        close(s_sock6);
+        return -1;
+    }
+
+    epoll_event evt;
+
+    memset(&evt, 0, sizeof(evt));
+    evt.data.fd = s_sock6;
+    evt.events = EPOLLIN|EPOLLET|EPOLLERR|EPOLLHUP;
+    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, s_sock6, &evt)) {
+        LOG_ERROR("net", "[%s] (%s:%d) epoll_ctl FAILED: %s.",
                 name.c_str(), ip.c_str(), port,
                 strerror(errno));
         close(s_sock6);

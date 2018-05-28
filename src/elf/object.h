@@ -43,7 +43,7 @@ typedef std::map<oid_t, pb_t *> pb_map_id;
 struct Proto {
     pb_t *pb;
     oid_t id;
-    oid_t uid;
+    oid_t xid;
     oid_t pid;
     int ptype;
     int type;
@@ -120,21 +120,21 @@ public:
     ///
     /// Add protobuf data.
     /// @param[in] pb Protobuf data.
-    /// @param[in] uid User ID.
+    /// @param[in] xid Root ID.
     /// @param[in] pid Parent ID.
     /// @param[in] type Protobuf data type.
     /// @param[in] id Protobuf data ID.
     /// @param[in] idx Protobuf data index.
     ///
     template<class Type>
-        static Type *AddPB(const Type &pb, oid_t uid, oid_t pid, int type, oid_t id, int idx) {
+        static Type *AddPB(const Type &pb, oid_t xid, oid_t pid, int type, oid_t id, int idx) {
             pb_t *dst = FindPB(id, type);
             if (dst == NULL) {
                 dst = E_NEW Type(pb);
             } else {
                 dst->CopyFrom(pb);
             }
-            IndexProto(dst, uid, pid, type, id, idx);
+            IndexProto(dst, xid, pid, type, id, idx);
             return static_cast<Type *>(dst);
         }
 
@@ -341,13 +341,13 @@ protected:
     /// Index Proto.
     /// @param[in] id Proto ID.
     /// @param[in] pb Protobuf data.
-    /// @param[in] uid User ID.
+    /// @param[in] xid User ID.
     /// @param[in] pid Parent ID.
     /// @param[in] type Proto type.
     /// @param[in] id Proto ID.
     /// @param[in] idx Proto index.
     ///
-    static void IndexProto(pb_t *pb, oid_t uid, oid_t pid, int type, oid_t id, int idx);
+    static void IndexProto(pb_t *pb, oid_t xid, oid_t pid, int type, oid_t id, int idx);
 
     ///
     /// Unindex Proto.
@@ -376,8 +376,8 @@ protected:
     /// Object ID
     oid_t m_id;
 
-    /// User ID
-    oid_t m_uid;
+    /// Root ID
+    oid_t m_xid;
 
     /// parent ID
     oid_t m_pid;

@@ -14,7 +14,7 @@ id_lismap Object::s_containers;
 
 Object::Object() :
     m_id(0),
-    m_uid(0),
+    m_xid(0),
     m_pid(0),
     m_type(0),
     m_idx(0),
@@ -45,7 +45,7 @@ void Object::OnInit(void)
     }
     s_objs[m_id] = this;
     if (m_pb != NULL) {
-        IndexProto(m_pb, m_uid, m_pid, m_type, m_id, m_idx);
+        IndexProto(m_pb, m_xid, m_pid, m_type, m_id, m_idx);
     }
 }
 
@@ -125,7 +125,7 @@ void Object::DelPB(oid_t id, bool recursive)
     UnindexProto(id, recursive);
 }
 
-void Object::IndexProto(pb_t *pb, oid_t uid, oid_t pid, int type, oid_t id, int idx)
+void Object::IndexProto(pb_t *pb, oid_t xid, oid_t pid, int type, oid_t id, int idx)
 {
     Proto *parent = NULL;
     Proto *proto = FindProto(id);
@@ -136,7 +136,7 @@ void Object::IndexProto(pb_t *pb, oid_t uid, oid_t pid, int type, oid_t id, int 
         proto = E_NEW Proto;
         proto->pb = pb;
         proto->id = id;
-        proto->uid = uid;
+        proto->xid = xid;
         proto->idx = idx;
         proto->pid = pid;
         if (parent != NULL) {
@@ -148,8 +148,12 @@ void Object::IndexProto(pb_t *pb, oid_t uid, oid_t pid, int type, oid_t id, int 
         proto->ref = 1;
         s_pbs[id] = proto;
         AddChild(pid, type, id);
-        if (pid != 0) {
+        if (xid > 0) {
+            AddChild(xid, type + 3000, id);
+        }
+        if (pid > 0) {
             AddChild(0, type, id);
+            AddContainerItem(pid, type + 1000, idx, id);
         }
     } else {
         proto->ref++;
@@ -162,44 +166,53 @@ void Object::UnindexProto(oid_t id, bool recursive)
     if (proto == NULL) {
         return;
     }
-    oid_t pid = proto->pid;
-    int type = proto->type;
 
     proto->ref--;
     if (proto->ref == 0) {
-        proto->ref = 1;
-        s_pbs.erase(id);
-        DelChild(pid, type, id);
-        if (pid != 0) {
-            DelChild(0, type, id);
-        }
-        E_DELETE(proto->pb);
-        E_DELETE(proto);
+        return;
+    }
 
-        id_lismap::iterator itr = s_containers.find(id);
-        if (itr == s_containers.end()) {
-            return;
-        }
+    elf::oid_t xid = proto->xid;
+    oid_t pid = proto->pid;
+    int type = proto->type;
+    int idx = proto->idx;
 
-        id_ismap *ism = itr->second;
-        if (ism == NULL) {
-            return;
-        }
+    proto->ref = 1;
+    s_pbs.erase(id);
+    DelChild(pid, type, id);
+    if (xid > 0) {
+        DelChild(xid, type + 3000, id);
+    }
+    if (pid > 0) {
+        DelChild(0, type, id);
+        DelContainerItem(pid, type + 1000, idx, id);
+    }
+    E_DELETE(proto->pb);
+    E_DELETE(proto);
 
-        if (recursive) {
-            id_ismap::iterator itr_i = ism->begin();
-            for (; itr_i != ism->end(); ++itr_i) {
-                id_set ctner = *(itr_i->second); // erased while `UnindexProto`
-                id_set::iterator itr_s = ctner.begin();
-                for (; itr_s != ctner.end(); ++itr_s) {
-                    UnindexProto(*itr_s, true);
-                }
+    id_lismap::iterator itr = s_containers.find(id);
+    if (itr == s_containers.end()) {
+        return;
+    }
 
-                S_DELETE(itr_i->second);
+    id_ismap *ism = itr->second;
+    if (ism == NULL) {
+        return;
+    }
+
+    if (recursive) {
+        id_ismap::iterator itr_i = ism->begin();
+        for (; itr_i != ism->end(); ++itr_i) {
+            id_set ctner = *(itr_i->second); // erased while `UnindexProto`
+            id_set::iterator itr_s = ctner.begin();
+            for (; itr_s != ctner.end(); ++itr_s) {
+                UnindexProto(*itr_s, true);
             }
-            E_DELETE(ism);
-            s_containers.erase(itr);
+
+            S_DELETE(itr_i->second);
         }
+        E_DELETE(ism);
+        s_containers.erase(itr);
     }
 }
 
@@ -318,7 +331,6 @@ pb_t *Object::GetContainerItem(oid_t pid, int type, int idx)
 
     if (oid != 0) {
         pb = FindPB(oid, 0);
-        assert(pb);
     }
     return pb;
 }

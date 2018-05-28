@@ -102,6 +102,12 @@ static void query(mysql_thread_t *th)
             return;
         }
         if (q->type == QUERY_NO_RES) {
+            do {
+                MYSQL_RES *res = mysql_store_result(m);
+                if (res) {
+                    mysql_free_result(res);
+                }
+            } while (!mysql_next_result(m));
             destroy(q);
             return;
         }
