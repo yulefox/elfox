@@ -148,5 +148,23 @@ void pb_set_field(pb_t *pb, const FieldDescriptor *fd,
             assert(0);
     }
 }
+
+int pb_get_repeated_size(const pb_t &pb, const std::string &key)
+{
+    const Descriptor *des = pb.GetDescriptor();
+    const Reflection *ref = pb.GetReflection();
+    const FieldDescriptor *fd = des->FindFieldByName(key);
+
+    return ref->FieldSize(pb, fd);
+}
+
+pb_t *pb_get_repeated_item(pb_t *pb, const std::string &key, int idx)
+{
+    const Descriptor *des = pb->GetDescriptor();
+    const Reflection *ref = pb->GetReflection();
+    const FieldDescriptor *fd = des->FindFieldByName(key);
+
+    return ref->MutableRepeatedMessage(pb, fd, idx);
+}
 } // namespace elf
 

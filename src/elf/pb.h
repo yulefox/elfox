@@ -102,6 +102,23 @@ void pb_set_field(pb_t *pb, const ::google::protobuf::FieldDescriptor *fd,
 ///
 void pb_set_field(pb_t *pb, const ::google::protobuf::FieldDescriptor *fd,
         const char *val, int len);
+
+///
+/// Get the number of elements of a repeated field.
+/// @param[in] pb Protobuf object.
+/// @param[in] key Field name.
+/// @return Protobuf.
+///
+int pb_get_repeated_size(const pb_t &pb, const std::string &key);
+
+///
+/// Get raw message with given index of a repeated field.
+/// @param[in] pb Protobuf object.
+/// @param[in] key Field name.
+/// @param[in] idx Index of element.
+/// @return Protobuf.
+///
+pb_t *pb_get_repeated_item(pb_t *pb, const std::string &key, int idx);
 } // namespace elf
 
 #endif /* !ELF_PB_H */
