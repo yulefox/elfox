@@ -351,7 +351,7 @@ static void recv_message_fini(recv_message_t *msg)
     assert(msg);
 
     //
-    context_fini(msg->ctx);
+    context_decref(msg->ctx);
 
     S_DELETE(msg->pb);
     E_DELETE msg;
