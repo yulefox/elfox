@@ -132,6 +132,7 @@ struct context_t {
     int close_time;
     int last_time;
     int error_times;
+    int ref_cnt;
     bool internal;
 
     context_t()
@@ -173,6 +174,8 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
         const struct sockaddr_in6 &addr);
 static void context_close(oid_t peer);
 static void context_fini(context_t *ctx);
+static void context_incref(context_t *ctx);
+static void context_decref(context_t *ctx);
 static void on_accept(const epoll_event &evt);
 static void on_accept6(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
@@ -217,7 +220,7 @@ static void *context_thread(void *args)
             if ((ct - ctx->close_time) < CONTEXT_CLOSE_TIME) {
                 break;
             }
-            context_fini(ctx);
+            context_decref(ctx);
             s_free_contexts.pop();
         }
         usleep(500);
@@ -338,12 +341,17 @@ static recv_message_t *recv_message_init(context_t *ctx)
     msg->ctx = ctx;
     msg->rpc_ctx = NULL;
     msg->is_raw = false;
+
+    context_incref(ctx);
     return msg;
 }
 
 static void recv_message_fini(recv_message_t *msg)
 {
     assert(msg);
+
+    //
+    context_fini(msg->ctx);
 
     S_DELETE(msg->pb);
     E_DELETE msg;
@@ -585,6 +593,7 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     ctx->encipher = NULL;
     ctx->decipher = NULL;
     ctx->internal = false;
+    ctx->ref_cnt = 1;
     blob_init(ctx->recv_data);
     blob_init(ctx->send_data);
     event_init(ctx);
@@ -627,6 +636,7 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
     ctx->encipher = NULL;
     ctx->decipher = NULL;
     ctx->internal = false;
+    ctx->ref_cnt = 1;
     blob_init(ctx->recv_data);
     blob_init(ctx->send_data);
     event_init(ctx);
@@ -671,9 +681,26 @@ static void context_close(oid_t peer)
     s_free_contexts.push(ctx);
 }
 
+static void context_incref(context_t *ctx)
+{
+    __sync_add_and_fetch(&(ctx->ref_cnt), 1);
+}
+
+static void context_decref(context_t *ctx)
+{
+    if (__sync_sub_and_fetch(&(ctx->ref_cnt), 1) <= 0) {
+        context_fini(ctx);
+    }
+}
+
 static void context_fini(context_t *ctx)
 {
     assert(ctx);
+
+    if (ctx->ref_cnt > 0) {
+        return;
+    }
+
     mutex_fini(&ctx->lock);
     LOG_INFO("net", "%s is FREED. S: %d/%d R: %d/%d.",
             ctx->peer.info,
