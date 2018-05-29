@@ -24,6 +24,7 @@
 #include <mutex>
 
 #include <grpc/grpc.h>
+#include <grpc/grpc_posix.h>
 #include <grpc++/channel.h>
 #include <grpc++/client_context.h>
 #include <grpc++/create_channel.h>
@@ -337,6 +338,8 @@ int open(int id, const std::string &name,
         readCfg(certFile, cert);
     }
 
+    // disable signal
+    grpc_use_signal(-1);
     std::shared_ptr<struct RpcSession> s = RpcSessionInit(id, name, peer, ip, port, ca_cert, key, cert, metaList);
     RpcSessionStart(s);
     return 0;
