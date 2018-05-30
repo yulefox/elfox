@@ -37,3 +37,7 @@ tags
 *.out
 *.app
 
+src/elf/net/proto/dbus.grpc.pb.cpp
+src/elf/net/proto/dbus.grpc.pb.h
+src/elf/net/proto/dbus.pb.cpp
+src/elf/net/proto/dbus.pb.h
