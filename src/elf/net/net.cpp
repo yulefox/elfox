@@ -38,6 +38,9 @@ static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
 static const int NAME_SIZE_MASK = 0xFFFFFF;
 static const int NAME_SIZE_BITS = 24;
+static const int WORKER_THREAD_SIZE = 4; // (2^n)
+static const int WORKER_THREAD_SIZE_MASK = WORKER_THREAD_SIZE - 1;
+static const int CONTEXT_FREE_THRESHOLD = 1024;
 
 enum MSG_FLAG {
     ENCRYPT_FLAG    = 0x1,
@@ -54,9 +57,11 @@ struct stat_msg_t;
 
 typedef std::list<chunk_t *> chunk_queue;
 typedef std::map<std::string, stat_msg_t *> msg_map;
-typedef std::queue<context_t *> free_context_queue;
 typedef std::deque<recv_message_t *> recv_message_queue;
+typedef xqueue<context_t *> free_context_queue;
 typedef xqueue<recv_message_t *> recv_message_xqueue;
+typedef xqueue<context_t *> context_xqueue;
+typedef xqueue<blob_t*> write_context_xqueue;
 
 struct stat_msg_t {
     int msg_num; // number of recv given msg
@@ -101,11 +106,13 @@ struct blob_t {
     int msg_size; // current recv msg size(for splicing)
     int total_size; // total send/recv msg size
     int pending_size; // pending send/recv msg size
+    void *ctx;
 };
 
 struct chunk_t {
     int wr_offset;
     int rd_offset;
+    int data_size;
     int size;
     char data[0];
 };
@@ -134,6 +141,8 @@ struct context_t {
     int error_times;
     int ref_cnt;
     bool internal;
+    int running;
+    int instance;
 
     context_t()
     {
@@ -144,6 +153,35 @@ struct context_t {
     {
         ++s_stat.context_size_released;
     }
+
+    int inc_ref()
+    {
+        return __sync_add_and_fetch(&ref_cnt, 1);
+    }
+
+    int dec_ref()
+    {
+        return __sync_sub_and_fetch(&ref_cnt, 1);
+    }
+
+    int ref()
+    {
+        return __sync_val_compare_and_swap(&ref_cnt, 0, 0);
+    }
+
+    int alive()
+    {
+        return __sync_val_compare_and_swap(&running, 1, 1);
+    }
+
+    int hash()
+    {
+        int idx = peer.sock & WORKER_THREAD_SIZE_MASK;
+        if (internal) {
+            idx = WORKER_THREAD_SIZE;
+        }
+        return idx;
+    }
 };
 
 typedef std::map<oid_t, context_t *> context_map;
@@ -151,6 +189,12 @@ typedef std::set<oid_t> context_set;
 
 static thread_t s_tid; // io thread
 static thread_t s_cid; // context thread
+static thread_t s_writer_tid[WORKER_THREAD_SIZE + 1]; // writer thread
+static thread_t s_reader_tid[WORKER_THREAD_SIZE + 1]; // reader thread
+
+static context_xqueue s_pending_read[WORKER_THREAD_SIZE + 1];
+static write_context_xqueue s_pending_write[WORKER_THREAD_SIZE + 1];
+
 static spin_t s_context_lock;
 static spin_t s_pre_context_lock;
 static int s_epoll;
@@ -161,6 +205,7 @@ static context_map s_contexts;
 static context_set s_pre_contexts;
 static free_context_queue s_free_contexts;
 static std::set<std::string> s_raw_msgs;
+static std::list<context_t*> s_pending_gc;
 
 ///
 /// Running.
@@ -173,14 +218,18 @@ static context_t *context_init(int idx, oid_t peer, int fd,
 static context_t *context_init6(int idx, oid_t peer, int fd,
         const struct sockaddr_in6 &addr);
 static void context_close(oid_t peer);
-static void context_fini(context_t *ctx);
-static void context_incref(context_t *ctx);
-static void context_decref(context_t *ctx);
+static bool context_fini(context_t *ctx);
+static void context_stop(context_t *ctx);
 static void on_accept(const epoll_event &evt);
 static void on_accept6(const epoll_event &evt);
 static void on_read(const epoll_event &evt);
 static void on_write(const epoll_event &evt);
+static void handle_read(context_t *ctx);
+static bool handle_write(context_t *ctx);
 static void on_error(const epoll_event &evt);
+static void append_send(context_t *ctx, blob_t *msg);
+static void blob_init(blob_t *blob, context_t *ctx);
+static void blob_fini(blob_t *blob);
 
 
 static bool is_raw_msg(const std::string &name)
@@ -192,9 +241,28 @@ static void *net_thread(void *args)
 {
     while (true) {
         net_update();
-        usleep(50);
     }
     return NULL;
+}
+
+static void context_stop(context_t *ctx)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    if (0 == __sync_val_compare_and_swap(&(ctx->running), 1, 0)) {
+        return;
+    }
+
+    LOG_DEBUG("net", "context stop: %lld %d %d", ctx->peer.id, ctx->peer.sock, ctx->internal);
+
+    // do notify wthread
+    int idx = ctx->hash();
+
+    blob_t *msg = E_NEW blob_t;
+    blob_init(msg, ctx);
+    s_pending_write[idx].push(msg);
 }
 
 static void *context_thread(void *args)
@@ -212,21 +280,79 @@ static void *context_thread(void *args)
             context_close(*itr);
         }
 
-        time_t ct = time_s();
-
-        while (!s_free_contexts.empty()) {
-            context_t *ctx = s_free_contexts.front();
-
-            if ((ct - ctx->close_time) < CONTEXT_CLOSE_TIME) {
-                break;
+        for (std::list<context_t*>::iterator itr = s_pending_gc.begin(); itr != s_pending_gc.end(); ) {
+            context_t *ctx = *itr;
+            if (ctx == NULL) {
+                itr = s_pending_gc.erase(itr);
+            } else {
+                if (context_fini(ctx)) {
+                    itr = s_pending_gc.erase(itr);
+                } else {
+                    ++itr;
+                }
             }
-            context_decref(ctx);
-            s_free_contexts.pop();
         }
-        usleep(500);
+
+        // free
+        while (s_free_contexts.size() > CONTEXT_FREE_THRESHOLD) {
+            context_t *ctx = NULL;
+            s_free_contexts.pop(ctx);
+            if (ctx != NULL) {
+                E_DELETE ctx;
+            }
+        }
+        usleep(50000);
     }
     return NULL;
 }
+
+
+static void *net_reader(void *args)
+{
+    context_xqueue *que = (context_xqueue *)(args);
+    while (true) {
+        context_t *ctx;
+        que->pop(ctx);
+        handle_read(ctx);
+    }
+    return NULL;
+}
+
+static void *net_writer(void *args)
+{
+    write_context_xqueue *que = (write_context_xqueue *)(args);
+
+    while (true) {
+        blob_t *msg = NULL;
+        que->pop(msg);
+
+        ///
+        int instance;
+        context_t *ctx = (context_t*)(msg->ctx);
+        instance = (uintptr_t)ctx & 1;
+        ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
+        if (ctx->peer.sock == -1 || ctx->instance != instance) {
+            LOG_DEBUG("net", "%s", "expired send req...");
+            blob_fini(msg);
+            continue;
+        }
+
+        if (ctx->alive() == 1) {
+            if (msg != NULL && msg->total_size > 0) {
+                append_send(ctx, msg);
+            }
+            handle_write(ctx);
+        }
+        blob_fini(msg);
+
+        // release
+        if (ctx->alive() == 0) {
+            net_close(ctx->peer.id);
+        }
+    }
+    return NULL;
+}
+
 
 static int net_update(void)
 {
@@ -305,6 +431,7 @@ static chunk_t *chunk_init(size_t size)
 
     c->wr_offset = 0;
     c->rd_offset = 0;
+    c->data_size = size;
     c->size = size;
     memset(c->data, 0, size);
     ++s_stat.chunk_size_created;
@@ -341,8 +468,7 @@ static recv_message_t *recv_message_init(context_t *ctx)
     msg->ctx = ctx;
     msg->rpc_ctx = NULL;
     msg->is_raw = false;
-
-    context_incref(ctx);
+    ctx->inc_ref();
     return msg;
 }
 
@@ -351,7 +477,9 @@ static void recv_message_fini(recv_message_t *msg)
     assert(msg);
 
     //
-    context_decref(msg->ctx);
+    if (msg->ctx != NULL) {
+        msg->ctx->dec_ref();
+    }
 
     S_DELETE(msg->pb);
     E_DELETE msg;
@@ -536,18 +664,30 @@ static bool message_splice(context_t *ctx)
     return true;
 }
 
-static void blob_init(blob_t *blob)
+static void blob_init(blob_t *blob, context_t *ctx)
 {
     assert(blob);
     blob->chunks.clear();
     blob->msg_size = 0;
     blob->total_size = 0;
     blob->pending_size = 0;
+
+    if (ctx != NULL) {
+        ctx->inc_ref();
+        blob->ctx = (void*)((uintptr_t)ctx | ctx->instance);
+    }
 }
 
 static void blob_fini(blob_t *blob)
 {
     assert(blob);
+
+    if (blob->ctx != NULL) {
+        context_t *ctx = (context_t*)(blob->ctx);
+        //int instance = (uintptr_t)ctx & 1;
+        ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
+        ctx->dec_ref();
+    }
 
     chunk_queue::iterator itr = blob->chunks.begin();
 
@@ -564,14 +704,29 @@ static void event_init(context_t *ctx)
     epoll_event *evt = &(ctx->evt);
 
     memset(evt, 0, sizeof(*evt));
-    evt->data.ptr = ctx;
+    evt->data.ptr = (void*)((uintptr_t)ctx | ctx->instance);
     evt->events = EPOLLIN|EPOLLOUT|EPOLLET|EPOLLERR;
+}
+
+
+static context_t *context_alloc()
+{
+    context_t *ctx = NULL;
+
+    if (s_free_contexts.size() > 0) {
+        s_free_contexts.pop(ctx);
+    } else {
+        ctx = E_NEW context_t;
+        ctx->instance = 0;
+    }
+
+    return ctx;
 }
 
 static context_t *context_init(int idx, oid_t peer, int fd,
         const struct sockaddr_in &addr)
 {
-    context_t *ctx = E_NEW context_t;
+    context_t *ctx = context_alloc();
 
     ctx->peer.idx = idx;
     ctx->peer.id = (peer != 0) ? peer : oid_gen();
@@ -593,9 +748,12 @@ static context_t *context_init(int idx, oid_t peer, int fd,
     ctx->encipher = NULL;
     ctx->decipher = NULL;
     ctx->internal = false;
+    ctx->running = 1;
     ctx->ref_cnt = 1;
-    blob_init(ctx->recv_data);
-    blob_init(ctx->send_data);
+    int instance = ctx->instance;
+    ctx->instance = !instance;
+    blob_init(ctx->recv_data, NULL);
+    blob_init(ctx->send_data, NULL);
     event_init(ctx);
     mutex_init(&ctx->lock);
     spin_lock(&s_context_lock);
@@ -614,7 +772,7 @@ static context_t *context_init(int idx, oid_t peer, int fd,
 static context_t *context_init6(int idx, oid_t peer, int fd,
         const struct sockaddr_in6 &addr)
 {
-    context_t *ctx = E_NEW context_t;
+    context_t *ctx = context_alloc();
 
     ctx->peer.idx = idx;
     ctx->peer.id = (peer != 0) ? peer : oid_gen();
@@ -636,9 +794,12 @@ static context_t *context_init6(int idx, oid_t peer, int fd,
     ctx->encipher = NULL;
     ctx->decipher = NULL;
     ctx->internal = false;
+    ctx->running = 1;
     ctx->ref_cnt = 1;
-    blob_init(ctx->recv_data);
-    blob_init(ctx->send_data);
+    int instance = ctx->instance;
+    ctx->instance = !instance;
+    blob_init(ctx->recv_data, NULL);
+    blob_init(ctx->send_data, NULL);
     event_init(ctx);
     mutex_init(&ctx->lock);
     spin_lock(&s_context_lock);
@@ -678,30 +839,26 @@ static void context_close(oid_t peer)
     s_recv_msgs.push(msg);
 
     ctx->close_time = time_s();
-    s_free_contexts.push(ctx);
+    //context_fini(ctx);
+    //
+    ctx->dec_ref();
+
+    //
+    s_pending_gc.push_back(ctx);
 }
 
-static void context_incref(context_t *ctx)
-{
-    __sync_add_and_fetch(&(ctx->ref_cnt), 1);
-}
-
-static void context_decref(context_t *ctx)
-{
-    if (__sync_sub_and_fetch(&(ctx->ref_cnt), 1) <= 0) {
-        context_fini(ctx);
-    }
-}
-
-static void context_fini(context_t *ctx)
+static bool context_fini(context_t *ctx)
 {
     assert(ctx);
 
-    if (ctx->ref_cnt > 0) {
-        return;
+    if (__sync_val_compare_and_swap(&(ctx->ref_cnt), 0, 0) > 0) {
+        return false;
     }
 
     mutex_fini(&ctx->lock);
+
+    LOG_DEBUG("net", "context del: id<%lld> sock<%d>", ctx->peer.id, ctx->peer.sock);
+
     LOG_INFO("net", "%s is FREED. S: %d/%d R: %d/%d.",
             ctx->peer.info,
             ctx->send_data->pending_size,
@@ -712,7 +869,16 @@ static void context_fini(context_t *ctx)
     blob_fini(ctx->recv_data);
     cipher_fini(ctx->encipher);
     cipher_fini(ctx->decipher);
-    E_DELETE(ctx);
+
+    ctx->send_data = NULL;
+    ctx->recv_data = NULL;
+    ctx->peer.sock = -1;
+    ctx->peer.id = 0;
+    //E_DELETE(ctx);
+
+    // gc
+    s_free_contexts.push(ctx);
+    return true;
 }
 
 static context_t *context_find(oid_t peer)
@@ -747,60 +913,28 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
 
 static void push_send(context_t *ctx, blob_t *msg)
 {
-    assert(ctx && msg);
-    mutex_lock(&(ctx->lock));
-    chunk_queue::const_iterator itr = msg->chunks.begin();
+    if (ctx->alive() == 1) {
+        int idx = ctx->hash();
+        s_pending_write[idx].push(msg);
+    }
+}
 
+static void append_send(context_t *ctx, blob_t *msg)
+{
+    assert(ctx && msg);
+    chunk_queue::const_iterator itr = msg->chunks.begin();
     for (; itr != msg->chunks.end(); ++itr) {
         chunk_t *c = *itr;
+
+        c->data_size = c->wr_offset;
         ctx->send_data->chunks.push_back(c);
     }
     msg->chunks.clear();
     ctx->send_data->pending_size += msg->total_size;
     ctx->send_data->total_size += msg->total_size;
-    mutex_unlock(&(ctx->lock));
+
     ++s_stat.send_msg_num;
     s_stat.send_msg_size += msg->total_size;
-
-    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
-        LOG_INFO("net", "%s epoll_ctl FAILED: %s.",
-                ctx->peer.info,
-                strerror(errno));
-    }
-}
-
-static void push_send(context_t *ctx, chunk_queue &chunks)
-{
-    assert(ctx);
-
-    mutex_lock(&(ctx->lock));
-    chunk_queue::const_reverse_iterator itr = chunks.rbegin();
-
-    for (; itr != chunks.rend(); ++itr) {
-        ctx->send_data->chunks.push_front(*itr);
-    }
-    mutex_unlock(&(ctx->lock));
-
-    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
-        LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
-                ctx->peer.info,
-                strerror(errno));
-    }
-}
-
-static chunk_t *pop_send(context_t *ctx, chunk_queue &clone)
-{
-    assert(ctx);
-
-    chunk_t *c = NULL;
-    mutex_lock(&(ctx->lock));
-    chunk_queue &src = ctx->send_data->chunks;
-    for (size_t i = 0; i < CHUNK_MAX_NUM && !src.empty(); ++i) {
-        clone.push_back(src.front());
-        src.pop_front();
-    }
-    mutex_unlock(&(ctx->lock));
-    return c;
 }
 
 int net_init(void)
@@ -815,6 +949,12 @@ int net_init(void)
     spin_init(&s_pre_context_lock);
     s_tid = thread_init(net_thread, NULL);
     s_cid = thread_init(context_thread, NULL);
+
+    for (int i = 0; i < WORKER_THREAD_SIZE + 1; i++) {
+        s_writer_tid[i] = thread_init(net_writer, s_pending_write + i);
+        s_reader_tid[i] = thread_init(net_reader, s_pending_read + i);
+    }
+
     return 0;
 }
 
@@ -1183,7 +1323,7 @@ blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb
         encipher = ctx->encipher;
     }
 
-    blob_init(msg);
+    blob_init(msg, ctx);
 
     int name_len = pb_name.size();
     int body_len = pb_body.size();
@@ -1296,7 +1436,7 @@ void net_send(oid_t peer, const pb_t &pb, oid_t dest)
     blob_t *msg = net_encode(peer, pb, dest);
 
     net_send(peer, msg);
-    blob_fini(msg);
+    //blob_fini(msg);
 }
 
 void net_send(const id_set &peers, const pb_t &pb, oid_t dest)
@@ -1311,7 +1451,7 @@ void net_send(const id_set &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(*itr, name, body, dest);
         net_send(*itr, msg);
-        blob_fini(msg);
+        //blob_fini(msg);
     }
 }
 
@@ -1327,7 +1467,7 @@ void net_send(const obj_map_id &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->first, name, body, dest);
         net_send(itr->first, msg);
-        blob_fini(msg);
+        //blob_fini(msg);
     }
 }
 
@@ -1343,7 +1483,7 @@ void net_send(const pb_map_id &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->first, name, body, dest);
         net_send(itr->first, msg);
-        blob_fini(msg);
+        //blob_fini(msg);
     }
 }
 
@@ -1359,7 +1499,7 @@ void net_send(const id_limap &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->first, name, body, dest);
         net_send(itr->first, msg);
-        blob_fini(msg);
+        //blob_fini(msg);
     }
 }
 
@@ -1375,7 +1515,7 @@ void net_send(const id_ilmap &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->second, name, body, dest);
         net_send(itr->second, msg);
-        blob_fini(msg);
+        //blob_fini(msg);
     }
 }
 
@@ -1383,7 +1523,7 @@ void net_rawsend(oid_t peer, const std::string &name, const std::string &body, o
 {
     blob_t *msg = net_encode(peer, name, body, dest);
     net_send(peer, msg);
-    blob_fini(msg);
+    //blob_fini(msg);
 }
 
 void net_rawsend(const id_set &peers, const std::string &name, const std::string &body, oid_t dest)
@@ -1466,14 +1606,31 @@ static void on_accept6(const epoll_event &evt)
 
 static void on_read(const epoll_event &evt)
 {
-    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
+    int instance;
+    context_t *ctx = (context_t*)(evt.data.ptr);
+    instance = (uintptr_t)ctx & 1;
+    ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
+    if (ctx->peer.sock == -1 || ctx->instance != instance) {
+        LOG_DEBUG("net", "%s", "expired read event...");
+        return;
+    }
+
+    if (ctx != NULL && ctx->alive() == 1) {
+        int idx = ctx->hash();
+
+        LOG_DEBUG("net", "on_read: sock: %d, internal: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
+        s_pending_read[idx].push(ctx);
+    }
+}
+
+static void handle_read(context_t *ctx)
+{
     int size = CHUNK_SIZE_L;
     int sock = ctx->peer.sock;
     chunk_queue chunks;
 
     static char buf[CHUNK_SIZE_L];
     while (size > 0) {
-
         size = recv(sock, buf, sizeof(buf), 0);
 
         if (size < 0) {
@@ -1486,7 +1643,7 @@ static void on_read(const epoll_event &evt)
                 LOG_INFO("net", "%s recv FAILED: %s.",
                         ctx->peer.info,
                         strerror(errno));
-                net_close(ctx->peer.id);
+                context_stop(ctx);
                 return;
             }
             break;
@@ -1495,11 +1652,10 @@ static void on_read(const epoll_event &evt)
         // client disconnect socket
         if (0 == size) {
             chunk_queue::iterator itr = chunks.begin();
-
             for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
                 chunk_fini(*itr);
             }
-            net_close(ctx->peer.id);
+            context_stop(ctx);
             return;
         }
 
@@ -1513,7 +1669,7 @@ static void on_read(const epoll_event &evt)
             for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
                 chunk_fini(*itr);
             }
-            net_close(ctx->peer.id);
+            context_stop(ctx);
             LOG_WARN("net", "%s <%d> chunk num over range, force closed.",
                     ctx->peer.info, chunks.size());
             return;
@@ -1525,33 +1681,54 @@ static void on_read(const epoll_event &evt)
     push_recv(ctx, chunks);
 }
 
+
+
 static void on_write(const epoll_event &evt)
 {
-    context_t *ctx = static_cast<context_t *>(evt.data.ptr);
-    chunk_queue chunks;
+    int instance;
+    context_t *ctx = (context_t*)(evt.data.ptr);
+    instance = (uintptr_t)ctx & 1;
+    ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
+    if (ctx->peer.sock == -1 || ctx->instance != instance) {
+        LOG_DEBUG("net", "%s", "expired write event...");
+        return;
+    }
 
-    pop_send(ctx, chunks);
+    if (ctx != NULL && ctx->alive() == 1) {
+        int idx = ctx->hash();
 
+        blob_t *msg = E_NEW blob_t;
+        blob_init(msg, ctx);
+
+        LOG_DEBUG("net", "on_write: sock: %d, internel: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
+        s_pending_write[idx].push(msg);
+    }
+}
+
+static bool handle_write(context_t *ctx)
+{
+    int sock = ctx->peer.sock;
     int sum = 0;
-    chunk_queue::iterator itr = chunks.begin();
-    while (itr != chunks.end()) {
-        chunk_t *c = *itr;
-        int rem = c->wr_offset - c->rd_offset;
+    chunk_queue &chunks = ctx->send_data->chunks;
 
-        while (rem > 0) {
-            int num = send(ctx->peer.sock,
-                    c->data + c->rd_offset, rem, 0);
+    while (ctx->alive() && !chunks.empty()) {
+        chunk_t *c = chunks.front();
+        if (c == NULL) continue;
+
+        int rem = c->data_size - c->rd_offset;
+        while (ctx->alive() && rem > 0) {
+            int num = send(sock, c->data + c->rd_offset, rem, 0);
             if (num < 0) {
                 if (errno != EINTR && errno != EAGAIN) {
-                    for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
-                        chunk_fini(*itr);
-                    }
-                    net_close(ctx->peer.id);
                     LOG_ERROR("net", "%s send FAILED: %s.",
                             ctx->peer.info,
                             strerror(errno));
                 } else {
-                    push_send(ctx, chunks);
+                    if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
+                        LOG_INFO("net", "%s epoll_ctl FAILED: %s.",
+                                ctx->peer.info,
+                                strerror(errno));
+                    }
                 }
                 goto stat;
             } else {
@@ -1560,14 +1737,24 @@ static void on_write(const epoll_event &evt)
                 sum += num;
             }
         }
+        chunks.pop_front();
         chunk_fini(c);
-        itr = chunks.erase(itr);
+        if (sum >= 1024 * 32) {
+            if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
+                LOG_INFO("net", "%s epoll_ctl FAILED: %s.",
+                        ctx->peer.info,
+                        strerror(errno));
+            }
+            LOG_INFO("net", "%s", "release resource...");
+            break;
+        }
     }
+
 stat:
-    mutex_lock(&(ctx->lock));
     ctx->send_data->pending_size -= sum;
-    mutex_unlock(&(ctx->lock));
+    return chunks.empty();
 }
+
 
 static void on_error(const epoll_event &evt)
 {
