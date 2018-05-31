@@ -671,6 +671,7 @@ static void blob_init(blob_t *blob, context_t *ctx)
     blob->msg_size = 0;
     blob->total_size = 0;
     blob->pending_size = 0;
+    blob->ctx = NULL;
 
     if (ctx != NULL) {
         ctx->inc_ref();
