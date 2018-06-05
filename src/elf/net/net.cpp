@@ -112,7 +112,6 @@ struct blob_t {
 struct chunk_t {
     int wr_offset;
     int rd_offset;
-    int data_size;
     int size;
     char data[0];
 };
@@ -143,6 +142,7 @@ struct context_t {
     bool internal;
     int running;
     int instance;
+    int worker_idx;
 
     context_t()
     {
@@ -173,15 +173,6 @@ struct context_t {
     {
         return __sync_val_compare_and_swap(&running, 1, 1);
     }
-
-    int hash()
-    {
-        int idx = peer.sock & WORKER_THREAD_SIZE_MASK;
-        if (internal) {
-            idx = WORKER_THREAD_SIZE;
-        }
-        return idx;
-    }
 };
 
 typedef std::map<oid_t, context_t *> context_map;
@@ -200,6 +191,7 @@ static spin_t s_pre_context_lock;
 static int s_epoll;
 static int s_sock;
 static int s_sock6;
+static int s_next_worker = 0;
 static recv_message_xqueue s_recv_msgs;
 static context_map s_contexts;
 static context_set s_pre_contexts;
@@ -258,11 +250,9 @@ static void context_stop(context_t *ctx)
     LOG_DEBUG("net", "context stop: %lld %d %d", ctx->peer.id, ctx->peer.sock, ctx->internal);
 
     // do notify wthread
-    int idx = ctx->hash();
-
     blob_t *msg = E_NEW blob_t;
     blob_init(msg, ctx);
-    s_pending_write[idx].push(msg);
+    s_pending_write[ctx->worker_idx].push(msg);
 }
 
 static void *context_thread(void *args)
@@ -311,9 +301,13 @@ static void *net_reader(void *args)
 {
     context_xqueue *que = (context_xqueue *)(args);
     while (true) {
-        context_t *ctx;
-        que->pop(ctx);
-        handle_read(ctx);
+        std::deque<context_t*> ctxs;
+        std::deque<context_t*>::iterator itr;
+        que->swap(ctxs);
+        for (itr = ctxs.begin(); itr != ctxs.end(); ++itr) {
+            handle_read(*itr);
+        }
+        usleep(50000);
     }
     return NULL;
 }
@@ -431,7 +425,6 @@ static chunk_t *chunk_init(size_t size)
 
     c->wr_offset = 0;
     c->rd_offset = 0;
-    c->data_size = size;
     c->size = size;
     memset(c->data, 0, size);
     ++s_stat.chunk_size_created;
@@ -577,7 +570,7 @@ static bool message_splice(context_t *ctx)
         LOG_WARN("net", "%s OVER PENDING message: %d.",
                 ctx->peer.info,
                 ctx->recv_data->pending_size);
-        net_close(ctx->peer.id);
+        context_stop(ctx);
         return false;
     }
 
@@ -590,7 +583,7 @@ static bool message_splice(context_t *ctx)
         LOG_TRACE("net", "%s INVALID message size: %d.",
                 ctx->peer.info,
                 msg_size);
-        net_close(ctx->peer.id);
+        context_stop(ctx);
         return false;
     }
 
@@ -607,7 +600,7 @@ static bool message_splice(context_t *ctx)
         LOG_TRACE("net", "%s INVALID name length: %d:%d.",
                 ctx->peer.info,
                 msg_size, name_len);
-        net_close(ctx->peer.id);
+        context_stop(ctx);
         return false;
     }
 
@@ -619,7 +612,7 @@ static bool message_splice(context_t *ctx)
         LOG_TRACE("net", "%s INVALID message size %d:%d:%d.",
                 ctx->peer.info,
                 msg_size, name_len, body_len);
-        net_close(ctx->peer.id);
+        context_stop(ctx);
         return false;
     }
 
@@ -721,6 +714,8 @@ static context_t *context_alloc()
         ctx->instance = 0;
     }
 
+    //
+    ctx->worker_idx = __sync_fetch_and_add(&s_next_worker, 1) & WORKER_THREAD_SIZE_MASK;
     return ctx;
 }
 
@@ -858,8 +853,6 @@ static bool context_fini(context_t *ctx)
 
     mutex_fini(&ctx->lock);
 
-    LOG_DEBUG("net", "context del: id<%lld> sock<%d>", ctx->peer.id, ctx->peer.sock);
-
     LOG_INFO("net", "%s is FREED. S: %d/%d R: %d/%d.",
             ctx->peer.info,
             ctx->send_data->pending_size,
@@ -915,8 +908,7 @@ static void push_recv(context_t *ctx, chunk_queue &chunks)
 static void push_send(context_t *ctx, blob_t *msg)
 {
     if (ctx->alive() == 1) {
-        int idx = ctx->hash();
-        s_pending_write[idx].push(msg);
+        s_pending_write[ctx->worker_idx].push(msg);
     }
 }
 
@@ -926,8 +918,6 @@ static void append_send(context_t *ctx, blob_t *msg)
     chunk_queue::const_iterator itr = msg->chunks.begin();
     for (; itr != msg->chunks.end(); ++itr) {
         chunk_t *c = *itr;
-
-        c->data_size = c->wr_offset;
         ctx->send_data->chunks.push_back(c);
     }
     msg->chunks.clear();
@@ -951,7 +941,7 @@ int net_init(void)
     s_tid = thread_init(net_thread, NULL);
     s_cid = thread_init(context_thread, NULL);
 
-    for (int i = 0; i < WORKER_THREAD_SIZE + 1; i++) {
+    for (int i = 0; i < WORKER_THREAD_SIZE; i++) {
         s_writer_tid[i] = thread_init(net_writer, s_pending_write + i);
         s_reader_tid[i] = thread_init(net_reader, s_pending_read + i);
     }
@@ -1555,6 +1545,7 @@ static void on_accept(const epoll_event &evt)
         context_t *ctx = context_init(0, 0, fd, addr);
 
         LOG_DEBUG("net", "%s", "accept new connection...");
+        LOG_INFO("net", "accept new connection fd=%d...", fd);
 
         if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
             LOG_ERROR("net", "%s epoll_ctl FAILED: %s.",
@@ -1607,30 +1598,31 @@ static void on_accept6(const epoll_event &evt)
 
 static void on_read(const epoll_event &evt)
 {
-    int instance;
     context_t *ctx = (context_t*)(evt.data.ptr);
-    instance = (uintptr_t)ctx & 1;
+    if (ctx == NULL) {
+        return;
+    }
+
+    int instance = (uintptr_t)ctx & 1;
     ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
-    if (ctx->peer.sock == -1 || ctx->instance != instance) {
+    if (ctx->alive() == 0 || ctx->peer.sock < 0 || ctx->instance != instance) {
         LOG_DEBUG("net", "%s", "expired read event...");
         return;
     }
 
-    if (ctx != NULL && ctx->alive() == 1) {
-        int idx = ctx->hash();
-
-        LOG_DEBUG("net", "on_read: sock: %d, internal: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
-        s_pending_read[idx].push(ctx);
-    }
+    //LOG_DEBUG("net", "on_read: sock: %d, internal: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
+    s_pending_read[ctx->worker_idx].push(ctx);
 }
 
 static void handle_read(context_t *ctx)
 {
+    LOG_INFO("net", "thread %lld, ctx %p, internal %d", pthread_self(), ctx, ctx->internal);
     int size = CHUNK_SIZE_L;
     int sock = ctx->peer.sock;
     chunk_queue chunks;
 
-    static char buf[CHUNK_SIZE_L];
+    char buf[CHUNK_SIZE_L];
+    LOG_INFO("net", "pthread: %lld, ctx: %p, buf: %p\n", pthread_self(), ctx, buf);
     while (size > 0) {
         size = recv(sock, buf, sizeof(buf), 0);
 
@@ -1656,11 +1648,13 @@ static void handle_read(context_t *ctx)
             for (itr = chunks.begin(); itr != chunks.end(); ++itr) {
                 chunk_fini(*itr);
             }
+            LOG_INFO("net", "%s is closed by peer.", ctx->peer.info);
             context_stop(ctx);
             return;
         }
 
         chunk_t *c = chunk_init(buf, size);
+        assert(c->wr_offset > 0);
 
         // append received chunk
         chunks.push_back(c);
@@ -1671,7 +1665,7 @@ static void handle_read(context_t *ctx)
                 chunk_fini(*itr);
             }
             context_stop(ctx);
-            LOG_WARN("net", "%s <%d> chunk num over range, force closed.",
+            LOG_ERROR("net", "%s <%d> chunk num over range, force closed.",
                     ctx->peer.info, chunks.size());
             return;
         }
@@ -1696,13 +1690,11 @@ static void on_write(const epoll_event &evt)
     }
 
     if (ctx != NULL && ctx->alive() == 1) {
-        int idx = ctx->hash();
-
         blob_t *msg = E_NEW blob_t;
         blob_init(msg, ctx);
 
-        LOG_DEBUG("net", "on_write: sock: %d, internel: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
-        s_pending_write[idx].push(msg);
+        //LOG_DEBUG("net", "on_write: sock: %d, internel: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
+        s_pending_write[ctx->worker_idx].push(msg);
     }
 }
 
@@ -1716,7 +1708,7 @@ static bool handle_write(context_t *ctx)
         chunk_t *c = chunks.front();
         if (c == NULL) continue;
 
-        int rem = c->data_size - c->rd_offset;
+        int rem = c->wr_offset - c->rd_offset;
         while (ctx->alive() && rem > 0) {
             int num = send(sock, c->data + c->rd_offset, rem, 0);
             if (num < 0) {
@@ -1740,13 +1732,12 @@ static bool handle_write(context_t *ctx)
         }
         chunks.pop_front();
         chunk_fini(c);
-        if (sum >= 1024 * 32) {
+        if (sum >= 1024 * 32 && !ctx->internal) {
             if (0 != epoll_ctl(s_epoll, EPOLL_CTL_MOD, ctx->peer.sock, &(ctx->evt))) {
                 LOG_INFO("net", "%s epoll_ctl FAILED: %s.",
                         ctx->peer.info,
                         strerror(errno));
             }
-            LOG_INFO("net", "%s", "release resource...");
             break;
         }
     }
