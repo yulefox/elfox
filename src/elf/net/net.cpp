@@ -16,6 +16,7 @@
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include <algorithm>
 #include <deque>
 #include <list>
@@ -38,8 +39,7 @@ static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
 static const int NAME_SIZE_MASK = 0xFFFFFF;
 static const int NAME_SIZE_BITS = 24;
-static const int WORKER_THREAD_SIZE = 4; // (2^n)
-static const int WORKER_THREAD_SIZE_MASK = WORKER_THREAD_SIZE - 1;
+static const int DEFAULT_WORKER_THREAD_SIZE = 4;
 static const int CONTEXT_FREE_THRESHOLD = 1024;
 
 enum MSG_FLAG {
@@ -180,11 +180,11 @@ typedef std::set<oid_t> context_set;
 
 static thread_t s_tid; // io thread
 static thread_t s_cid; // context thread
-static thread_t s_writer_tid[WORKER_THREAD_SIZE + 1]; // writer thread
-static thread_t s_reader_tid[WORKER_THREAD_SIZE + 1]; // reader thread
+static thread_t *s_writer_tid; // writer thread
+static thread_t *s_reader_tid; // reader thread
 
-static context_xqueue s_pending_read[WORKER_THREAD_SIZE + 1];
-static write_context_xqueue s_pending_write[WORKER_THREAD_SIZE + 1];
+static context_xqueue *s_pending_read;
+static write_context_xqueue *s_pending_write;
 
 static spin_t s_context_lock;
 static spin_t s_pre_context_lock;
@@ -192,6 +192,7 @@ static int s_epoll;
 static int s_sock;
 static int s_sock6;
 static int s_next_worker = 0;
+static int s_worker_num;
 static recv_message_xqueue s_recv_msgs;
 static context_map s_contexts;
 static context_set s_pre_contexts;
@@ -715,7 +716,7 @@ static context_t *context_alloc()
     }
 
     //
-    ctx->worker_idx = __sync_fetch_and_add(&s_next_worker, 1) & WORKER_THREAD_SIZE_MASK;
+    ctx->worker_idx = __sync_fetch_and_add(&s_next_worker, 1) % s_worker_num;
     return ctx;
 }
 
@@ -928,7 +929,13 @@ static void append_send(context_t *ctx, blob_t *msg)
     s_stat.send_msg_size += msg->total_size;
 }
 
-int net_init(void)
+
+static int get_cpus()
+{    
+    return sysconf(_SC_NPROCESSORS_ONLN);
+}
+
+int net_init(int worker_num)
 {
     MODULE_IMPORT_SWITCH;
     s_epoll = epoll_create(1000);
@@ -941,7 +948,20 @@ int net_init(void)
     s_tid = thread_init(net_thread, NULL);
     s_cid = thread_init(context_thread, NULL);
 
-    for (int i = 0; i < WORKER_THREAD_SIZE; i++) {
+    s_worker_num = worker_num;
+    if (s_worker_num <= 0) {
+        s_worker_num = get_cpus();
+    }
+    if (s_worker_num <= 0) {
+        s_worker_num = DEFAULT_WORKER_THREAD_SIZE;
+    }
+    LOG_INFO("net", "worker num: %d, cpus: %d", s_worker_num, get_cpus());
+
+    s_writer_tid = E_NEW thread_t[s_worker_num];
+    s_reader_tid = E_NEW thread_t[s_worker_num];
+    s_pending_read = E_NEW context_xqueue[s_worker_num];
+    s_pending_write = E_NEW write_context_xqueue[s_worker_num];
+    for (int i = 0; i < s_worker_num; i++) {
         s_writer_tid[i] = thread_init(net_writer, s_pending_write + i);
         s_reader_tid[i] = thread_init(net_reader, s_pending_read + i);
     }
@@ -955,6 +975,10 @@ int net_fini(void)
     spin_fini(&s_pre_context_lock);
     spin_fini(&s_context_lock);
     close(s_epoll);
+    E_DELETE s_writer_tid;
+    E_DELETE s_reader_tid;
+    E_DELETE s_pending_read;
+    E_DELETE s_pending_write;
     return 0;
 }
 

@@ -47,6 +47,12 @@ const char *os_getenv(const char *name);
 /// @return int value of the environment variable, see getenv(3).
 ///
 int os_getenv_int(const char *name);
+
+
+///
+/// Get CPU number
+int get_cpus();
+
 } // namespace elf
 
 #endif /* !ELF_OS_H */
