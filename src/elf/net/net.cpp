@@ -1544,7 +1544,6 @@ static void on_accept(const epoll_event &evt)
 
         context_t *ctx = context_init(0, 0, fd, addr);
 
-        LOG_DEBUG("net", "%s", "accept new connection...");
         LOG_INFO("net", "accept new connection fd=%d...", fd);
 
         if (0 != epoll_ctl(s_epoll, EPOLL_CTL_ADD, fd, &(ctx->evt))) {
@@ -1616,13 +1615,11 @@ static void on_read(const epoll_event &evt)
 
 static void handle_read(context_t *ctx)
 {
-    LOG_INFO("net", "thread %lld, ctx %p, internal %d", pthread_self(), ctx, ctx->internal);
     int size = CHUNK_SIZE_L;
     int sock = ctx->peer.sock;
     chunk_queue chunks;
 
     char buf[CHUNK_SIZE_L];
-    LOG_INFO("net", "pthread: %lld, ctx: %p, buf: %p\n", pthread_self(), ctx, buf);
     while (size > 0) {
         size = recv(sock, buf, sizeof(buf), 0);
 
