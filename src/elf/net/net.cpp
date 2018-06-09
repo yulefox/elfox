@@ -10,6 +10,7 @@
 #include <elf/pc.h>
 #include <elf/thread.h>
 #include <elf/time.h>
+#include <elf/os.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -927,12 +928,6 @@ static void append_send(context_t *ctx, blob_t *msg)
 
     ++s_stat.send_msg_num;
     s_stat.send_msg_size += msg->total_size;
-}
-
-
-static int get_cpus()
-{    
-    return sysconf(_SC_NPROCESSORS_ONLN);
 }
 
 int net_init(int worker_num)
