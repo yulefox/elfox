@@ -53,7 +53,7 @@ struct recv_message_t {
 /// Initialize the network module.
 /// @return (0).
 ///
-int net_init(void);
+int net_init(int worker_num = 0);
 
 ///
 /// Release the network module.

@@ -8,6 +8,7 @@
 #  include <sys/stat.h>
 #  include <sys/types.h>
 #  include <stdlib.h>
+#  include <unistd.h>
 #endif
 
 namespace elf {
@@ -40,5 +41,15 @@ int os_getenv_int(const char *name)
         return 0;
     }
 }
+
+int get_cpus()
+{    
+#if defined(ELF_PLATFORM_LINUX)
+    return sysconf(_SC_NPROCESSORS_ONLN);
+#else
+    return 4;
+#endif
+}
+
 } // namespace elf
 

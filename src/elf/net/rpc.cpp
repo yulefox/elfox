@@ -189,6 +189,7 @@ static void readCfg(const std::string& filename, std::string& data)
 static void read_routine (std::shared_ptr<struct RpcSession> s,
         std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream)
 {
+    LOG_INFO("net", "rpc reader start: %lld ", s->peer);
     while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
         pb::Packet pkt;
         while (stream->Read(&pkt)) {
@@ -214,6 +215,7 @@ static void read_routine (std::shared_ptr<struct RpcSession> s,
 static void write_routine (std::shared_ptr<struct RpcSession> s,
         std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream)
 {
+    LOG_INFO("net", "rpc writer start: %lld ", s->peer);
     std::deque<pb::Packet*> pending;
     while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
         // get cached pkts
@@ -279,8 +281,10 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
                         context->AddMetadata(s->metaList[i].key, s->metaList[i].val);
                         LOG_INFO("net", "add metadata %s %s", s->metaList[i].key.c_str(), s->metaList[i].val.c_str());
                     }
-                    context->set_wait_for_ready(false);
+                    //context->set_wait_for_ready(false);
                 }
+                context->set_wait_for_ready(true);
+
                 stream = std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> >(stub->Stream(context));
                 reader = new std::thread(read_routine, s, stream);
                 writer = new std::thread(write_routine, s, stream);
