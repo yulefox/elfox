@@ -120,7 +120,7 @@ void rand_str(char *rnds, int len);
 /// @param num Card num.
 /// @param res Roll response group.
 ///
-void shuffle_cards(unsigned int seed, int num, roll_res &res);
+void shuffle_cards(unsigned int seed, int num, int *res);
 } // namespace elf
 
 #endif /* !ELF_RAND_H */
