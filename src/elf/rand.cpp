@@ -197,8 +197,8 @@ void shuffle_cards(unsigned int seed, int num, int *res)
 
     for (int i = num - 1; i >= 0; --i) {
         int r = rand(0, i);
-        int ni = res[i] ? res[i] : (i + 1);
-        int nr = res[r] ? res[r] : (r + 1);
+        int ni = res[i] ? res[i] : i;
+        int nr = res[r] ? res[r] : r;
 
         res[i] = nr;
         res[r] = ni;
