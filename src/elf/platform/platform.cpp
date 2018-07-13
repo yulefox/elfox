@@ -124,7 +124,8 @@ int platform_auth(const char *token, platform_user_t &puser)
     if (reg_time_s != NULL) {
         puser.reg_time_s = std::string(reg_time_s);
     }
-            
+    puser.status = jwt_get_grant_int(jwt, "status");
+
     //
     free(uid_str);
     jwt_free(jwt);

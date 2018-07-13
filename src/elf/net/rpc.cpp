@@ -249,46 +249,48 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
     for (;;) {
         int stat = s->channel->GetState(true);
         if (stat == GRPC_CHANNEL_TRANSIENT_FAILURE) {
-            s->open();
+            //s->open();
             LOG_INFO("net", "rpc reopen<%s><%s:%d>", s->name.c_str(), s->ip.c_str(), s->port);
         } else if (stat == GRPC_CHANNEL_CONNECTING) {
             LOG_INFO("net", "wait rpc <%s><%s:%d> to be connected", s->name.c_str(), s->ip.c_str(), s->port);
-            gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(5, GPR_TIMESPAN));
-            if (!s->channel->WaitForConnected(deadline)) {
-                LOG_INFO("net", "rpc <%s><%s:%d> do not be connected", s->name.c_str(), s->ip.c_str(), s->port);
-            } else {
-                if (context != NULL) {
-                    delete context;
-                    context = NULL;
-                }
-
-                if (reader != NULL) {
-                    reader->join();
-                    delete reader;
-                }
-
-                if (writer != NULL) {
-                    writer->join();
-                    delete writer;
-                }
-
-                std::unique_ptr<pb::DBus::Stub> stub = pb::DBus::NewStub(s->channel);
-                if (context == NULL) {
-                    context = new grpc::ClientContext();
-
-                    // metadata
-                    for (size_t i = 0; i < s->metaList.size(); i++) {
-                        context->AddMetadata(s->metaList[i].key, s->metaList[i].val);
-                        LOG_INFO("net", "add metadata %s %s", s->metaList[i].key.c_str(), s->metaList[i].val.c_str());
+            while (s->channel->GetState(false) == GRPC_CHANNEL_CONNECTING) {
+                gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(5, GPR_TIMESPAN));
+                if (!s->channel->WaitForConnected(deadline)) {
+                    LOG_INFO("net", "rpc <%s><%s:%d> do not be connected", s->name.c_str(), s->ip.c_str(), s->port);
+                } else {
+                    if (context != NULL) {
+                        delete context;
+                        context = NULL;
                     }
-                    //context->set_wait_for_ready(false);
-                }
-                context->set_wait_for_ready(true);
 
-                stream = std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> >(stub->Stream(context));
-                reader = new std::thread(read_routine, s, stream);
-                writer = new std::thread(write_routine, s, stream);
-                LOG_INFO("net", "rpc <%s><%s:%d> established.", s->name.c_str(), s->ip.c_str(), s->port);
+                    if (reader != NULL) {
+                        reader->join();
+                        delete reader;
+                    }
+
+                    if (writer != NULL) {
+                        writer->join();
+                        delete writer;
+                    }
+
+                    std::unique_ptr<pb::DBus::Stub> stub = pb::DBus::NewStub(s->channel);
+                    if (context == NULL) {
+                        context = new grpc::ClientContext();
+
+                        // metadata
+                        for (size_t i = 0; i < s->metaList.size(); i++) {
+                            context->AddMetadata(s->metaList[i].key, s->metaList[i].val);
+                            LOG_INFO("net", "add metadata %s %s", s->metaList[i].key.c_str(), s->metaList[i].val.c_str());
+                        }
+                        //context->set_wait_for_ready(false);
+                    }
+                    context->set_wait_for_ready(true);
+
+                    stream = std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> >(stub->Stream(context));
+                    reader = new std::thread(read_routine, s, stream);
+                    writer = new std::thread(write_routine, s, stream);
+                    LOG_INFO("net", "rpc <%s><%s:%d> established.", s->name.c_str(), s->ip.c_str(), s->port);
+                }
             }
         }
         usleep(500000);
