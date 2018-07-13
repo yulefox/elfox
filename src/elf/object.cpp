@@ -168,7 +168,7 @@ void Object::UnindexProto(oid_t id, bool recursive)
     }
 
     proto->ref--;
-    if (proto->ref == 0) {
+    if (proto->ref > 0) {
         return;
     }
 
@@ -177,7 +177,6 @@ void Object::UnindexProto(oid_t id, bool recursive)
     int type = proto->type;
     int idx = proto->idx;
 
-    proto->ref = 1;
     s_pbs.erase(id);
     DelChild(pid, type, id);
     if (xid > 0) {

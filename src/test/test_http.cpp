@@ -56,7 +56,7 @@ void object::test<1>() {
     start_time = elf::time_ms();
     do {
         int *arg = new int(req_times);
-        elf::http_json(URL, JSON, do_response, arg);
+        //elf::http_json(URL, JSON, do_response, arg);
         usleep(20000);
     } while (++req_times < TEST_TIMES);
     end_time = elf::time_ms();
@@ -75,7 +75,7 @@ void object::test<1>() {
     start_time = elf::time_ms();
     do {
         int *arg = new int(req_times);
-        elf::http_json(URL_D, JSON, do_response, arg);
+        //elf::http_json(URL_D, JSON, do_response, arg);
         usleep(20000);
     } while (++req_times < TEST_TIMES);
     end_time = elf::time_ms();

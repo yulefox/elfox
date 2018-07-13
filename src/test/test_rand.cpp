@@ -69,13 +69,13 @@ template<>
 void object::test<4>() {
     set_test_name("perfect shuffle");
 
-    elf::roll_res res;
-    elf::shuffle_cards(1, 54, res);
+    int n = 8;
+    int res[n];
+    elf::shuffle_cards(1, n, res);
 
     printf("\n");
-    elf::roll_res::iterator itr = res.begin();
-    for (; itr != res.end(); ++itr) {
-        printf("%3d:%3d\n", itr->first, itr->second);
+    for (int i = 0; i < n; ++i) {
+        printf("%3d:%3d\n", i, res[i]);
     }
 }
 }

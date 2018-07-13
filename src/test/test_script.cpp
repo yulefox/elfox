@@ -7,7 +7,7 @@
 #include <elf/script/script.h>
 #include <elf/time.h>
 #include <tut/tut.hpp>
-#include <bind/bind.hpp>
+//#include <bind/bind.hpp>
 
 using namespace elf;
 
@@ -29,7 +29,7 @@ template<>
 template<>
 void object::test<1>() {
     set_test_name("Run File");
-    tolua_bind_open(elf::script_get_state());
+    //tolua_bind_open(elf::script_get_state());
 
     int rc = script_file_exec("scripts/init.lua");
 
