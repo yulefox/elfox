@@ -191,7 +191,7 @@ static void retrieve_field(query_t *q)
             if (ofd == NULL) {
                 continue;
             }
-            if (row[c] == NULL || (strlen(row[c]) == 0)) {
+            if (row[c] == NULL || len[c] == 0) {
                 pb_set_field(item, ofd, "");
             } else {
                 pb_set_field(item, ofd, row[c], len[c]);
