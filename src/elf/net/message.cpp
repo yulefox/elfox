@@ -60,5 +60,32 @@ void message_handle(recv_message_t *msg)
                 msg->name.c_str());
     }
 }
+
+void rpc_message_handle(recv_message_t *msg)
+{
+    assert(msg);
+
+    reg_map::const_iterator itr = s_regs.find(msg->name);
+
+    if (itr != s_regs.end()) {
+        message_handler_t *hdl = itr->second;
+
+        msg->pb = hdl->init();
+        if (net_decode(msg)) {
+            net_stat_message(*msg);
+            hdl->proc(*msg);
+        }
+    } else if ((msg->ctx != NULL) && !net_internal(*(msg->ctx))) {
+        //net_error(msg->ctx);
+        //net_close(msg->peer);
+        LOG_WARN("net", "%lld INVALID message: %s.",
+                msg->peer,
+                msg->name.c_str());
+    }
+}
+
+
+
+
 } // namespace elf
 

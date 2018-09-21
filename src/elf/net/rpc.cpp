@@ -306,6 +306,7 @@ static void RpcSessionStop(std::shared_ptr<struct RpcSession> s)
 {
 }
 
+
 static int Proc()
 {
     std::deque<recv_message_t*> msgs;
@@ -313,7 +314,7 @@ static int Proc()
     s_recv_msgs.swap(msgs);
     for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
         recv_message_t *msg = *itr;
-        message_handle(msg);
+        rpc_message_handle(msg);
 
         pb::Peer *peer = static_cast<pb::Peer*>(msg->rpc_ctx);
         S_DELETE(peer);
