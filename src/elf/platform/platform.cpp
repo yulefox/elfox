@@ -113,7 +113,9 @@ int platform_auth(const char *token, platform_user_t &puser)
     }
 
     puser.uid = uid;
-    puser.sid = std::string(sid);
+    if (sid != NULL) {
+        puser.sid = std::string(sid);
+    }
     puser.platform = std::string(platform);
     puser.channel = std::string(channel);
     puser.sdk = std::string(sdk);
