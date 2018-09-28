@@ -116,9 +116,15 @@ int platform_auth(const char *token, platform_user_t &puser)
     if (sid != NULL) {
         puser.sid = std::string(sid);
     }
-    puser.platform = std::string(platform);
-    puser.channel = std::string(channel);
-    puser.sdk = std::string(sdk);
+    if (platform != NULL) {
+        puser.platform = std::string(platform);
+    }
+    if (channel != NULL) {
+        puser.channel = std::string(channel);
+    }
+    if (sdk != NULL) { 
+        puser.sdk = std::string(sdk);
+    }
     if (account != NULL) {
         puser.account = std::string(account);
     }
