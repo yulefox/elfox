@@ -92,6 +92,7 @@ int platform_auth(const char *token, platform_user_t &puser)
     }
 
     char *uid_str = jwt_get_grants_json(jwt, "uid");
+    const char *sid = jwt_get_grant(jwt, "sid");
     const char *platform = jwt_get_grant(jwt, "platform");
     const char *channel = jwt_get_grant(jwt, "channel");
     const char *sdk = jwt_get_grant(jwt, "sdk");
@@ -112,6 +113,7 @@ int platform_auth(const char *token, platform_user_t &puser)
     }
 
     puser.uid = uid;
+    puser.sid = std::string(sid);
     puser.platform = std::string(platform);
     puser.channel = std::string(channel);
     puser.sdk = std::string(sdk);

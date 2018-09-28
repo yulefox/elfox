@@ -27,6 +27,7 @@ enum platform_error {
 
 typedef struct platform_user_s {
     int64_t uid;
+    std::string sid;
     std::string platform;
     std::string channel;
     std::string sdk;
