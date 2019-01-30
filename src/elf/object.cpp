@@ -215,6 +215,38 @@ void Object::UnindexProto(oid_t id, bool recursive)
     }
 }
 
+void Object::Reindex(oid_t id, oid_t spid, oid_t dpid)
+{
+    Proto *dp = NULL;
+    Proto *proto = FindProto(id);
+
+    if (proto == NULL) {
+        return;
+    }
+
+    int idx = proto->idx;
+    int type = proto->type;
+
+    // unindex from source
+    if (spid != 0) {
+        DelChild(spid, type, id);
+        DelContainerItem(spid, type + 1000, idx, id);
+        proto->ptype = 0;
+    }
+
+    // index to destination
+    if (dpid != 0) {
+        dp = FindProto(dpid);
+        if (dp != NULL) {
+            proto->ptype = dp->type;
+        } else {
+            proto->ptype = 0;
+        }
+        AddChild(dpid, type, id);
+        AddContainerItem(dpid, type + 1000, idx, id);
+    }
+}
+
 int Object::GetMaxType(oid_t pid)
 {
     id_lismap::const_iterator itr = s_containers.find(pid);

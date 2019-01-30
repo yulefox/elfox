@@ -9,13 +9,15 @@
 
 namespace elf {
 int MAGIC_INDEX = 0;
-static const int MAX_INDEX  = 920000ll;
-static const oid_t MAX_TIME = 10000000000000ll;
+static const oid_t MAX_OID    = 9223372036854775807ll;
+static const int MAX_INDEX    = 9222ll;
+static const oid_t START_TIME = 1374835140000ll; // '2013-07-26 18:39:00'
+static const oid_t MAX_TIME   = 1000000000000000ll;
 
 oid_t oid_gen(void)
 {
     static oid_t id = 0;
-    oid_t time = (oid_t)time_ms();
+    oid_t time = (oid_t)((time_ms() - START_TIME) * 1000ll);
 
     assert(MAGIC_INDEX < MAX_INDEX && time < MAX_TIME);
 

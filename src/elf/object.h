@@ -154,6 +154,14 @@ public:
     static void DelPB(oid_t id, bool recursive);
 
     ///
+    /// Reindex Object by ID.
+    /// @param[in] id Object ID.
+    /// @param[in] spid Source parent ID.
+    /// @param[in] dpid Destination parent ID.
+    ///
+    static void Reindex(oid_t id, oid_t spid, oid_t dpid);
+
+    ///
     /// Find Object by ID.
     /// @param[in] id Object ID.
     /// @return Pointer to Object if found, or NULL.
