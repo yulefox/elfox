@@ -322,7 +322,6 @@ static void *net_writer(void *args)
         blob_t *msg = NULL;
         que->pop(msg);
 
-        ///
         int instance;
         context_t *ctx = (context_t*)(msg->ctx);
         instance = (uintptr_t)ctx & 1;
@@ -680,7 +679,6 @@ static void blob_fini(blob_t *blob)
 
     if (blob->ctx != NULL) {
         context_t *ctx = (context_t*)(blob->ctx);
-        //int instance = (uintptr_t)ctx & 1;
         ctx = (context_t*)((uintptr_t)ctx & (uintptr_t) ~1);
         ctx->dec_ref();
     }
@@ -716,7 +714,6 @@ static context_t *context_alloc()
         ctx->instance = 0;
     }
 
-    //
     ctx->worker_idx = __sync_fetch_and_add(&s_next_worker, 1) % s_worker_num;
     return ctx;
 }
@@ -837,11 +834,8 @@ static void context_close(oid_t peer)
     s_recv_msgs.push(msg);
 
     ctx->close_time = time_s();
-    //context_fini(ctx);
-    //
     ctx->dec_ref();
 
-    //
     s_pending_gc.push_back(ctx);
 }
 
@@ -870,7 +864,6 @@ static bool context_fini(context_t *ctx)
     ctx->recv_data = NULL;
     ctx->peer.sock = -1;
     ctx->peer.id = 0;
-    //E_DELETE(ctx);
 
     // gc
     s_free_contexts.push(ctx);
@@ -1435,6 +1428,7 @@ int net_send(oid_t peer, blob_t *msg)
 
     context_t *ctx = context_find(peer);
     if (ctx == NULL) {
+        blob_fini(msg);
         return -1;
     }
     push_send(ctx, msg);
@@ -1446,7 +1440,6 @@ void net_send(oid_t peer, const pb_t &pb, oid_t dest)
     blob_t *msg = net_encode(peer, pb, dest);
 
     net_send(peer, msg);
-    //blob_fini(msg);
 }
 
 void net_send(const id_set &peers, const pb_t &pb, oid_t dest)
@@ -1461,7 +1454,6 @@ void net_send(const id_set &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(*itr, name, body, dest);
         net_send(*itr, msg);
-        //blob_fini(msg);
     }
 }
 
@@ -1477,7 +1469,6 @@ void net_send(const obj_map_id &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->first, name, body, dest);
         net_send(itr->first, msg);
-        //blob_fini(msg);
     }
 }
 
@@ -1493,7 +1484,6 @@ void net_send(const pb_map_id &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->first, name, body, dest);
         net_send(itr->first, msg);
-        //blob_fini(msg);
     }
 }
 
@@ -1509,7 +1499,6 @@ void net_send(const id_limap &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->first, name, body, dest);
         net_send(itr->first, msg);
-        //blob_fini(msg);
     }
 }
 
@@ -1525,7 +1514,6 @@ void net_send(const id_ilmap &peers, const pb_t &pb, oid_t dest)
     for (; itr != peers.end(); ++itr) {
         blob_t *msg = net_encode(itr->second, name, body, dest);
         net_send(itr->second, msg);
-        //blob_fini(msg);
     }
 }
 
@@ -1533,7 +1521,6 @@ void net_rawsend(oid_t peer, const std::string &name, const std::string &body, o
 {
     blob_t *msg = net_encode(peer, name, body, dest);
     net_send(peer, msg);
-    //blob_fini(msg);
 }
 
 void net_rawsend(const id_set &peers, const std::string &name, const std::string &body, oid_t dest)
@@ -1628,7 +1615,6 @@ static void on_read(const epoll_event &evt)
         return;
     }
 
-    //LOG_DEBUG("net", "on_read: sock: %d, internal: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
     s_pending_read[ctx->worker_idx].push(ctx);
 }
 
@@ -1709,7 +1695,6 @@ static void on_write(const epoll_event &evt)
         blob_t *msg = E_NEW blob_t;
         blob_init(msg, ctx);
 
-        //LOG_DEBUG("net", "on_write: sock: %d, internel: %d, idx = %d, mask = %d", ctx->peer.sock, ctx->internal, idx, WORKER_THREAD_SIZE_MASK);
         s_pending_write[ctx->worker_idx].push(msg);
     }
 }
