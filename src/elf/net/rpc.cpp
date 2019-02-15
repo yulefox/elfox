@@ -249,7 +249,7 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
     for (;;) {
         int stat = s->channel->GetState(true);
         if (stat == GRPC_CHANNEL_TRANSIENT_FAILURE) {
-            //s->open();
+            s->open();
             LOG_INFO("net", "rpc reopen<%s><%s:%d>", s->name.c_str(), s->ip.c_str(), s->port);
         } else if (stat == GRPC_CHANNEL_CONNECTING) {
             LOG_INFO("net", "wait rpc <%s><%s:%d> to be connected", s->name.c_str(), s->ip.c_str(), s->port);
@@ -289,10 +289,11 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
                     stream = std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> >(stub->Stream(context));
                     reader = new std::thread(read_routine, s, stream);
                     writer = new std::thread(write_routine, s, stream);
-                    LOG_INFO("net", "rpc <%s><%s:%d> established.", s->name.c_str(), s->ip.c_str(), s->port);
                 }
             }
-        }
+        } 
+            
+        LOG_INFO("net", "rpc stat: %d.", stat);
         usleep(500000);
     }
 }
