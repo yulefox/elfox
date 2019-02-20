@@ -293,7 +293,6 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
             }
         } 
             
-        LOG_INFO("net", "rpc stat: %d.", stat);
         usleep(500000);
     }
 }

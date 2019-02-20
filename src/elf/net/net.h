@@ -27,9 +27,9 @@
 namespace elf {
 enum net_stat_flag {
     NET_STAT_NONE       = 0,
-    NET_STAT_REQ        = 0x01,
-    NET_STAT_RES        = 0x02,
-    NET_STAT_MESSAGES   = 0x02,
+    NET_STAT_SEND       = 0x01,
+    NET_STAT_RECV       = 0x02,
+    NET_STAT_MESSAGES   = 0x03,
     NET_STAT_CONTEXTS   = 0x10,
     NET_STAT_ALL        = 0xff,
 };
@@ -123,22 +123,21 @@ void net_close(oid_t peer);
 int net_proc(void);
 
 ///
+/// Set statistics flag.
+/// @param[in] flag Statistics flag.
+///
+void net_stat_set_flag(int flag);
+
+///
 /// Output statistics info.
-/// @param flag Statistics flag.
 ///
-void net_stat(int flag);
+void net_stat(void);
 
 ///
-/// Statistics message info.
-/// @param msg Receive message data.
+/// Statistics recv message info.
+/// @param[in] msg Receive message data.
 ///
-void net_stat_message(const recv_message_t &msg);
-
-///
-/// Output statistics info of given peer.
-/// @param[in] peer Peer id.
-///
-void net_peer_stat(oid_t peer);
+void net_stat_recv(const recv_message_t &msg);
 
 ///
 /// Get peer address ip.

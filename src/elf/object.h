@@ -108,9 +108,10 @@ public:
     void SetName(const std::string &name);
 
     ///
-    /// Output statistics info.
+    /// Set statistics flag.
+    /// @param[in] flag Statistics flag.
     ///
-    static void Stat(void);
+    static void SetStatFlag(int flag);
 
     ///
     /// Release all Object/Protos.
@@ -149,9 +150,8 @@ public:
     ///
     /// Remove protobuf data.
     /// @param[in] id Protobuf data ID.
-    /// @param[in] recursive Recursive removing.
     ///
-    static void DelPB(oid_t id, bool recursive);
+    static void DelPB(oid_t id);
 
     ///
     /// Reindex Object by ID.
@@ -320,9 +320,9 @@ public:
     ///
     /// Remove children by parent ID and type from `s_containers`.
     /// @param[in] pid Parent ID.
-    /// @param[in] type Object type, clear all(free memory) if type is 0.
+    /// @param[in] type Object type, 0: clear container, -1: clear container and children containers.
     ///
-    static void DelChildren(oid_t pid, int type = 0);
+    static void DelChildren(oid_t pid, int type);
 
     ///
     /// Get size of object map.
@@ -338,9 +338,9 @@ public:
 
     ///
     /// Statistic info.
-    /// @param[in] args Current time.
+    /// @param[in] pid Parent ID.
     ///
-    static bool Stat(void *args);
+    static void Stat(elf::oid_t pid);
 
     virtual ~Object(void);
 
@@ -360,9 +360,8 @@ protected:
     ///
     /// Unindex Proto.
     /// @param[in] id Proto ID.
-    /// @param[in] recursive Recursive removing.
     ///
-    static void UnindexProto(oid_t id, bool recursive);
+    static void UnindexProto(oid_t id);
 
     typedef std::map<oid_t, Proto *> proto_map;
 
@@ -377,9 +376,16 @@ protected:
     /// Get container ID by parent ID and type in `s_containers`.
     /// @param[in] pid Parent ID.
     /// @param[in] type Object type.
+    /// @param[in] add Add if NOT exists.
     /// @return Container ID.
     ///
-    static oid_t GetContainer(oid_t pid, int type);
+    static oid_t GetContainer(oid_t pid, int type, bool add);
+
+    ///
+    /// Delete container.
+    /// @param[in] id Container ID.
+    ///
+    static void DelContainer(oid_t id);
 
     /// Object ID
     oid_t m_id;
@@ -407,6 +413,9 @@ protected:
 
     /// protobuf data
     pb_t *m_pb;
+
+    /// statistics flag
+    static int s_stat_flag;
 
     /// global Object map(key: m_id)
     static obj_map_id s_objs;

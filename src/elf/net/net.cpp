@@ -26,6 +26,7 @@
 #include <string>
 
 namespace elf {
+static int NET_STAT_FLAG = NET_STAT_NONE;
 static const int LINGER_ONOFF = 0;
 static const int LINGER_TIME = 5;
 static const int CONTEXT_CLOSE_TIME = 90;
@@ -107,6 +108,7 @@ struct blob_t {
     int msg_size; // current recv msg size(for splicing)
     int total_size; // total send/recv msg size
     int pending_size; // pending send/recv msg size
+    std::string name; // send msg name
     void *ctx;
 };
 
@@ -224,6 +226,8 @@ static void on_error(const epoll_event &evt);
 static void append_send(context_t *ctx, blob_t *msg);
 static void blob_init(blob_t *blob, context_t *ctx);
 static void blob_fini(blob_t *blob);
+static void net_stat_send(const blob_t &msg);
+static void net_stat_messages(void);
 
 
 static bool is_raw_msg(const std::string &name)
@@ -919,8 +923,8 @@ static void append_send(context_t *ctx, blob_t *msg)
     ctx->send_data->pending_size += msg->total_size;
     ctx->send_data->total_size += msg->total_size;
 
-    ++s_stat.send_msg_num;
-    s_stat.send_msg_size += msg->total_size;
+    net_stat_send(*msg);
+
 }
 
 int net_init(int worker_num)
@@ -1163,7 +1167,15 @@ int net_proc(void)
     return 0;
 }
 
-static void net_stat_detail(int flag)
+void net_stat_set_flag(int flag)
+{
+    NET_STAT_FLAG = flag;
+    if ((flag & NET_STAT_MESSAGES) == 0) {
+        net_stat_messages(); // clear
+    }
+}
+
+static void net_stat_messages(void)
 {
     LOG_INFO("stat", "send msg: %d(%d), recv msg: %d(%d), contexts: %d/%d, chunks: %d/%d",
             s_stat.send_msg_num,
@@ -1178,44 +1190,40 @@ static void net_stat_detail(int flag)
     stat_msg_t *sm = NULL;
     msg_map::iterator itr;
 
-    if (flag & NET_STAT_REQ) {
-        msg_map &msgs = s_stat.req_msgs;
-
-        for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
-            sm = itr->second;
-            LOG_INFO("stat", "  %s> msg num: %d, msg size: %d",
-                    itr->first.c_str(),
-                    sm->msg_num,
-                    sm->msg_size);
-            E_DELETE(sm);
-        }
-        msgs.clear();
+    // .REQ
+    for (itr = s_stat.req_msgs.begin(); itr != s_stat.req_msgs.end(); ++itr) {
+        sm = itr->second;
+        LOG_INFO("stat", "  %s> msg num: %d, msg size: %d",
+                itr->first.c_str(),
+                sm->msg_num,
+                sm->msg_size);
+        E_DELETE(sm);
     }
 
-    if (flag & NET_STAT_RES) {
-        msg_map &msgs = s_stat.res_msgs;
-
-        for (itr = msgs.begin(); itr != msgs.end(); ++itr) {
-            sm = itr->second;
-            LOG_INFO("stat", "  %s> msg num: %d, msg size: %d",
-                    itr->first.c_str(),
-                    sm->msg_num,
-                    sm->msg_size);
-            E_DELETE(sm);
-        }
-        msgs.clear();
+    // .RES
+    for (itr = s_stat.res_msgs.begin(); itr != s_stat.res_msgs.end(); ++itr) {
+        sm = itr->second;
+        LOG_INFO("stat", "  %s> msg num: %d, msg size: %d",
+                itr->first.c_str(),
+                sm->msg_num,
+                sm->msg_size);
+        E_DELETE(sm);
     }
+    s_stat.req_msgs.clear();
+    s_stat.res_msgs.clear();
     s_stat.send_msg_num = 0;
     s_stat.send_msg_size = 0;
     s_stat.recv_msg_num = 0;
     s_stat.recv_msg_size = 0;
 }
 
-void net_stat(int flag)
+void net_stat(void)
 {
-    net_stat_detail(flag);
+    if (NET_STAT_FLAG & NET_STAT_MESSAGES) {
+        net_stat_messages();
+    }
 
-    if (flag & NET_STAT_CONTEXTS) {
+    if (NET_STAT_FLAG & NET_STAT_CONTEXTS) {
         context_map::const_iterator itr = s_contexts.begin();
 
         spin_lock(&s_context_lock);
@@ -1234,8 +1242,50 @@ void net_stat(int flag)
     }
 }
 
-void net_stat_message(const recv_message_t &msg)
+static void net_stat_send(const blob_t &msg)
 {
+    // stat
+    if ((NET_STAT_FLAG & NET_STAT_SEND) == 0) {
+        return;
+    }
+    stat_msg_t *sm = NULL;
+    msg_map::iterator itr_m;
+    int size = msg.total_size;
+
+    if (msg.name.find(".Res") != std::string::npos) {
+        itr_m = s_stat.res_msgs.find(msg.name);
+        if (itr_m == s_stat.res_msgs.end()) {
+            sm = E_NEW stat_msg_t;
+            s_stat.res_msgs.insert(std::make_pair(msg.name, sm));
+        } else {
+            sm = itr_m->second;
+        }
+    } else if (msg.name.find(".Req") != std::string::npos) {
+        itr_m = s_stat.req_msgs.find(msg.name);
+        if (itr_m == s_stat.req_msgs.end()) {
+            sm = E_NEW stat_msg_t;
+            s_stat.req_msgs.insert(std::make_pair(msg.name, sm));
+        } else {
+            sm = itr_m->second;
+        }
+    } else {
+        LOG_WARN("net", "INVALID message type: %s.",
+                msg.name.c_str());
+        return;
+    }
+    sm->msg_num++;
+    sm->msg_size += size;
+    ++s_stat.send_msg_num;
+    s_stat.send_msg_size += msg.total_size;
+
+}
+
+void net_stat_recv(const recv_message_t &msg)
+{
+    if ((NET_STAT_FLAG & NET_STAT_RECV) == 0) {
+        return;
+    }
+
     msg_map::iterator itr;
 
     if (msg.pb != NULL) {
@@ -1267,21 +1317,6 @@ void net_stat_message(const recv_message_t &msg)
         sm->msg_size += size;
         s_stat.recv_msg_num++;
         s_stat.recv_msg_size += size;
-    }
-}
-
-void net_peer_stat(oid_t peer)
-{
-    context_t *ctx = context_find(peer);
-
-    if (ctx != NULL) {
-        LOG_INFO("stat", "%d %lld: RECV %d/%d SEND %d/%d.",
-                ctx->peer.idx,
-                ctx->peer.id,
-                ctx->recv_data->pending_size,
-                ctx->recv_data->total_size,
-                ctx->send_data->pending_size,
-                ctx->send_data->total_size);
     }
 }
 
@@ -1325,6 +1360,7 @@ blob_t *net_encode(oid_t peer, const std::string &pb_name, const std::string &pb
     if (ctx != NULL) {
         encipher = ctx->encipher;
     }
+    msg->name = pb_name;
 
     blob_init(msg, ctx);
 

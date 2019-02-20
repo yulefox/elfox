@@ -49,7 +49,7 @@ void message_handle(recv_message_t *msg)
             msg->pb = hdl->init();
         }
         if (net_decode(msg)) {
-            net_stat_message(*msg);
+            net_stat_recv(*msg);
             hdl->proc(*msg);
         }
     } else if ((msg->ctx != NULL) && !net_internal(*(msg->ctx))) {
@@ -72,7 +72,7 @@ void rpc_message_handle(recv_message_t *msg)
 
         msg->pb = hdl->init();
         if (net_decode(msg)) {
-            net_stat_message(*msg);
+            net_stat_recv(*msg);
             hdl->proc(*msg);
         }
     } else if ((msg->ctx != NULL) && !net_internal(*(msg->ctx))) {
