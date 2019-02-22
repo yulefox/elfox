@@ -3,6 +3,7 @@
  * http://www.yulefox.com/
  */
 
+#include <elf/log.h>
 #include <elf/oid.h>
 #include <elf/memory.h>
 #include <elf/time.h>
@@ -245,6 +246,7 @@ void oid_lismap_add(id_lismap &lism, oid_t key, int k, oid_t v)
 
     if (itr == lism.end()) {
         lism[key] = ism = E_NEW id_ismap;
+        LOG_TRACE("stat", "+ CTNER: %19lld(%3d)", key, lism.size());
     } else {
         ism = itr->second;
     }
