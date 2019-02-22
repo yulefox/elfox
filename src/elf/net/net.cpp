@@ -40,7 +40,7 @@ static const int MESSAGE_MAX_PENDING_SIZE = MESSAGE_MAX_VALID_SIZE * 2;
 static const int BACKLOG = 128;
 static const int NAME_SIZE_MASK = 0xFFFFFF;
 static const int NAME_SIZE_BITS = 24;
-static const int DEFAULT_WORKER_THREAD_SIZE = 4;
+static const int DEFAULT_WORKER_THREAD_SIZE = 1;
 static const int CONTEXT_FREE_THRESHOLD = 1024;
 
 enum MSG_FLAG {
@@ -703,7 +703,7 @@ static void event_init(context_t *ctx)
 }
 
 
-static context_t *context_alloc()
+static context_t *context_alloc(int flag)
 {
     context_t *ctx = NULL;
 
@@ -714,14 +714,20 @@ static context_t *context_alloc()
         ctx->instance = 0;
     }
 
-    ctx->worker_idx = __sync_fetch_and_add(&s_next_worker, 1) % s_worker_num;
+    if (flag == 0 || s_worker_num == 1) {
+        ctx->worker_idx = 0;
+    } else {
+        ctx->worker_idx = s_worker_num - s_next_worker - 1;
+        s_next_worker = (s_next_worker + 1) % (s_worker_num - 1);
+    }
     return ctx;
 }
 
 static context_t *context_init(int idx, oid_t peer, int fd,
         const struct sockaddr_in &addr)
 {
-    context_t *ctx = context_alloc();
+    int flag = strcmp(inet_ntoa(addr.sin_addr), "127.0.0.1");
+    context_t *ctx = context_alloc(flag);
 
     ctx->peer.idx = idx;
     ctx->peer.id = (peer != 0) ? peer : oid_gen();
@@ -767,12 +773,16 @@ static context_t *context_init(int idx, oid_t peer, int fd,
 static context_t *context_init6(int idx, oid_t peer, int fd,
         const struct sockaddr_in6 &addr)
 {
-    context_t *ctx = context_alloc();
+    char ipv6[INET6_ADDRSTRLEN];
+    inet_ntop(AF_INET6, &addr.sin6_addr, ipv6, sizeof(addr));
+
+    int flag = strcmp(ipv6, "::1");
+    context_t *ctx = context_alloc(flag);
 
     ctx->peer.idx = idx;
     ctx->peer.id = (peer != 0) ? peer : oid_gen();
     ctx->peer.sock = fd;
-    inet_ntop(AF_INET6, &addr.sin6_addr, ctx->peer.ipv6, sizeof(addr));
+    strcpy(ctx->peer.ipv6, ipv6);
     ctx->peer.port = ntohs(addr.sin6_port);
     sprintf(ctx->peer.info, "%d <%d>%lld (%s:%d)",
             ctx->peer.idx,
@@ -938,7 +948,7 @@ int net_init(int worker_num)
 
     s_worker_num = worker_num;
     if (s_worker_num <= 0) {
-        s_worker_num = get_cpus();
+        s_worker_num = get_cpus() / 2;
     }
     if (s_worker_num <= 0) {
         s_worker_num = DEFAULT_WORKER_THREAD_SIZE;
