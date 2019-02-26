@@ -9,6 +9,7 @@
 #include <elf/time.h>
 
 namespace elf {
+static const oid_t OBJECT_ID = 2000000000ll;
 int Object::s_stat_flag;
 obj_map_id Object::s_objs;
 Object::proto_map Object::s_pbs;
@@ -281,6 +282,28 @@ oid_t Object::GetLastChild(oid_t pid, int type)
     return -1;
 }
 
+bool Object::Empty(oid_t pid)
+{
+    id_lismap::const_iterator itr = s_containers.find(pid);
+
+    if (itr != s_containers.end()) {
+        id_ismap *ism = itr->second;
+
+        if (ism != NULL) {
+            id_ismap::const_iterator itr_i = ism->begin();
+
+            for (; itr_i != ism->end(); ++itr_i) {
+                id_set *is = itr_i->second;
+
+                if (is != NULL && !is->empty()) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 bool Object::HasChild(oid_t pid, int type, oid_t id)
 {
     id_set *is = GetChildren(pid, type);
@@ -360,7 +383,7 @@ pb_t *Object::GetContainerItem(oid_t pid, int type, int idx)
     oid_t oid = GetLastChild(cid, idx);
     pb_t *pb = NULL;
 
-    if (oid != 0) {
+    if (oid > 0) {
         pb = FindPB(oid, 0);
     }
     return pb;
@@ -423,7 +446,7 @@ void Object::DelChildren(oid_t pid, int type)
             if (type < 0 && is != NULL) {
                 id_set::const_reverse_iterator itr_s = is->rbegin();
 
-                if (itr_s != is->rend()) {
+                if (itr_s != is->rend() && pid > OBJECT_ID && *itr_s > OBJECT_ID) {
                     DelContainer(*itr_s);
                 }
             }
@@ -442,10 +465,6 @@ void Object::SetStatFlag(int flag)
 
 void Object::Stat(elf::oid_t pid)
 {
-    if (pid == 0 && s_stat_flag == 0) {
-        return;
-    }
-
     time_t ct = time_s();
     struct tm ctm;
     char cts[20];
@@ -457,6 +476,10 @@ void Object::Stat(elf::oid_t pid)
             s_pbs.size(),
             s_objs.size(),
             s_containers.size());
+
+    if (pid <= 0 && s_stat_flag == 0) {
+        return;
+    }
 
     id_lismap::const_iterator itr = s_containers.find(pid);
     if (itr == s_containers.end()) {
@@ -475,13 +498,13 @@ void Object::Stat(elf::oid_t pid)
                 for (; itr_i != is->end(); ++itr_i) {
                     Proto *proto = FindProto(*itr_i);
                     if (proto != NULL) {
-                        LOG_TRACE("stat", "%23lld - %19lld <%d:%d>",
+                        LOG_INFO("stat", "%23lld - %19lld <%d:%d>",
                                 proto->pid,
                                 proto->id,
                                 proto->idx,
                                 proto->ref);
                     } else {
-                        LOG_TRACE("stat", "%23lld",
+                        LOG_INFO("stat", "%23lld",
                                 *itr_i);
                     }
                 }

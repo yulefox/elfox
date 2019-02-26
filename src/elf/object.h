@@ -228,9 +228,16 @@ public:
     /// Find the last/only child object ID by parent ID and type in `s_containers`.
     /// @param[in] pid Parent ID.
     /// @param[in] type Object type.
-    /// @return Last/Only element object ID.
+    /// @return Last/Only element object ID, -1 if NOT found.
     ///
     static oid_t GetLastChild(oid_t pid, int type);
+
+    ///
+    /// Check if has any children.
+    /// @param[in] pid Parent ID.
+    /// @return true if empty, or false.
+    ///
+    static bool Empty(oid_t pid);
 
     ///
     /// Check if has child object ID in `s_containers`.

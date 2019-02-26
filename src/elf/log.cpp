@@ -28,6 +28,7 @@ int log_init(void)
 {
     MODULE_IMPORT_SWITCH;
     os_mkdir("log");
+    os_mkdir("log/pub");
 #if defined(ELF_USE_LOG4CPLUS)
     try {
         log4cplus::ConfigureAndWatchThread th(CONFIG_FILE_NAME);
