@@ -33,6 +33,7 @@ typedef struct platform_user_s {
     std::string sdk;
     std::string account;
     std::string reg_time_s;
+    std::string ext;
     int32_t reg_time;
     int32_t status;
 } platform_user_t;

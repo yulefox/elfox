@@ -25,6 +25,12 @@
 
 namespace elf {
 typedef int64_t oid_t;
+
+const oid_t MAX_OID    = 9223372036854775807ll;
+const int MAX_INDEX    = 9222ll;
+const oid_t START_TIME = 1374835140000ll; // '2013-07-26 18:39:00'
+const oid_t MAX_TIME   = 1000000000000000ll;
+
 typedef std::list< oid_t > id_list;
 typedef std::set< oid_t > id_set;
 
