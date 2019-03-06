@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <future>
 
 #include <grpc/grpc.h>
 #include <grpc/grpc_posix.h>
@@ -111,6 +112,7 @@ static std::map< std::string, oid_t> s_name_ids;
 static xqueue<recv_message_t*> s_recv_msgs;
 static std::mutex s_lock_id;
 static std::mutex s_lock_name;
+static const int64_t KEEPALIVE_TIMEOUT = 2000; // 2 seconds
 
 
 std::shared_ptr<struct RpcSession> RpcSessionInit(int id, const std::string &name,
@@ -187,12 +189,15 @@ static void readCfg(const std::string& filename, std::string& data)
 
 
 static void read_routine (std::shared_ptr<struct RpcSession> s,
-        std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream)
+        std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream,
+        std::future<void> &futureObj)
 {
     LOG_INFO("net", "rpc reader start: %lld ", s->peer);
+    std::future_status st = std::future_status::timeout;
     while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
         pb::Packet pkt;
-        while (stream->Read(&pkt)) {
+        while (stream->Read(&pkt) &&
+               (st = futureObj.wait_for(std::chrono::milliseconds(0))) == std::future_status::timeout) {
             // message source
             pb::Peer *from = E_NEW pb::Peer;
             from->CopyFrom(pkt.peer());
@@ -206,18 +211,23 @@ static void read_routine (std::shared_ptr<struct RpcSession> s,
             msg->rpc_ctx = (void*)from;
             s_recv_msgs.push(msg);
         }
-        usleep(500000);
+	    if (st != std::future_status::timeout) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     LOG_ERROR("net", "rpc reader quit: %lld ", s->peer);
 }
 
 
-static void write_routine (std::shared_ptr<struct RpcSession> s,
-        std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream)
+static void send_routine (std::shared_ptr<struct RpcSession> s,
+        std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream,
+        std::future<void> &futureObj)
 {
     LOG_INFO("net", "rpc writer start: %lld ", s->peer);
     std::deque<pb::Packet*> pending;
-    while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
+    while (s->channel->GetState(false) == GRPC_CHANNEL_READY && 
+           futureObj.wait_for(std::chrono::milliseconds(0)) == std::future_status::timeout) {
         // get cached pkts
         std::unique_lock<std::mutex> lock(s->mutex);
         while(!s->wque.empty()) {
@@ -235,7 +245,7 @@ static void write_routine (std::shared_ptr<struct RpcSession> s,
                 E_DELETE pkt;
             }
         }
-        usleep(500000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     LOG_ERROR("net", "rpc writer quit: %lld ", s->peer);
 }
@@ -246,8 +256,30 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
     std::thread *reader = NULL;
     std::thread *writer = NULL;
     grpc::ClientContext *context = NULL;
+    int64_t last = 0;
+    std::promise<void> *readerSignal = NULL;
+    std::promise<void> *senderSignal = NULL;
     for (;;) {
         int stat = s->channel->GetState(true);
+        if (stat == GRPC_CHANNEL_READY &&
+            (last == 0 || time_ms() >= (time64_t)(last + KEEPALIVE_TIMEOUT))) {
+            pb::PingReq req;
+            pb::PingRes res;
+            grpc::ClientContext ctx;
+
+            req.set_stamp((int64_t)time_ms());
+            std::unique_ptr<pb::DBus::Stub> stub = pb::DBus::NewStub(s->channel);
+
+            gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(2, GPR_TIMESPAN));
+            ctx.set_deadline(deadline);
+            grpc::Status st = stub->Ping(&ctx, req, &res);
+            if (!st.ok()) {
+                LOG_INFO("net", "grpc ping failed: %s", st.error_message().c_str());
+                // notify workers to exit
+            } else {
+                last = time_ms();
+            }
+        }
         if (stat == GRPC_CHANNEL_TRANSIENT_FAILURE) {
             s->open();
             LOG_INFO("net", "rpc reopen<%s><%s:%d>", s->name.c_str(), s->ip.c_str(), s->port);
@@ -263,14 +295,23 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
                         context = NULL;
                     }
 
+                    if (readerSignal != NULL) {
+                        readerSignal->set_value();
+                    }
+                    if (senderSignal != NULL) {
+                        senderSignal->set_value();
+                    }
+
                     if (reader != NULL) {
                         reader->join();
                         delete reader;
+                        delete readerSignal;
                     }
 
                     if (writer != NULL) {
                         writer->join();
                         delete writer;
+                        delete senderSignal;
                     }
 
                     std::unique_ptr<pb::DBus::Stub> stub = pb::DBus::NewStub(s->channel);
@@ -286,14 +327,20 @@ static void watch_routine (std::shared_ptr<struct RpcSession> s)
                     }
                     context->set_wait_for_ready(true);
 
+                    readerSignal = new std::promise<void>();
+                    senderSignal = new std::promise<void>();
+
+                    std::future<void> readerFut = readerSignal->get_future();
+                    std::future<void> senderFut = senderSignal->get_future();
+
                     stream = std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> >(stub->Stream(context));
-                    reader = new std::thread(read_routine, s, stream);
-                    writer = new std::thread(write_routine, s, stream);
+                    reader = new std::thread(read_routine, s, stream, std::ref(readerFut));
+                    writer = new std::thread(send_routine, s, stream, std::ref(senderFut));
                 }
             }
         } 
             
-        usleep(500000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 }
 
@@ -345,8 +392,6 @@ int open(int id, const std::string &name,
         readCfg(certFile, cert);
     }
 
-    // disable signal
-    grpc_use_signal(-1);
     std::shared_ptr<struct RpcSession> s = RpcSessionInit(id, name, peer, ip, port, ca_cert, key, cert, metaList);
     RpcSessionStart(s);
     return 0;

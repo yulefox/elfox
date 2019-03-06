@@ -13,7 +13,16 @@ message Packet {
     bytes payload                   = 9;
 }
 
+message PingReq {
+    int64 stamp                     = 1;
+}
+
+message PingRes {
+    int64 stamp                     = 1;
+}
+
 service DBus {
+    rpc Ping(PingReq) returns (PingRes);
 	rpc Stream(stream Packet) returns (stream Packet);
 }
 
