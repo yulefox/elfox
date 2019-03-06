@@ -92,14 +92,13 @@ int platform_auth(const char *token, platform_user_t &puser)
     }
 
     char *uid_str = jwt_get_grants_json(jwt, "uid");
+    const char *account = jwt_get_grant(jwt, "account");
     const char *sid = jwt_get_grant(jwt, "sid");
     const char *platform = jwt_get_grant(jwt, "platform");
     const char *channel = jwt_get_grant(jwt, "channel");
     const char *sdk = jwt_get_grant(jwt, "sdk");
-    const char *account = jwt_get_grant(jwt, "account");
-    const char *reg_time = jwt_get_grant(jwt, "reg_time");
-    const char *reg_time_s = jwt_get_grant(jwt, "reg_time_s");
-    if (uid_str == NULL || platform == NULL || channel == NULL || sdk == NULL) {
+
+    if (!uid_str || !account || !sid || !platform || !channel || !sdk) {
         jwt_free(jwt);
         LOG_ERROR("json", "invalid token: %s", token);
         return PLATFORM_TOKEN_INVALID;
@@ -107,36 +106,21 @@ int platform_auth(const char *token, platform_user_t &puser)
 
     int64_t uid = strtoll(uid_str, NULL, 10);
     if (errno == EINVAL || errno == ERANGE) {
+        free(uid_str);
         jwt_free(jwt);
         LOG_ERROR("json", "parse uid failed: %s", token);
         return PLATFORM_TOKEN_INVALID;
     }
 
     puser.uid = uid;
-    if (sid != NULL) {
-        puser.sid = std::string(sid);
-    }
-    if (platform != NULL) {
-        puser.platform = std::string(platform);
-    }
-    if (channel != NULL) {
-        puser.channel = std::string(channel);
-    }
-    if (sdk != NULL) { 
-        puser.sdk = std::string(sdk);
-    }
-    if (account != NULL) {
-        puser.account = std::string(account);
-    }
-    if (reg_time != NULL) {
-        puser.reg_time = atoi(reg_time);
-    }
-    if (reg_time_s != NULL) {
-        puser.reg_time_s = std::string(reg_time_s);
-    }
+    puser.sid = sid;
+    puser.platform = platform;
+    puser.channel = channel;
+    puser.sdk = sdk;
+    puser.account = account;
+    puser.reg_time = jwt_get_grant_int(jwt, "reg_time");
     puser.status = jwt_get_grant_int(jwt, "status");
 
-    //
     free(uid_str);
     jwt_free(jwt);
     return PLATFORM_OK;
