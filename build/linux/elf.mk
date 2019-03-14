@@ -35,6 +35,8 @@ CFLAGS		:= \
 	-I/usr/include/libxml2 \
 	-I$(INCDIR) \
 	-I$(ENV_PATH)/include/lua \
+	-I$(ENV_PATH)/include/libmongoc-1.0 \
+	-I$(ENV_PATH)/include/libbson-1.0 \
 	-I$(ENV_PATH)/include \
 	-fPIC 
 endif
