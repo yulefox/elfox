@@ -83,7 +83,7 @@ int mongodb_ping(void);
 /// @param[out] out Store query data.
 /// @param[in] field pb field.
 ///
-void monogdb_req(int idx, const char *selector, const char *doc, bool parallel = false, db_callback proc = NULL,
+void monogdb_req(int idx, const char *collection, const char *selector, const char *doc, bool parallel = false, db_callback proc = NULL,
         oid_t oid = 0, pb_t *out = NULL,
         const std::string &field = "");
 

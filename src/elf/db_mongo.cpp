@@ -8,6 +8,7 @@
 #include <elf/memory.h>
 #include <elf/pc.h>
 #include <elf/thread.h>
+#include <elf/json.h>
 #include <deque>
 #include <map>
 #include <string>
@@ -59,8 +60,6 @@ static void *handle(void *args);
 static void query(mongo_thread_t *th);
 static void destroy(query_t *q);
 static void response(query_t *q);
-static void retrieve_pb(query_t *q);
-static void retrieve_field(query_t *q);
 
 //
 static mongoc_client_pool_t *s_pool;
@@ -102,6 +101,7 @@ static void query(mongo_thread_t *th)
     selector = bson_new_from_json((const uint8_t*)q->selector.data(), q->selector.size(), &error);
     if (selector == NULL) {
         LOG_ERROR("db", "invalid selecotr:`%s`, %s.", q->selector.c_str(), error.message);
+        destroy(q);
         goto CLEANUP;
     }
 
@@ -109,6 +109,7 @@ static void query(mongo_thread_t *th)
         doc = bson_new_from_json((const uint8_t*)q->doc.data(), q->selector.size(), &error);
         if (doc == NULL) {
             LOG_ERROR("db", "invalid selecotr:`%s`, %s.", q->selector.c_str(), error.message);
+            destroy(q);
             goto CLEANUP;
         }
     }
@@ -117,62 +118,49 @@ static void query(mongo_thread_t *th)
         bson_t *opts = BCON_NEW ("upsert", BCON_BOOL(true));
         if (!mongoc_collection_replace_one(collection, selector, doc, opts, NULL, &error)) {
             LOG_ERROR("db", "upsert failed:`%s`, `%s`, %s.", q->selector.c_str(), q->doc.c_str(), error.message);
+            destroy(q);
             goto CLEANUP;
         }
     } else {
-        mongoc_cursor_t *cursor = mongoc_collection_find_with_opts(collection, selector, NULL, NULL);
+        opts = BCON_NEW ("projection", "{", "_id", BCON_BOOL (false), "}");
+        mongoc_cursor_t *cursor = mongoc_collection_find_with_opts(collection, selector, opts, NULL);
         const bson_t *item;
-        while (mongoc_cursor_next(cursor, &item)) {
-            q->data.push_back(bson_copy(item));
+
+        if (q->type == QUERY_FIELD) {
+            const Reflection *ref = q->pb->GetReflection();
+            const Descriptor *des = q->pb->GetDescriptor();
+            const FieldDescriptor *ctn = des->FindFieldByName(q->field);
+            assert(ctn);
+            while (mongoc_cursor_next(cursor, &item)) {
+                char *str = bson_as_canonical_extended_json (doc, NULL);
+                pb_t *item = ref->AddMessage(q->pb, ctn);
+                json2pb(str, item);
+                bson_free(str);
+            }
+        } else if (q->type == QUERY_PB) {
+            if (mongoc_cursor_next(cursor, &item)) {
+                char *str = bson_as_canonical_extended_json (doc, NULL);
+                json2pb(str, q->pb);
+                bson_free(str);
+            }
+        } else { // raw
+            while (mongoc_cursor_next(cursor, &item)) {
+                pb->data.push_back(bson_copy(item));
+            }
         }
 
         //
-        if (mongoc_cursor_error (cursor, &error)) {
+        if (mongoc_cursor_error(cursor, &error)) {
             LOG_ERROR("db", "find failed:`%s`, %s.", q->selector.c_str(), error.message);
         } else {
             // push result
             s_queue_res.push(q);
         }
         mongoc_cursor_destroy(cursor);
-
-
-    /*
-    const Reflection *ref = q->pb->GetReflection();
-    const Descriptor *des = q->pb->GetDescriptor();
-    const FieldDescriptor *ctn = des->FindFieldByName(q->field);
-    const int row_num = mysql_num_rows(q->data);
-    const int field_num = mysql_num_fields(q->data);
-
-    assert(ctn);
-    for (int r = 0; r < row_num; ++r) {
-        pb_t *item = ref->AddMessage(q->pb, ctn);
-        const MYSQL_ROW row = mysql_fetch_row(q->data);
-        unsigned long *len = mysql_fetch_lengths(q->data);
-
-        des = item->GetDescriptor();
-        for (int c = 0; c < field_num; ++c) {
-            const MYSQL_FIELD *ifd = mysql_fetch_field_direct(q->data, c);
-            const FieldDescriptor *ofd =
-                des->FindFieldByName(ifd->name);
-
-            if (ofd == NULL) {
-                continue;
-            }
-            if (row[c] == NULL || len[c] == 0) {
-                pb_set_field(item, ofd, "");
-            } else {
-                pb_set_field(item, ofd, row[c], len[c]);
-            }
-        }
-    }
-    */
-
-
     }
 
 CLEANUP:
     // cleanup
-    destroy(q);
     bson_destroy(selector);
     bson_destroy(opts);
     bson_destroy(doc);
@@ -183,73 +171,15 @@ static void destroy(query_t *q)
 {
     assert(q);
 
-    //if (q->data) {
-    //    mysql_free_result(q->data);
-    //}
+    for (size_t i = 0;i < q->data.size(); i++) {
+        bson_t *item = q->data[i];
+        if (item != NULL) {
+            bson_destroy(item);
+        }
+    }
+    q->data.clear();
     E_DELETE(q->pb);
     E_DELETE(q);
-}
-
-static void retrieve_pb(query_t *q)
-{
-    //assert(q && q->data && q->pb);
-
-    /*
-    const Descriptor *des = q->pb->GetDescriptor();
-    const int field_num = mysql_num_fields(q->data);
-    const MYSQL_ROW row = mysql_fetch_row(q->data);
-    size_t *len = mysql_fetch_lengths(q->data);
-
-    for (int c = 0; c < field_num; ++c) {
-        const MYSQL_FIELD *ifd = mysql_fetch_field_direct(q->data, c);
-        const FieldDescriptor *ofd = des->FindFieldByName(ifd->name);
-
-        if (ofd == NULL) {
-            continue;
-        }
-        if (row[c] == NULL || (strlen(row[c]) == 0)) {
-            pb_set_field(q->pb, ofd, "");
-        } else {
-            pb_set_field(q->pb, ofd, row[c], len[c]);
-        }
-    }
-    */
-}
-
-static void retrieve_field(query_t *q)
-{
-    //assert(q && q->data && q->pb);
-
-    /*
-    const Reflection *ref = q->pb->GetReflection();
-    const Descriptor *des = q->pb->GetDescriptor();
-    const FieldDescriptor *ctn = des->FindFieldByName(q->field);
-    const int row_num = mysql_num_rows(q->data);
-    const int field_num = mysql_num_fields(q->data);
-
-    assert(ctn);
-    for (int r = 0; r < row_num; ++r) {
-        pb_t *item = ref->AddMessage(q->pb, ctn);
-        const MYSQL_ROW row = mysql_fetch_row(q->data);
-        unsigned long *len = mysql_fetch_lengths(q->data);
-
-        des = item->GetDescriptor();
-        for (int c = 0; c < field_num; ++c) {
-            const MYSQL_FIELD *ifd = mysql_fetch_field_direct(q->data, c);
-            const FieldDescriptor *ofd =
-                des->FindFieldByName(ifd->name);
-
-            if (ofd == NULL) {
-                continue;
-            }
-            if (row[c] == NULL || len[c] == 0) {
-                pb_set_field(item, ofd, "");
-            } else {
-                pb_set_field(item, ofd, row[c], len[c]);
-            }
-        }
-    }
-    */
 }
 
 int mongodb_init(void)
@@ -345,7 +275,7 @@ int mongodb_proc(void)
     return 0;
 }
 
-void mongodb_req(int idx, const char *selector, const char *doc, bool parallel, db_callback proc,
+void mongodb_req(int idx, const char *collection, const char *selector, const char *doc, bool parallel, db_callback proc,
         oid_t oid, pb_t *out, const std::string &field)
 {
     thread_list_map::iterator itr = s_threads.find(idx);
@@ -366,6 +296,7 @@ void mongodb_req(int idx, const char *selector, const char *doc, bool parallel, 
     } else {
         q->type = QUERY_FIELD;
     }
+    q->collection = collection;
     q->selector = selector;
     q->doc = doc;
     q->stamp = time_ms();
@@ -391,7 +322,6 @@ void response(query_t *q)
             }
             break;
         case QUERY_PB:
-            retrieve_pb(q);
             if (q->proc) {
                 q->proc(q->oid, q->pb);
             }
