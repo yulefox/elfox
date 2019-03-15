@@ -4,7 +4,7 @@
  */
 
 #include <elf/cp.h>
-#include <elf/db.h>
+#include <elf/db/db.h>
 #include <elf/log.h>
 #include <libxml/parser.h>
 #include <fstream>

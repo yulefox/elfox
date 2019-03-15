@@ -24,9 +24,10 @@
 #include <elf/oid.h>
 #include <elf/pb.h>
 #include <elf/time.h>
+#include <mysql/mysql.h>
+#include <mongoc/mongoc.h>
 #include <string>
 #include <deque>
-#include <mongoc.h>
 
 enum db_rc {
     ELF_RC_DB_OK,
@@ -46,32 +47,34 @@ typedef void (*db_callback)(oid_t, void *);
  * Initialize the DB module.
  * @return ELF_RC_DB_OK(0).
  */
-int mongodb_init(void);
+int db_init(void);
 
 /**
  * Release the DB module.
  * @return ELF_RC_DB_OK(0).
  */
-int mongodb_fini(void);
+int db_fini(void);
 
 /**
  * Process all query session.
  * @return (0).
  */
-int mongodb_proc(void);
+int db_proc(void);
 
 /**
  * Initialize the DB module.
 /// @param[in] idx DB index.
  * @return ELF_RC_DB_OK(0).
  */
-int mongodb_connect(int idx, const std::string &uri_str, const std::string &appname, const std::string &db, int threads);
+int db_connect(int idx, const std::string &host, const std::string &user,
+        const std::string &passwd, const std::string &db, unsigned int port,
+        int threads);
 
 /**
  * Check connection, reconnect if dropped.
  * @return ELF_RC_DB_OK(0).
  */
-int mongodb_ping(void);
+int db_ping(void);
 
 ///
 /// DB request(asynchronous).
@@ -83,7 +86,7 @@ int mongodb_ping(void);
 /// @param[out] out Store query data.
 /// @param[in] field pb field.
 ///
-void monogdb_req(int idx, const char *selector, const char *doc, bool parallel = false, db_callback proc = NULL,
+void db_req(int idx, const char *cmd, bool parallel = false, db_callback proc = NULL,
         oid_t oid = 0, pb_t *out = NULL,
         const std::string &field = "");
 
@@ -92,7 +95,25 @@ void monogdb_req(int idx, const char *selector, const char *doc, bool parallel =
 /// @param[in] idx DB index.
 /// @return Size of pending request queues.
 ///
+size_t db_pending_size(int idx);
+
+
+
+
+
+
+////////////////////////////
+int mongodb_init(void);
+int mongodb_fini(void);
+int mongodb_proc(void);
+int mongodb_connect(int idx, const std::string &uri_str, const std::string &appname, const std::string &db, int threads);
+int mongodb_ping(void);
+void mongodb_req(int idx, const char *collection, const char *selector, const char *doc, bool parallel = false, db_callback proc = NULL,
+        oid_t oid = 0, pb_t *out = NULL,
+        const std::string &field = "");
 size_t mongodb_pending_size(int idx);
+
+
 } // namespace elf
 
 #endif /* !ELF_DB_H */

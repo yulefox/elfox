@@ -3,7 +3,7 @@
  * http://www.yulefox.com/
  */
 
-#include <elf/db.h>
+#include <elf/db/db.h>
 #include <elf/log.h>
 #include <elf/memory.h>
 #include <elf/pc.h>

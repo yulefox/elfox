@@ -18,7 +18,7 @@
 #define ELF_CP_H
 
 #include <elf/config.h>
-#include <elf/db.h>
+#include <elf/db/db.h>
 #include <elf/oid.h>
 #include <elf/pb.h>
 #include <string>

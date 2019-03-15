@@ -18,7 +18,6 @@
 #define ELF_USE_OID
 #define ELF_USE_PB
 #define ELF_USE_SINGLETON
-#define ELF_USE_MONGO
 
 #if defined ELF_USE_ALL
 #   define ELF_USE_OS
@@ -67,12 +66,8 @@
 #endif /* ELF_USE_CP */
 
 #if defined(ELF_USE_DB)
-#   include <elf/db.h>
+#   include <elf/db/db.h>
 #endif /* ELF_USE_DB */
-
-#if defined(ELF_USE_MONGO)
-#   include <elf/db_mongo.h>
-#endif /* ELF_USE_MONGO */
 
 #if defined(ELF_USE_EVENT)
 #   include <elf/event.h>
