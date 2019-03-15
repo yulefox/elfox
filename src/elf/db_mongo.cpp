@@ -120,10 +120,13 @@ static void query(mongo_thread_t *th)
             goto CLEANUP;
         }
     } else {
-        mongoc_cursor_t *cursor = mongoc_collection_find_with_opts(collection, selector, NULL, NULL);
+        opts = BCON_NEW ("projection", "{", "_id", BCON_BOOL (false), "}");
+        mongoc_cursor_t *cursor = mongoc_collection_find_with_opts(collection, selector, opts, NULL);
         const bson_t *item;
         while (mongoc_cursor_next(cursor, &item)) {
-            q->data.push_back(bson_copy(item));
+            char *str = bson_as_canonical_extended_json (doc, NULL);
+            //q->data.push_back(bson_copy(item));
+            bson_free(str);
         }
 
         //
