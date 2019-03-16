@@ -16,15 +16,15 @@
 using namespace google::protobuf;
 
 namespace elf {
-enum query_type {
+enum mongo_query_type {
     QUERY_NO_RES,       // no response
     QUERY_RAW,          // response with raw result
     QUERY_FIELD,        // response with PB field result
     QUERY_PB,           // response with PB result
 };
 
-struct query_t {
-    query_type type;            // type
+struct mongo_query_t {
+    mongo_query_type type;            // type
     std::string collection;     // collection
     std::string selector;       // containing the query to match the document for operations
     std::string doc;            // doc
@@ -41,7 +41,7 @@ typedef struct mongo_thread_s {
     string dbname;
     thread_t tid;
     mongoc_client_pool_t *pool;
-    xqueue<query_t *> req;
+    xqueue<mongo_query_t *> req;
 } mongo_thread_t;
 
 typedef struct thread_list_s {
@@ -54,12 +54,12 @@ typedef std::map<int, thread_list_t*> thread_list_map;
 static thread_list_map s_threads;
 
 static const int THREAD_NUM_DEFAULT = 5;
-static xqueue<query_t *> s_queue_res;
+static xqueue<mongo_query_t *> s_queue_res;
 
 static void *handle(void *args);
 static void query(mongo_thread_t *th);
-static void destroy(query_t *q);
-static void response(query_t *q);
+static void destroy(mongo_query_t *q);
+static void response(mongo_query_t *q);
 
 //
 static mongoc_client_pool_t *s_pool;
@@ -89,7 +89,7 @@ static void query(mongo_thread_t *th)
     bson_t *selector = NULL;
     bson_t *opts = NULL;
     bson_t *doc = NULL;
-    query_t *q = NULL;
+    mongo_query_t *q = NULL;
     bson_error_t error;
 
     th->req.pop(q);
@@ -106,9 +106,9 @@ static void query(mongo_thread_t *th)
     }
 
     if (!q->doc.empty()) {
-        doc = bson_new_from_json((const uint8_t*)q->doc.data(), q->selector.size(), &error);
+        doc = bson_new_from_json((const uint8_t*)q->doc.data(), q->doc.size(), &error);
         if (doc == NULL) {
-            LOG_ERROR("db", "invalid selecotr:`%s`, %s.", q->selector.c_str(), error.message);
+            LOG_ERROR("db", "invalid doc:`%s`, %s.", q->doc.c_str(), error.message);
             destroy(q);
             goto CLEANUP;
         }
@@ -166,12 +166,12 @@ CLEANUP:
     mongoc_client_pool_push (pool, client);
 }
 
-static void destroy(query_t *q)
+static void destroy(mongo_query_t *q)
 {
     assert(q);
 
     for (size_t i = 0;i < q->data.size(); i++) {
-        bson_t *item = q->data[i];
+        bson_t *item = (bson_t*)q->data[i];
         if (item != NULL) {
             bson_destroy(item);
         }
@@ -213,7 +213,7 @@ int mongodb_fini(void)
     return ELF_RC_DB_OK;
 }
 
-int mongodb_connect(int idx, const std::string &uri_str, const std::string &appname, const std::string &db, int num)
+int mongodb_connect(int idx, const std::string &uri_str, const std::string &appname, const std::string &dbname, int num)
 {
     if (num <= 0) {
         num = THREAD_NUM_DEFAULT;
@@ -248,6 +248,7 @@ int mongodb_connect(int idx, const std::string &uri_str, const std::string &appn
 
     for (int i = 0; i < num; ++i) {
         mongo_thread_t *th = th_list->threads + i;
+        th->dbname = dbname;
         th->pool = s_pool;
         th->tid = thread_init(handle, (void *)th);
     }
@@ -261,12 +262,12 @@ int mongodb_proc(void)
 {
     if (s_threads.empty()) return -1;
 
-    std::deque<query_t *> list;
-    std::deque<query_t *>::iterator itr;
+    std::deque<mongo_query_t *> list;
+    std::deque<mongo_query_t *>::iterator itr;
 
     s_queue_res.swap(list);
     for (itr = list.begin(); itr != list.end(); ++itr) {
-        query_t *q = *itr;
+        mongo_query_t *q = *itr;
 
         // object has not been destroyed
         response(q);
@@ -284,8 +285,8 @@ void mongodb_req(int idx, const char *collection, const char *selector, const ch
     thread_list_t *th_list = itr->second;
 
     int tidx = 0;
-    query_t *q = E_NEW query_t;
 
+    mongo_query_t *q = E_NEW mongo_query_t;
     if (proc == NULL && out == NULL) {
         q->type = QUERY_NO_RES;
     } else if (out == NULL) {
@@ -295,6 +296,7 @@ void mongodb_req(int idx, const char *collection, const char *selector, const ch
     } else {
         q->type = QUERY_FIELD;
     }
+
     q->collection = collection;
     q->selector = selector;
     q->doc = doc;
@@ -311,7 +313,7 @@ void mongodb_req(int idx, const char *collection, const char *selector, const ch
     th->req.push(q);
 }
 
-void response(query_t *q)
+void response(mongo_query_t *q)
 {
     assert(q);
     switch (q->type) {
