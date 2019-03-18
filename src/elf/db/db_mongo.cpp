@@ -9,6 +9,7 @@
 #include <elf/pc.h>
 #include <elf/thread.h>
 #include <elf/json.h>
+#include <elf/base64.h>
 #include <deque>
 #include <map>
 #include <string>
@@ -81,6 +82,51 @@ static void *handle(void *args)
     return NULL;
 }
 
+int bson2pb(const bson_t *doc, pb_t *pb)
+{
+
+    bson_iter_t iter;
+    if (!bson_iter_init (&iter, doc)) {
+        return -1;
+    }
+   
+    const Descriptor *des = pb->GetDescriptor();    
+    const Reflection *ref = pb->GetReflection();
+    while (bson_iter_next (&iter)) {
+        const char *key = bson_iter_key(&iter);
+        const bson_value_t *val = bson_iter_value(&iter);
+        if (key == NULL || val == NULL) {
+            continue;
+        }
+        const FieldDescriptor *fd = des->FindFieldByName(key);
+        if (fd == NULL) {
+            continue;
+        }
+
+        FieldDescriptor::CppType type = fd->cpp_type();
+        switch (type) {
+        case FieldDescriptor::CPPTYPE_INT32:
+        case FieldDescriptor::CPPTYPE_UINT32:
+            ref->SetInt32(pb, fd, val->value.v_int32);
+            break;
+        case FieldDescriptor::CPPTYPE_INT64:
+        case FieldDescriptor::CPPTYPE_UINT64:
+            ref->SetInt64(pb, fd, atoll(val->value.v_utf8.str));
+            break;
+        case FieldDescriptor::CPPTYPE_STRING:
+            if (fd->type() == FieldDescriptor::TYPE_BYTES) {
+                ref->SetString(pb, fd, base64_decode(val->value.v_utf8.str, val->value.v_utf8.len, false));
+            } else {
+                ref->SetString(pb, fd, std::string(val->value.v_utf8.str, val->value.v_utf8.len));
+            }
+            break;
+        default:
+            LOG_ERROR("pb", "Invalid field type %d.", type);
+        };
+    }
+    return 0;
+}
+
 static void query(mongo_thread_t *th)
 {
     mongoc_client_pool_t *pool = th->pool;
@@ -97,6 +143,10 @@ static void query(mongo_thread_t *th)
 
     client = mongoc_client_pool_pop(pool);
     collection = mongoc_client_get_collection(client, th->dbname.c_str(), q->collection.c_str());
+
+    if (strcmp(q->collection.c_str(), "attr") == 0) {
+        LOG_ERROR("db", "selecotr:`%s`, %s.", q->selector.c_str(), q->collection.c_str());
+    }
 
     selector = bson_new_from_json((const uint8_t*)q->selector.data(), q->selector.size(), &error);
     if (selector == NULL) {
@@ -131,13 +181,21 @@ static void query(mongo_thread_t *th)
             const FieldDescriptor *ctn = des->FindFieldByName(q->field);
             assert(ctn);
             while (mongoc_cursor_next(cursor, &res)) {
-                //char *str = bson_as_canonical_extended_json(res, NULL);
                 char *str = bson_as_json(res, NULL);
                 pb_t *item = ref->AddMessage(q->pb, ctn);
                 int code = json2pb(str, item, true);
                 if (code != 0) {
                     LOG_ERROR("db", "json2pb failed: %s", str);
                 }
+
+                /*
+                pb_t *item = ref->AddMessage(q->pb, ctn);
+                int code = bson2pb(res, item);
+                if (code != 0) {
+                    LOG_ERROR("db", "bson2pb failed: %s", bson_as_json(res, NULL));
+                }
+                */
+
                 bson_free(str);
             }
         } else if (q->type == QUERY_PB) {
@@ -147,6 +205,14 @@ static void query(mongo_thread_t *th)
                 if (code != 0) {
                     LOG_ERROR("db", "json2pb failed: %s", str);
                 }
+
+                /*
+                int code = bson2pb(res, q->pb);
+                if (code != 0) {
+                    LOG_ERROR("db", "bson2pb failed: %s", bson_as_json(res, NULL));
+                }
+                */
+
                 bson_free(str);
             }
         } else { // raw
