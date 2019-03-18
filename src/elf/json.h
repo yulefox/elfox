@@ -67,7 +67,7 @@ pb_t *json_pb(const std::string &pb_type, const std::string &json);
 /// @param[in out] pb Protobuf object.
 /// @return 0 if converted done.
 ///
-int json2pb(const std::string &json, pb_t *pb);
+int json2pb(const std::string &json, pb_t *pb, bool ignore_unknown_fields = false);
 
 ///
 /// Convert protobuf object to existed json string.

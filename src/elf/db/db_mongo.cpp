@@ -124,27 +124,34 @@ static void query(mongo_thread_t *th)
     } else {
         opts = BCON_NEW ("projection", "{", "_id", BCON_BOOL (false), "}");
         mongoc_cursor_t *cursor = mongoc_collection_find_with_opts(collection, selector, opts, NULL);
-        const bson_t *item;
+        const bson_t *res;
         if (q->type == QUERY_FIELD) {
             const Reflection *ref = q->pb->GetReflection();
             const Descriptor *des = q->pb->GetDescriptor();
             const FieldDescriptor *ctn = des->FindFieldByName(q->field);
             assert(ctn);
-            while (mongoc_cursor_next(cursor, &item)) {
-                char *str = bson_as_canonical_extended_json (doc, NULL);
+            while (mongoc_cursor_next(cursor, &res)) {
+                //char *str = bson_as_canonical_extended_json(res, NULL);
+                char *str = bson_as_json(res, NULL);
                 pb_t *item = ref->AddMessage(q->pb, ctn);
-                json2pb(str, item);
+                int code = json2pb(str, item, true);
+                if (code != 0) {
+                    LOG_ERROR("db", "json2pb failed: %s", str);
+                }
                 bson_free(str);
             }
         } else if (q->type == QUERY_PB) {
-            if (mongoc_cursor_next(cursor, &item)) {
-                char *str = bson_as_canonical_extended_json (doc, NULL);
-                json2pb(str, q->pb);
+            if (mongoc_cursor_next(cursor, &res)) {
+                char *str = bson_as_json(res, NULL);
+                int code = json2pb(str, q->pb, true);
+                if (code != 0) {
+                    LOG_ERROR("db", "json2pb failed: %s", str);
+                }
                 bson_free(str);
             }
         } else { // raw
-            while (mongoc_cursor_next(cursor, &item)) {
-                q->data.push_back(bson_copy(item));
+            while (mongoc_cursor_next(cursor, &res)) {
+                q->data.push_back(bson_copy(res));
             }
         }
 
