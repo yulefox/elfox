@@ -108,7 +108,7 @@ int mongodb_fini(void);
 int mongodb_proc(void);
 int mongodb_connect(int idx, const std::string &uri_str, const std::string &appname, const std::string &db, int threads);
 int mongodb_ping(void);
-void mongodb_req(int idx, const char *collection, const char *selector, const char *doc, bool parallel = false, db_callback proc = NULL,
+void mongodb_req(int idx, const char *collection, const char *selector, const bson_t *doc, bool parallel = false, db_callback proc = NULL,
         oid_t oid = 0, pb_t *out = NULL,
         const std::string &field = "");
 size_t mongodb_pending_size(int idx);

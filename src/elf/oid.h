@@ -223,6 +223,12 @@ void oid_llsmap_add(id_llsmap &llsm, oid_t key, oid_t k, oid_t v);
 /// @param[in] v `id_lsmap:value`.
 ///
 void oid_llsmap_del(id_llsmap &llsm, oid_t key, oid_t k, oid_t v);
+
+
+///
+std::string oid2s(int64_t i);
+
+
 } // namespace elf
 
 #endif /* !ELF_OID_H */

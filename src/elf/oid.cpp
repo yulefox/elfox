@@ -317,5 +317,13 @@ void oid_llsmap_del(id_llsmap &llsm, oid_t key, int k, oid_t v)
         }
     }
 }
+
+std::string oid2s(int64_t i)
+{
+    char buf[64];
+    sprintf(buf, "%lld", i);
+    return std::string(buf);
+}
+
 } // namespace elf
 

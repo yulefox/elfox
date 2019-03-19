@@ -103,7 +103,7 @@ int json2pb(const std::string &json, pb_t *pb, bool ignore_unknown_fields)
 
     util::Status st = google::protobuf::util::JsonStringToMessage(json, pb, opts);
     if (st.error_code() != 0) {
-        LOG_ERROR("json", "%s.", "json2pb failed");
+        LOG_ERROR("json", "json2pb failed: %s %s", json.c_str(), st.ToString().c_str());
     }
 
     return st.error_code();

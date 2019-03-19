@@ -25,11 +25,11 @@ enum mongo_query_type {
 };
 
 struct mongo_query_t {
-    mongo_query_type type;            // type
+    mongo_query_type type;      // type
     std::string collection;     // collection
     std::string selector;       // containing the query to match the document for operations
-    std::string doc;            // doc
-    std::vector<bson_t*> data;    // query result
+    bson_t *doc;                // doc
+    std::vector<bson_t*> data;  // query result
     oid_t oid;                  // associated object id
     pb_t *pb;                   // store query data
     std::string field;          // pb field
@@ -72,7 +72,7 @@ static void *handle(void *args)
     mongo_thread_t *self = (mongo_thread_t*)args;
 
     if (self == NULL) {
-        LOG_ERROR("db", "Create thread failed: %s", "mysql_thread_t is NULL");
+        LOG_ERROR("db", "Create thread failed: %s", "mongodb_thread_t is NULL");
         return NULL;
     }
 
@@ -80,51 +80,6 @@ static void *handle(void *args)
         query(self);
     }
     return NULL;
-}
-
-int bson2pb(const bson_t *doc, pb_t *pb)
-{
-
-    bson_iter_t iter;
-    if (!bson_iter_init (&iter, doc)) {
-        return -1;
-    }
-   
-    const Descriptor *des = pb->GetDescriptor();    
-    const Reflection *ref = pb->GetReflection();
-    while (bson_iter_next (&iter)) {
-        const char *key = bson_iter_key(&iter);
-        const bson_value_t *val = bson_iter_value(&iter);
-        if (key == NULL || val == NULL) {
-            continue;
-        }
-        const FieldDescriptor *fd = des->FindFieldByName(key);
-        if (fd == NULL) {
-            continue;
-        }
-
-        FieldDescriptor::CppType type = fd->cpp_type();
-        switch (type) {
-        case FieldDescriptor::CPPTYPE_INT32:
-        case FieldDescriptor::CPPTYPE_UINT32:
-            ref->SetInt32(pb, fd, val->value.v_int32);
-            break;
-        case FieldDescriptor::CPPTYPE_INT64:
-        case FieldDescriptor::CPPTYPE_UINT64:
-            ref->SetInt64(pb, fd, atoll(val->value.v_utf8.str));
-            break;
-        case FieldDescriptor::CPPTYPE_STRING:
-            if (fd->type() == FieldDescriptor::TYPE_BYTES) {
-                ref->SetString(pb, fd, base64_decode(val->value.v_utf8.str, val->value.v_utf8.len, false));
-            } else {
-                ref->SetString(pb, fd, std::string(val->value.v_utf8.str, val->value.v_utf8.len));
-            }
-            break;
-        default:
-            LOG_ERROR("pb", "Invalid field type %d.", type);
-        };
-    }
-    return 0;
 }
 
 static void query(mongo_thread_t *th)
@@ -144,10 +99,6 @@ static void query(mongo_thread_t *th)
     client = mongoc_client_pool_pop(pool);
     collection = mongoc_client_get_collection(client, th->dbname.c_str(), q->collection.c_str());
 
-    if (strcmp(q->collection.c_str(), "attr") == 0) {
-        LOG_ERROR("db", "selecotr:`%s`, %s.", q->selector.c_str(), q->collection.c_str());
-    }
-
     selector = bson_new_from_json((const uint8_t*)q->selector.data(), q->selector.size(), &error);
     if (selector == NULL) {
         LOG_ERROR("db", "invalid selecotr:`%s`, %s.", q->selector.c_str(), error.message);
@@ -155,19 +106,10 @@ static void query(mongo_thread_t *th)
         goto CLEANUP;
     }
 
-    if (!q->doc.empty()) {
-        doc = bson_new_from_json((const uint8_t*)q->doc.data(), q->doc.size(), &error);
-        if (doc == NULL) {
-            LOG_ERROR("db", "invalid doc:`%s`, %s.", q->doc.c_str(), error.message);
-            destroy(q);
-            goto CLEANUP;
-        }
-    }
-
     if (q->type == QUERY_NO_RES) {
         bson_t *opts = BCON_NEW ("upsert", BCON_BOOL(true));
-        if (!mongoc_collection_replace_one(collection, selector, doc, opts, NULL, &error)) {
-            LOG_ERROR("db", "upsert failed:`%s`, `%s`, %s.", q->selector.c_str(), q->doc.c_str(), error.message);
+        if (q->doc == NULL || !mongoc_collection_replace_one(collection, selector, q->doc, opts, NULL, &error)) {
+            LOG_ERROR("db", "upsert failed:`%s`, %s.", q->selector.c_str(), error.message);
             destroy(q);
             goto CLEANUP;
         }
@@ -183,36 +125,17 @@ static void query(mongo_thread_t *th)
             while (mongoc_cursor_next(cursor, &res)) {
                 char *str = bson_as_json(res, NULL);
                 pb_t *item = ref->AddMessage(q->pb, ctn);
-                int code = json2pb(str, item, true);
-                if (code != 0) {
+                if (json2pb(str, item, true) != 0) {
                     LOG_ERROR("db", "json2pb failed: %s", str);
                 }
-
-                /*
-                pb_t *item = ref->AddMessage(q->pb, ctn);
-                int code = bson2pb(res, item);
-                if (code != 0) {
-                    LOG_ERROR("db", "bson2pb failed: %s", bson_as_json(res, NULL));
-                }
-                */
-
                 bson_free(str);
             }
         } else if (q->type == QUERY_PB) {
             if (mongoc_cursor_next(cursor, &res)) {
                 char *str = bson_as_json(res, NULL);
-                int code = json2pb(str, q->pb, true);
-                if (code != 0) {
+                if (json2pb(str, q->pb, true) != 0) {
                     LOG_ERROR("db", "json2pb failed: %s", str);
                 }
-
-                /*
-                int code = bson2pb(res, q->pb);
-                if (code != 0) {
-                    LOG_ERROR("db", "bson2pb failed: %s", bson_as_json(res, NULL));
-                }
-                */
-
                 bson_free(str);
             }
         } else { // raw
@@ -250,6 +173,9 @@ static void destroy(mongo_query_t *q)
         }
     }
     q->data.clear();
+    if (q->doc != NULL) {
+        bson_destroy(q->doc);
+    }
     E_DELETE(q->pb);
     E_DELETE(q);
 }
@@ -348,7 +274,7 @@ int mongodb_proc(void)
     return 0;
 }
 
-void mongodb_req(int idx, const char *collection, const char *selector, const char *doc, bool parallel, db_callback proc,
+void mongodb_req(int idx, const char *collection, const char *selector, const bson_t *doc, bool parallel, db_callback proc,
         oid_t oid, pb_t *out, const std::string &field)
 {
     thread_list_map::iterator itr = s_threads.find(idx);
@@ -372,7 +298,10 @@ void mongodb_req(int idx, const char *collection, const char *selector, const ch
 
     q->collection = collection;
     q->selector = selector;
-    q->doc = doc;
+    q->doc = NULL;
+    if (doc != NULL) {
+        q->doc = bson_copy(doc);
+    }
     q->stamp = time_ms();
     q->oid = oid;
     q->pb = out;
@@ -392,7 +321,7 @@ void response(mongo_query_t *q)
     switch (q->type) {
         case QUERY_RAW:
             if (q->proc) {
-                q->proc(q->oid, NULL);
+                q->proc(q->oid, &(q->data));
             }
             break;
         case QUERY_PB:
