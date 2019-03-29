@@ -8,6 +8,7 @@
 #include <elf/net/net.h>
 #include <elf/net/message.h>
 #include <elf/pc.h>
+#include <elf/pike.h>
 #include <elf/thread.h>
 #include <elf/time.h>
 #include <elf/os.h>
@@ -1804,13 +1805,18 @@ static void on_error(const epoll_event &evt)
     net_close(ctx->peer.id);
 }
 
-void net_cipher_set(oid_t peer, cipher_t *encipher, cipher_t *decipher)
+void net_cipher_set(oid_t peer, uint32_t token)
 {
     context_t *ctx = context_find(peer);
     if (ctx != NULL) {
+        pike_t *penc = pike_ctx_init(token);
+        pike_t *pdec = pike_ctx_init(token);
+        cipher_t *enc = cipher_init((void *)penc, pike_codec, pike_ctx_fini);
+        cipher_t *dec = cipher_init((void *)pdec, pike_codec, pike_ctx_fini);
+
         mutex_lock(&(ctx->lock));
-        ctx->encipher = encipher;
-        ctx->decipher = decipher;
+        ctx->encipher = enc;
+        ctx->decipher = dec;
         mutex_unlock(&(ctx->lock));
     }
 }

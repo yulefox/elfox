@@ -229,7 +229,7 @@ void net_rawsend(oid_t peer, const std::string &name, const std::string &body, o
 
 void net_rawsend(const id_set &peers, const std::string &name, const std::string &body, oid_t dest = 0);
 
-void net_cipher_set(oid_t peer, cipher_t *encipher, cipher_t *decipher);
+void net_cipher_set(oid_t peer, uint32_t token);
 
 void net_register_raw(const std::string &name);
 
