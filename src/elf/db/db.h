@@ -113,6 +113,9 @@ void mongodb_req(int idx, const char *collection, const char *selector, const bs
         const std::string &field = "");
 size_t mongodb_pending_size(int idx);
 
+///
+int pb2bson(bson_t *doc, const pb_t &pb, int nfields, const char *fields[], oid_t xid = 0);
+
 
 } // namespace elf
 

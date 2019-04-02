@@ -274,6 +274,83 @@ int mongodb_proc(void)
     return 0;
 }
 
+
+int pb2bson(bson_t *doc, const pb_t &pb, int nfields, const char *fields[], oid_t xid)
+{
+    if (doc == NULL || nfields <= 0) {
+        return -1;
+    }
+    const Descriptor *des = pb.GetDescriptor();    
+    const Reflection *ref = pb.GetReflection();
+
+    for (int i = 0; i < nfields; i++) {
+        const char *field = fields[i];
+        if (fields == NULL) {
+            return -1;
+        }
+        const FieldDescriptor *fd = des->FindFieldByName(field);
+        if (fd == NULL) {
+            return -1;
+        }
+
+        FieldDescriptor::Type type = fd->type();
+        switch (type) {
+        case FieldDescriptor::TYPE_INT32:
+            {
+                int32_t val = ref->GetInt32(pb, fd);
+                bson_append_int32(doc, field, -1, val);
+                if (strcmp(field, "createtime") == 0 || strcmp(field, "stamp") == 0) {
+                    char ts[20];
+                    time_t t = (time_t)val;
+                    struct tm tm;
+                    localtime_r(&t, &tm);
+                    strftime(ts, 20, "%F %T", &tm);
+                    std::string name = std::string(field) + "_s"; 
+                    bson_append_utf8(doc, name.c_str(), -1, ts, -1);
+                }
+            }
+            break; 
+        case FieldDescriptor::TYPE_UINT32:
+            bson_append_int32(doc, field, -1, ref->GetUInt32(pb, fd));
+            break; 
+        case FieldDescriptor::TYPE_INT64:
+            {
+                std::string val = oid2s(ref->GetInt64(pb, fd));
+                bson_append_utf8(doc, field, -1, val.c_str(), val.size());
+            }
+            break; 
+        case FieldDescriptor::TYPE_UINT64:
+            {
+                std::string val = oid2s(ref->GetUInt64(pb, fd));
+                bson_append_utf8(doc, field, -1, val.c_str(), val.size());
+            }
+            break; 
+        case FieldDescriptor::TYPE_STRING:
+            {
+                std::string val = ref->GetString(pb, fd);
+                bson_append_utf8(doc, field, -1, val.c_str(), val.size());
+            }
+            break;
+        case FieldDescriptor::TYPE_BYTES:
+            {
+                std::string raw = ref->GetString(pb, fd);
+                std::string val = base64_encode(raw.data(), raw.size(), false);
+                bson_append_utf8(doc, field, -1, val.c_str(), val.size());
+            }
+            break;
+        default:
+            return -1;
+        }
+    }
+
+    if (xid > 0) {
+        std::string xid_s = oid2s(xid);
+        bson_append_utf8(doc, "xid", -1, xid_s.c_str(), xid_s.size());
+    }
+    return 0;
+}
+
+
 void mongodb_req(int idx, const char *collection, const char *selector, const bson_t *doc, bool parallel, db_callback proc,
         oid_t oid, pb_t *out, const std::string &field)
 {

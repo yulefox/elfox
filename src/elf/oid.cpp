@@ -325,5 +325,13 @@ std::string oid2s(int64_t i)
     return std::string(buf);
 }
 
+std::string oid2s(uint64_t i)
+{
+    char buf[64];
+    sprintf(buf, "%llu", i);
+    return std::string(buf);
+}
+
+
 } // namespace elf
 

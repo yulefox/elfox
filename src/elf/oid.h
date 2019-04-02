@@ -227,6 +227,7 @@ void oid_llsmap_del(id_llsmap &llsm, oid_t key, oid_t k, oid_t v);
 
 ///
 std::string oid2s(int64_t i);
+std::string oid2s(uint64_t i);
 
 
 } // namespace elf
