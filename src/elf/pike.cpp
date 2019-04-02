@@ -68,7 +68,7 @@ pike_t *pike_ctx_init(uint32_t sd)  {
     return ctx;
 }
 
-void pike_ctx_fini(pike_t *ctx) {
+void pike_ctx_fini(void *ctx) {
     if (ctx != NULL) {
         free(ctx);
     }
@@ -129,7 +129,9 @@ static void _generate(pike_t *ctx) {
 	ctx->index = 0;
 }
 
-uint8_t *pike_codec(pike_t *ctx, uint8_t *data, size_t size) {
+uint8_t *pike_codec(void *c, uint8_t *data, size_t size) {
+    pike_t *ctx = (pike_t *)c;
+
     if (size == 0) {
         return data;
     }
