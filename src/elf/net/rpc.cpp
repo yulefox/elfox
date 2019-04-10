@@ -36,28 +36,198 @@
 
 namespace elf {
 namespace rpc {
-MetaData::MetaData(const std::string &_key, const std::string &_val) : key(_key), val(_val)
-    {}
 
-MetaData::MetaData(const std::string &_key, int _val) {
-    key = _key;
-    val = std::to_string(_val);
-}
+static std::map< std::string, oid_t> s_name_ids;
+static xqueue<recv_message_t*> s_recv_msgs;
+static std::mutex s_lock_id;
+static std::mutex s_lock_name;
+static const int64_t KEEPALIVE_TIMEOUT = 2000; // 2 seconds
 
-MetaData::MetaData(const std::string &_key, int64_t _val) {
-    key = _key;
-    val = std::to_string(_val);
-}
 
-MetaData::~MetaData() {}
+class DBusClient {
+public:
+    explicit DBusClient(int id, oid_t peer, const std::vector<MetaData> &metaList,
+            std::shared_ptr<grpc::Channel> channel) {
+            
+        metaList_ = metaList;
+        channel_ = channel;
+        stub_ = pb::DBus::NewStub(channel);
+        id_ = id;
+        peer_ = peer;
+
+        //Init();
+    }
+
+    void Init() {
+        LOG_INFO("net", "%s", "start initialize stream...");
+        AsyncClientCall *call = new AsyncClientCall;
+        call->oper = AsyncClientCall::OperType::INIT;
+
+        // metadata
+        for (size_t i = 0; i < metaList_.size(); i++) {
+            call->context.AddMetadata(metaList_[i].key, metaList_[i].val);
+            LOG_INFO("net", "add metadata %s %s", metaList_[i].key.c_str(), metaList_[i].val.c_str());
+        }
+        //call->context.set_wait_for_ready(true);
+        stream_ = stub_->AsyncStream(&call->context, &cq_, call);
+    }
+
+    void PushSend(const pb_t &pb, void *ctx) {
+        std::string name = pb.GetTypeName();
+        std::string payload;
+        pb.SerializeToString(&payload);
+
+
+        pb::Packet *pkt = E_NEW pb::Packet;
+        pb::Peer *peer = pkt->mutable_peer();
+        pb::Peer *to = static_cast<pb::Peer*>(ctx);
+        if (to == NULL) {
+            peer->set_name("gs");
+            peer->add_peers(id_);
+        } else {
+            peer->CopyFrom(*to);
+        }
+        pkt->set_type(name);
+        pkt->set_payload(payload);
+
+        std::unique_lock<std::mutex> lock(mutex_);
+        wque_.push_back(pkt);
+
+        LOG_INFO("net", "push send: %s", name.c_str());
+
+        // start request write
+        if (wque_.size() == 1) {
+            LOG_INFO("net", "%s", "launch to send...");
+            nextWrite();
+        }
+    }
+
+    static void WorkerRoutine(DBusClient *clt) {
+        clt->Loop();
+    }
+
+    void Loop() {
+        int prev_st = GRPC_CHANNEL_IDLE;
+        for (;;) {
+            void* got_tag = NULL;
+            bool ok = false;
+
+            gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(1, GPR_TIMESPAN));
+            grpc::CompletionQueue::NextStatus st = cq_.AsyncNext(&got_tag, &ok, deadline);
+            if (st == grpc::CompletionQueue::SHUTDOWN) {
+                LOG_ERROR("net", "%s", "grpc::CompletionQueue has been shutdown...");
+                break;
+            } else if (st == grpc::CompletionQueue::TIMEOUT) {
+                int curr_st = channel_->GetState(true);
+                if ((prev_st == GRPC_CHANNEL_IDLE ||
+                     prev_st == GRPC_CHANNEL_CONNECTING ||
+                     prev_st == GRPC_CHANNEL_TRANSIENT_FAILURE) && curr_st == GRPC_CHANNEL_READY) {
+                    Init();
+                }
+                LOG_INFO("net", "grpcloop...channel stat: prev(%d) curr(%d)", prev_st, curr_st);
+                prev_st = curr_st;
+            } else if (st == grpc::CompletionQueue::GOT_EVENT) {
+                if (ok) {
+                    AsyncClientCall* call = static_cast<AsyncClientCall*>(got_tag);
+                    switch (call->oper) {
+                    case AsyncClientCall::OperType::INIT:
+                        onInit(call);
+                        break;
+                    case AsyncClientCall::OperType::READ:
+                        onRead(call);
+                        break;
+                    case AsyncClientCall::OperType::WRITE:
+                        onWrite(call);
+                        break;
+                    default:
+                        LOG_INFO("net", "%s", "get an unknown type operation");
+                        break;
+                    }
+                    //delete call;
+                }
+            }
+        }
+    }
+
+private:
+    struct AsyncClientCall {
+        enum OperType { INIT = 0x1, READ = 0x2, WRITE = 0x4};
+        OperType oper;
+        grpc::ClientContext context;
+        pb::Packet pkt;
+    };
+
+    void nextRead() {
+        AsyncClientCall *call = new AsyncClientCall;
+        call->oper = AsyncClientCall::OperType::READ;
+        stream_->Read(&call->pkt, call);
+    }
+
+    void nextWrite() {
+        pb::Packet *pkt = wque_.front();
+        AsyncClientCall *call = new AsyncClientCall;
+        call->oper = AsyncClientCall::OperType::WRITE;
+        stream_->Write(*pkt, (void*)call);
+    }
+
+    void onInit(AsyncClientCall *call) {
+        nextRead();
+
+        LOG_INFO("net", "%s", "grpc on inited...");
+    }
+
+    void onRead(AsyncClientCall *call) {
+        LOG_INFO("net", "%s", "grpc on read...");
+
+        pb::Packet *pkt = &(call->pkt);
+
+        pb::Peer *from = E_NEW pb::Peer;
+        from->CopyFrom(pkt->peer());
+
+        recv_message_t *msg = E_NEW recv_message_t;
+        msg->name = pkt->type();
+        msg->body = pkt->payload();
+        msg->peer = peer_;
+        msg->pb = NULL;
+        msg->rpc_ctx = (void*)from;
+        msg->ctx = (elf::context_t*)((void*)this);
+
+        //msg->ctx = (elf::context_t*)((void*)s.get());
+        //
+        s_recv_msgs.push(msg);
+
+        LOG_INFO("net", "recv msg: %s", msg->name.c_str());
+
+        //
+        nextRead();
+    }
+
+    void onWrite(AsyncClientCall *call) {
+        LOG_INFO("net", "%s", "grpc on write...");
+        std::unique_lock<std::mutex> lock(mutex_);
+        wque_.pop_front();
+
+        // keep request to send
+        if (!wque_.empty()) {
+            nextWrite();
+        }
+    }
+
+private:
+    std::unique_ptr<grpc::ClientAsyncReaderWriter<pb::Packet, pb::Packet> > stream_;
+    std::shared_ptr<grpc::Channel> channel_;
+    std::unique_ptr<pb::DBus::Stub> stub_;
+    std::deque<pb::Packet*> wque_;
+    std::mutex mutex_;
+    std::vector<MetaData> metaList_;
+    grpc::ClientContext context_;
+    grpc::CompletionQueue cq_;
+    oid_t peer_;
+    int id_;
+};
 
 struct RpcSession {
-    std::deque<pb::Packet*> wque;
-    std::mutex mutex;
     std::shared_ptr<grpc::Channel>  channel;
-    std::thread *watcher;
-    std::thread *reader;
-    std::thread *writer;
     std::string name;
     std::string ip;
     grpc::SslCredentialsOptions ssl_opts;
@@ -66,32 +236,12 @@ struct RpcSession {
     int id;
     std::vector<MetaData> metaList;
     oid_t peer;
+    std::thread *worker;
 
-    ///
-    void send(const pb_t &pb, void *ctx) {
-        std::string name = pb.GetTypeName();
-        std::string payload;
-        pb.SerializeToString(&payload);
-
-        pb::Packet *pkt = E_NEW pb::Packet;
-        pb::Peer *peer = pkt->mutable_peer();
-        pb::Peer *to = static_cast<pb::Peer*>(ctx);
-        if (to == NULL) {
-            peer->set_name("gs");
-            peer->add_peers(id);
-        } else {
-            peer->CopyFrom(*to);
-        }
-        pkt->set_type(name);
-        pkt->set_payload(payload);
-
-        std::unique_lock<std::mutex> lock(mutex);
-        wque.push_back(pkt);
-    }
+    DBusClient *client;
 
     void open()
     {
-        
         char raddr[128];
         sprintf(raddr, "%s:%d", ip.c_str(), port);
 
@@ -101,19 +251,20 @@ struct RpcSession {
         } else {
             channel = grpc::CreateChannel(raddr, grpc::InsecureChannelCredentials());
         }
+
+        client = new DBusClient(id, peer, metaList, channel);
+        worker = new std::thread(&DBusClient::WorkerRoutine, client);
     }
 
+    void close() {
+        delete client;
+        worker->join();
+        delete worker;
+    }
 };
 
-
-
+//
 static std::map<oid_t, std::shared_ptr<struct RpcSession> > s_sessions;
-static std::map< std::string, oid_t> s_name_ids;
-static xqueue<recv_message_t*> s_recv_msgs;
-static std::mutex s_lock_id;
-static std::mutex s_lock_name;
-static const int64_t KEEPALIVE_TIMEOUT = 2000; // 2 seconds
-
 
 std::shared_ptr<struct RpcSession> RpcSessionInit(int id, const std::string &name,
         oid_t peer,
@@ -132,15 +283,13 @@ std::shared_ptr<struct RpcSession> RpcSessionInit(int id, const std::string &nam
     }
 
     s->id = id;
-    s->wque.clear();
-    s->watcher = NULL;
-    s->reader = NULL;
-    s->writer = NULL;
     s->name = name;
     s->ip = ip;
     s->port = port;
     s->peer = peer;
     s->metaList = metaList;
+    s->client = NULL;
+    s->worker = NULL;
 
     std::unique_lock<std::mutex> lock1(s_lock_id);
     std::unique_lock<std::mutex> lock2(s_lock_name);
@@ -187,173 +336,6 @@ static void readCfg(const std::string& filename, std::string& data)
 	}
 }
 
-
-static void read_routine (std::shared_ptr<struct RpcSession> s,
-        std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream,
-        std::future<void> &futureObj)
-{
-    LOG_INFO("net", "rpc reader start: %lld ", s->peer);
-    std::future_status st = std::future_status::timeout;
-    while (s->channel->GetState(false) == GRPC_CHANNEL_READY) {
-        pb::Packet pkt;
-        while (stream->Read(&pkt) &&
-               (st = futureObj.wait_for(std::chrono::milliseconds(0))) == std::future_status::timeout) {
-            // message source
-            pb::Peer *from = E_NEW pb::Peer;
-            from->CopyFrom(pkt.peer());
-
-            recv_message_t *msg = E_NEW recv_message_t;
-            msg->name = pkt.type();
-            msg->body = pkt.payload();
-            msg->peer = s->peer,
-            msg->ctx = (elf::context_t*)((void*)s.get());
-            msg->pb = NULL;
-            msg->rpc_ctx = (void*)from;
-            s_recv_msgs.push(msg);
-        }
-	    if (st != std::future_status::timeout) {
-            break;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-    LOG_ERROR("net", "rpc reader quit: %lld ", s->peer);
-}
-
-
-static void send_routine (std::shared_ptr<struct RpcSession> s,
-        std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream,
-        std::future<void> &futureObj)
-{
-    LOG_INFO("net", "rpc writer start: %lld ", s->peer);
-    std::deque<pb::Packet*> pending;
-    while (s->channel->GetState(false) == GRPC_CHANNEL_READY && 
-           futureObj.wait_for(std::chrono::milliseconds(0)) == std::future_status::timeout) {
-        // get cached pkts
-        std::unique_lock<std::mutex> lock(s->mutex);
-        while(!s->wque.empty()) {
-            pb::Packet *pkt = s->wque.front();
-            pending.push_back(pkt);
-            s->wque.pop_front();
-        }
-        lock.unlock();
-
-        // try to send
-        if (!pending.empty()) {
-            pb::Packet *pkt = pending.front();
-            if (pkt == NULL || stream->Write(*pkt)) {
-                pending.pop_front();
-                E_DELETE pkt;
-            }
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-    LOG_ERROR("net", "rpc writer quit: %lld ", s->peer);
-}
-
-static void watch_routine (std::shared_ptr<struct RpcSession> s)
-{
-    std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> > stream = NULL;
-    std::thread *reader = NULL;
-    std::thread *writer = NULL;
-    grpc::ClientContext *context = NULL;
-    int64_t last = 0;
-    std::promise<void> *readerSignal = NULL;
-    std::promise<void> *senderSignal = NULL;
-    for (;;) {
-        int stat = s->channel->GetState(true);
-        if (stat == GRPC_CHANNEL_READY &&
-            (last == 0 || time_ms() >= (time64_t)(last + KEEPALIVE_TIMEOUT))) {
-            pb::PingReq req;
-            pb::PingRes res;
-            grpc::ClientContext ctx;
-
-            req.set_stamp((int64_t)time_ms());
-            std::unique_ptr<pb::DBus::Stub> stub = pb::DBus::NewStub(s->channel);
-
-            gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(2, GPR_TIMESPAN));
-            ctx.set_deadline(deadline);
-            grpc::Status st = stub->Ping(&ctx, req, &res);
-            if (!st.ok()) {
-                LOG_INFO("net", "grpc ping failed: %s", st.error_message().c_str());
-                // notify workers to exit
-            } else {
-                last = time_ms();
-            }
-        }
-        if (stat == GRPC_CHANNEL_TRANSIENT_FAILURE) {
-            s->open();
-            LOG_INFO("net", "rpc reopen<%s><%s:%d>", s->name.c_str(), s->ip.c_str(), s->port);
-        } else if (stat == GRPC_CHANNEL_CONNECTING) {
-            LOG_INFO("net", "wait rpc <%s><%s:%d> to be connected", s->name.c_str(), s->ip.c_str(), s->port);
-            while (s->channel->GetState(false) == GRPC_CHANNEL_CONNECTING) {
-                gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(5, GPR_TIMESPAN));
-                if (!s->channel->WaitForConnected(deadline)) {
-                    LOG_INFO("net", "rpc <%s><%s:%d> do not be connected", s->name.c_str(), s->ip.c_str(), s->port);
-                } else {
-                    if (context != NULL) {
-                        delete context;
-                        context = NULL;
-                    }
-
-                    if (readerSignal != NULL) {
-                        readerSignal->set_value();
-                    }
-                    if (senderSignal != NULL) {
-                        senderSignal->set_value();
-                    }
-
-                    if (reader != NULL) {
-                        reader->join();
-                        delete reader;
-                        delete readerSignal;
-                    }
-
-                    if (writer != NULL) {
-                        writer->join();
-                        delete writer;
-                        delete senderSignal;
-                    }
-
-                    std::unique_ptr<pb::DBus::Stub> stub = pb::DBus::NewStub(s->channel);
-                    if (context == NULL) {
-                        context = new grpc::ClientContext();
-
-                        // metadata
-                        for (size_t i = 0; i < s->metaList.size(); i++) {
-                            context->AddMetadata(s->metaList[i].key, s->metaList[i].val);
-                            LOG_INFO("net", "add metadata %s %s", s->metaList[i].key.c_str(), s->metaList[i].val.c_str());
-                        }
-                        //context->set_wait_for_ready(false);
-                    }
-                    context->set_wait_for_ready(true);
-
-                    readerSignal = new std::promise<void>();
-                    senderSignal = new std::promise<void>();
-
-                    std::future<void> readerFut = readerSignal->get_future();
-                    std::future<void> senderFut = senderSignal->get_future();
-
-                    stream = std::shared_ptr<grpc::ClientReaderWriter<pb::Packet, pb::Packet> >(stub->Stream(context));
-                    reader = new std::thread(read_routine, s, stream, std::ref(readerFut));
-                    writer = new std::thread(send_routine, s, stream, std::ref(senderFut));
-                }
-            }
-        } 
-            
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-}
-
-static void RpcSessionStart(std::shared_ptr<struct RpcSession> s)
-{
-    s->watcher = new std::thread(watch_routine, s);
-}
-
-static void RpcSessionStop(std::shared_ptr<struct RpcSession> s)
-{
-}
-
-
 static int Proc()
 {
     std::deque<recv_message_t*> msgs;
@@ -393,29 +375,29 @@ int open(int id, const std::string &name,
     }
 
     std::shared_ptr<struct RpcSession> s = RpcSessionInit(id, name, peer, ip, port, ca_cert, key, cert, metaList);
-    RpcSessionStart(s);
+    //RpcSessionStart(s);
     return 0;
 }
 
 int send(const std::string &name, const pb_t &pb, void *ctx)
 {
     std::shared_ptr<struct RpcSession> s = RpcSessionFind(name);
-    if (s == NULL) {
+    if (s == NULL || s->client == NULL) {
         return -1;
     }
 
-    s->send(pb, ctx);
+    s->client->PushSend(pb, ctx);
     return 0;
 }
 
 int send(oid_t peer, const pb_t &pb, void *ctx)
 {
     std::shared_ptr<struct RpcSession> s = RpcSessionFind(peer);
-    if (s == NULL) {
+    if (s == NULL || s->client == NULL) {
         return -1;
     }
 
-    s->send(pb, ctx);
+    s->client->PushSend(pb, ctx);
     return 0;
 }
 
@@ -423,6 +405,8 @@ int proc(void)
 {
     return Proc();
 }
+
+
 
 } // namespace rpc
 } // namespace elf
