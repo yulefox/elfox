@@ -41,7 +41,6 @@ static std::map< std::string, oid_t> s_name_ids;
 static xqueue<recv_message_t*> s_recv_msgs;
 static std::mutex s_lock_id;
 static std::mutex s_lock_name;
-static const int64_t KEEPALIVE_TIMEOUT = 2000; // 2 seconds
 
 
 class DBusClient {
@@ -54,25 +53,54 @@ public:
         stub_ = pb::DBus::NewStub(channel);
         id_ = id;
         peer_ = peer;
+        revent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::READ);
+        wevent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::WRITE);
+        context_ = NULL;
+        running_ = 1;
+    }
 
-        //Init();
+    virtual ~DBusClient() {
+        running_ = 0;
+        cq_.Shutdown();
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (!wque_.empty()) {
+            pb::Packet *pkt = wque_.front();
+            if (pkt != NULL) {
+                E_DELETE pkt;
+            }
+            wque_.pop_front();
+        }
+        lock.unlock();
+
+        E_DELETE context_;
+        E_DELETE revent_;
+        E_DELETE wevent_;
     }
 
     void Init() {
-        LOG_INFO("net", "%s", "start initialize stream...");
-        AsyncClientCall *call = new AsyncClientCall;
-        call->oper = AsyncClientCall::OperType::INIT;
-
-        // metadata
-        for (size_t i = 0; i < metaList_.size(); i++) {
-            call->context.AddMetadata(metaList_[i].key, metaList_[i].val);
-            LOG_INFO("net", "add metadata %s %s", metaList_[i].key.c_str(), metaList_[i].val.c_str());
+        LOG_INFO("rpc", "%s", "start initialize stream...");
+        revent_->Init(AsyncClientCall::OperType::INIT);
+        if (context_ != NULL) {
+            context_->TryCancel();
+            E_DELETE context_;
         }
-        //call->context.set_wait_for_ready(true);
-        stream_ = stub_->AsyncStream(&call->context, &cq_, call);
+        // metadata
+        context_ = E_NEW grpc::ClientContext;
+        for (size_t i = 0; i < metaList_.size(); i++) {
+            context_->AddMetadata(metaList_[i].key, metaList_[i].val);
+            LOG_INFO("rpc", "init clientcontext, add metadata %s %s", metaList_[i].key.c_str(), metaList_[i].val.c_str());
+        }
+
+        //
+        stream_ = stub_->AsyncStream(context_, &cq_, revent_);
+        LOG_INFO("rpc", "%s", "start initialize stream...OK");
     }
 
     void PushSend(const pb_t &pb, void *ctx) {
+        if (running_ == 0) {
+            LOG_INFO("rpc", "%s", "asynclient has been shutdown.");
+            return;
+        }
         std::string name = pb.GetTypeName();
         std::string payload;
         pb.SerializeToString(&payload);
@@ -93,11 +121,11 @@ public:
         std::unique_lock<std::mutex> lock(mutex_);
         wque_.push_back(pkt);
 
-        LOG_INFO("net", "push send: %s", name.c_str());
+        LOG_INFO("rpc", "push send: %s", name.c_str());
 
         // start request write
         if (wque_.size() == 1) {
-            LOG_INFO("net", "%s", "launch to send...");
+            LOG_INFO("rpc", "%s", "launch to send...");
             nextWrite();
         }
     }
@@ -115,16 +143,19 @@ public:
             gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(1, GPR_TIMESPAN));
             grpc::CompletionQueue::NextStatus st = cq_.AsyncNext(&got_tag, &ok, deadline);
             if (st == grpc::CompletionQueue::SHUTDOWN) {
-                LOG_ERROR("net", "%s", "grpc::CompletionQueue has been shutdown...");
+                LOG_ERROR("rpc", "%s", "grpc::CompletionQueue has been shutdown...");
                 break;
             } else if (st == grpc::CompletionQueue::TIMEOUT) {
                 int curr_st = channel_->GetState(true);
+                if (curr_st == GRPC_CHANNEL_CONNECTING) {
+                    LOG_INFO("rpc", "%s", "try to reconnect to grpc server.");
+                }
                 if ((prev_st == GRPC_CHANNEL_IDLE ||
                      prev_st == GRPC_CHANNEL_CONNECTING ||
                      prev_st == GRPC_CHANNEL_TRANSIENT_FAILURE) && curr_st == GRPC_CHANNEL_READY) {
+                    LOG_INFO("rpc", "%s", "grpc reconnected.");
                     Init();
                 }
-                LOG_INFO("net", "grpcloop...channel stat: prev(%d) curr(%d)", prev_st, curr_st);
                 prev_st = curr_st;
             } else if (st == grpc::CompletionQueue::GOT_EVENT) {
                 if (ok) {
@@ -140,10 +171,9 @@ public:
                         onWrite(call);
                         break;
                     default:
-                        LOG_INFO("net", "%s", "get an unknown type operation");
+                        LOG_INFO("rpc", "%s", "get an unknown type operation");
                         break;
                     }
-                    //delete call;
                 }
             }
         }
@@ -153,31 +183,48 @@ private:
     struct AsyncClientCall {
         enum OperType { INIT = 0x1, READ = 0x2, WRITE = 0x4};
         OperType oper;
-        grpc::ClientContext context;
         pb::Packet pkt;
+
+        AsyncClientCall() {
+            pkt.Clear();
+        }
+
+        AsyncClientCall(OperType op) {
+            oper = op;
+            pkt.Clear();
+        }
+
+        ~AsyncClientCall() {}
+
+        void Init(OperType op) {
+            oper = op;
+            pkt.Clear();
+        }
     };
 
     void nextRead() {
-        AsyncClientCall *call = new AsyncClientCall;
-        call->oper = AsyncClientCall::OperType::READ;
-        stream_->Read(&call->pkt, call);
+        revent_->Init(AsyncClientCall::OperType::READ);
+        stream_->Read(&revent_->pkt, revent_);
     }
 
     void nextWrite() {
         pb::Packet *pkt = wque_.front();
-        AsyncClientCall *call = new AsyncClientCall;
-        call->oper = AsyncClientCall::OperType::WRITE;
-        stream_->Write(*pkt, (void*)call);
+        if (pkt != NULL) {
+            wevent_->Init(AsyncClientCall::OperType::WRITE);
+            stream_->Write(*pkt, wevent_);
+        } else {
+            wque_.pop_front();
+            LOG_ERROR("rpc", "got an nullptr from wque, do drop it.");
+        }
     }
 
     void onInit(AsyncClientCall *call) {
         nextRead();
-
-        LOG_INFO("net", "%s", "grpc on inited...");
+        LOG_INFO("rpc", "%s", "grpc on inited...try to launch to read.");
     }
 
     void onRead(AsyncClientCall *call) {
-        LOG_INFO("net", "%s", "grpc on read...");
+        LOG_INFO("rpc", "%s", "grpc on read...");
 
         pb::Packet *pkt = &(call->pkt);
 
@@ -192,22 +239,21 @@ private:
         msg->rpc_ctx = (void*)from;
         msg->ctx = (elf::context_t*)((void*)this);
 
-        //msg->ctx = (elf::context_t*)((void*)s.get());
         //
         s_recv_msgs.push(msg);
 
-        LOG_INFO("net", "recv msg: %s", msg->name.c_str());
+        LOG_INFO("rpc", "recv msg: %s", msg->name.c_str());
 
         //
         nextRead();
     }
 
     void onWrite(AsyncClientCall *call) {
-        LOG_INFO("net", "%s", "grpc on write...");
+        LOG_INFO("rpc", "%s", "grpc on write...");
         std::unique_lock<std::mutex> lock(mutex_);
         wque_.pop_front();
 
-        // keep request to send
+        // try to send
         if (!wque_.empty()) {
             nextWrite();
         }
@@ -220,8 +266,11 @@ private:
     std::deque<pb::Packet*> wque_;
     std::mutex mutex_;
     std::vector<MetaData> metaList_;
-    grpc::ClientContext context_;
     grpc::CompletionQueue cq_;
+    grpc::ClientContext *context_;
+    AsyncClientCall *revent_;
+    AsyncClientCall *wevent_;
+    volatile int running_;
     oid_t peer_;
     int id_;
 };
@@ -245,15 +294,22 @@ struct RpcSession {
         char raddr[128];
         sprintf(raddr, "%s:%d", ip.c_str(), port);
 
+        grpc::ChannelArguments args;
+        args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 1000);
+        args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 10000); 
+        args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
+        args.SetInt(GRPC_ARG_MIN_RECONNECT_BACKOFF_MS, 1000); // The minimum time between subsequent connection attempts, in ms.
+        args.SetInt(GRPC_ARG_MAX_RECONNECT_BACKOFF_MS, 4000); // The maximum time between subsequent connection attempts, in ms.
+        args.SetInt(GRPC_ARG_INITIAL_RECONNECT_BACKOFF_MS, 500); // The time between the first and second connection attempts, in ms.
         if (enable_ssl) {
             auto ssl_creds = grpc::SslCredentials(ssl_opts);
-            channel = grpc::CreateChannel(raddr, ssl_creds);
+            channel = grpc::CreateCustomChannel(raddr, ssl_creds, args);
         } else {
-            channel = grpc::CreateChannel(raddr, grpc::InsecureChannelCredentials());
+            channel = grpc::CreateCustomChannel(raddr, grpc::InsecureChannelCredentials(), args);
         }
 
-        client = new DBusClient(id, peer, metaList, channel);
-        worker = new std::thread(&DBusClient::WorkerRoutine, client);
+        client = E_NEW DBusClient(id, peer, metaList, channel);
+        worker = E_NEW std::thread(&DBusClient::WorkerRoutine, client);
     }
 
     void close() {
