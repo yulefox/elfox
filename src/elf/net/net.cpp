@@ -1441,31 +1441,38 @@ bool net_decode(recv_message_t *msg)
     assert(msg);
 
     context_t *ctx = msg->ctx;
-
-    if (ctx == NULL) {
+    if (ctx == NULL && msg->rpc_ctx == NULL) {
         return false;
     }
 
     if (!msg->is_raw) {
         bool flag = msg->pb->ParseFromString(msg->body);
         if (flag == false) {
-            LOG_WARN("net", "Protobuf parsing FAILED: %s %s.",
-                    net_peer_info(ctx),
-                    msg->name.c_str());
+            if (ctx != NULL) {
+                LOG_WARN("net", "Protobuf parsing FAILED: %s %s.", net_peer_info(ctx), msg->name.c_str());
+            } else {
+                LOG_WARN("net", "Protobuf parsing FAILED: %s.", msg->name.c_str());
+            }
             return false;
         }
         if (!(msg->pb->IsInitialized())) {
-            LOG_WARN("net", "INVALID request: %s %s.",
-                    net_peer_info(ctx),
-                    msg->name.c_str());
+            if (ctx != NULL) {
+                LOG_WARN("net", "INVALID request: %s %s.", net_peer_info(ctx), msg->name.c_str());
+            } else {
+                LOG_WARN("net", "INVALID request: %s.", msg->name.c_str());
+            }
             return false;
         }
-        LOG_TRACE("net", "-> %s %s.",
-                net_peer_info(ctx),
-                msg->name.c_str());
+        if (ctx != NULL) {
+            LOG_TRACE("net", "-> %s %s.", net_peer_info(ctx), msg->name.c_str());
+        } else {
+            LOG_TRACE("net", "-> %s %s.", msg->name.c_str());
+        }
     }
 
-    ctx->last_time = time_s();
+    if (ctx != NULL) {
+        ctx->last_time = time_s();
+    }
     return true;
 }
 

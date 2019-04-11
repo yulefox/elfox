@@ -57,10 +57,11 @@ public:
         wevent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::WRITE);
         context_ = NULL;
         running_ = 1;
+        ready_ = 0;
     }
 
     virtual ~DBusClient() {
-        running_ = 0;
+        setRunning(0);
         cq_.Shutdown();
         std::unique_lock<std::mutex> lock(mutex_);
         while (!wque_.empty()) {
@@ -79,6 +80,7 @@ public:
 
     void Init() {
         LOG_INFO("rpc", "%s", "start initialize stream...");
+        setReady(0);
         revent_->Init(AsyncClientCall::OperType::INIT);
         if (context_ != NULL) {
             context_->TryCancel();
@@ -97,7 +99,7 @@ public:
     }
 
     void PushSend(const pb_t &pb, void *ctx) {
-        if (running_ == 0) {
+        if (!isRunning()) {
             LOG_INFO("rpc", "%s", "asynclient has been shutdown.");
             return;
         }
@@ -124,7 +126,7 @@ public:
         LOG_INFO("rpc", "push send: %s", name.c_str());
 
         // start request write
-        if (wque_.size() == 1) {
+        if (isReady() && wque_.size() == 1) {
             LOG_INFO("rpc", "%s", "launch to send...");
             nextWrite();
         }
@@ -140,14 +142,14 @@ public:
             void* got_tag = NULL;
             bool ok = false;
 
-            gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_seconds(1, GPR_TIMESPAN));
+            gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_millis(100, GPR_TIMESPAN));
             grpc::CompletionQueue::NextStatus st = cq_.AsyncNext(&got_tag, &ok, deadline);
             if (st == grpc::CompletionQueue::SHUTDOWN) {
                 LOG_ERROR("rpc", "%s", "grpc::CompletionQueue has been shutdown...");
                 break;
             } else if (st == grpc::CompletionQueue::TIMEOUT) {
                 int curr_st = channel_->GetState(true);
-                if (curr_st == GRPC_CHANNEL_CONNECTING) {
+                if (prev_st != curr_st && curr_st == GRPC_CHANNEL_CONNECTING) {
                     LOG_INFO("rpc", "%s", "try to reconnect to grpc server.");
                 }
                 if ((prev_st == GRPC_CHANNEL_IDLE ||
@@ -220,7 +222,14 @@ private:
 
     void onInit(AsyncClientCall *call) {
         nextRead();
-        LOG_INFO("rpc", "%s", "grpc on inited...try to launch to read.");
+   
+        // launch to send
+        std::unique_lock<std::mutex> lock(mutex_);
+        setReady(1);
+        if (!wque_.empty()) {
+            nextWrite();
+        }
+        LOG_INFO("rpc", "%s", "grpc on inited...try to launch to read && write.");
     }
 
     void onRead(AsyncClientCall *call) {
@@ -237,7 +246,7 @@ private:
         msg->peer = peer_;
         msg->pb = NULL;
         msg->rpc_ctx = (void*)from;
-        msg->ctx = (elf::context_t*)((void*)this);
+        msg->ctx = (elf::context_t*)((void*)call);
 
         //
         s_recv_msgs.push(msg);
@@ -260,6 +269,24 @@ private:
     }
 
 private:
+
+    void setRunning(int flag) {
+        __sync_val_compare_and_swap(&running_, (flag ^ 1), flag);
+    }
+
+    bool isRunning() {
+        return __sync_val_compare_and_swap(&running_, 1, 1) == 1;
+    }
+
+    void setReady(int flag) {
+        __sync_val_compare_and_swap(&ready_, (flag ^ 1), flag);
+    }
+
+    bool isReady() {
+        return __sync_val_compare_and_swap(&ready_, 1, 1) == 1;
+    }
+
+private:
     std::unique_ptr<grpc::ClientAsyncReaderWriter<pb::Packet, pb::Packet> > stream_;
     std::shared_ptr<grpc::Channel> channel_;
     std::unique_ptr<pb::DBus::Stub> stub_;
@@ -270,7 +297,8 @@ private:
     grpc::ClientContext *context_;
     AsyncClientCall *revent_;
     AsyncClientCall *wevent_;
-    volatile int running_;
+    int running_;
+    int ready_;
     oid_t peer_;
     int id_;
 };
@@ -295,11 +323,13 @@ struct RpcSession {
         sprintf(raddr, "%s:%d", ip.c_str(), port);
 
         grpc::ChannelArguments args;
-        args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 1000);
-        args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 10000); 
+        args.SetInt(GRPC_ARG_MAX_RECEIVE_MESSAGE_LENGTH, 32 * 1024 * 1024); // 32M
+        args.SetInt(GRPC_ARG_MAX_SEND_MESSAGE_LENGTH, 32 * 1024 * 1024); // 32M
+        args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 3000);
+        args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 5000); 
         args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
         args.SetInt(GRPC_ARG_MIN_RECONNECT_BACKOFF_MS, 1000); // The minimum time between subsequent connection attempts, in ms.
-        args.SetInt(GRPC_ARG_MAX_RECONNECT_BACKOFF_MS, 4000); // The maximum time between subsequent connection attempts, in ms.
+        args.SetInt(GRPC_ARG_MAX_RECONNECT_BACKOFF_MS, 3000); // The maximum time between subsequent connection attempts, in ms.
         args.SetInt(GRPC_ARG_INITIAL_RECONNECT_BACKOFF_MS, 500); // The time between the first and second connection attempts, in ms.
         if (enable_ssl) {
             auto ssl_creds = grpc::SslCredentials(ssl_opts);
