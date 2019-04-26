@@ -216,7 +216,7 @@ private:
             stream_->Write(*pkt, wevent_);
         } else {
             wque_.pop_front();
-            LOG_ERROR("rpc", "got an nullptr from wque, do drop it.");
+            LOG_ERROR("rpc", "%s", "got an nullptr from wque, do drop it.");
         }
     }
 
