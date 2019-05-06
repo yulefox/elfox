@@ -151,5 +151,52 @@ int urlencode(const char *in, ssize_t size, std::string &out)
     return ret;
 }
 
+
+int http_json(const char *url, const char *json, std::string &output, int timeout)
+{
+    CURL *curl = curl_easy_init();
+    if (curl == NULL) {
+        LOG_ERROR("net", "%s", "curl_easy_init() failed.");
+        return -1;
+    }
+
+    CURLcode res;
+    http_chunk_t chunk;
+
+    chunk.data = NULL;
+    chunk.size = 0;
+
+    struct curl_slist *slist = NULL;
+    slist = curl_slist_append(slist, "Content-type:application/json;charset=utf-8");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
+    if (timeout <= 0) {
+        timeout = HTTP_POST_TIMEOUT;
+    }
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+
+    res = curl_easy_perform(curl);
+    if(res != CURLE_OK) {
+        LOG_ERROR("http", "curl_easy_perform() failed(%d): %s %s, %s.", res, curl_easy_strerror(res), url, json);
+        return -1;
+    }
+    curl_slist_free_all(slist);
+    curl_easy_cleanup(curl);
+
+    if (chunk.data == NULL || chunk.size == 0) {
+        return -1;
+    }
+    output.append(chunk.data, chunk.size);
+    E_FREE(chunk.data);
+    return 0;
+}
+
+
 } // namespace elf
 

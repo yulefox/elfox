@@ -53,6 +53,9 @@ int http_json(int method, const char *url, const char *json,
 
 int urlencode(const char *in, ssize_t size, std::string &out);
 
+/// sync http post
+int http_json(const char *url, const char *json, std::string &output, int timeout = 0);
+
 } // namespace elf
 
 #endif /* !ELF_NET_HTTP_H */

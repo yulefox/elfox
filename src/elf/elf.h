@@ -43,6 +43,7 @@
 #   define ELF_USE_TIMER
 #   define ELF_USE_UTILS
 #   define ELF_USE_VERSION
+#   define ELF_USE_BTDC
 #endif /* ELF_USE_MIN */
 
 #define ELF_INIT(mod) \
@@ -173,5 +174,9 @@
 #if defined(ELF_USE_VERSION)
 #   include <elf/version.h>
 #endif /* ELF_USE_VERSION */
+
+#if defined(ELF_USE_BTDC)
+#   include <elf/btdc/btdc.h>
+#endif 
 
 #endif /* !ELF_ELF_H */

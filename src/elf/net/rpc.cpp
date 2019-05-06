@@ -45,7 +45,7 @@ static std::mutex s_lock_name;
 
 class DBusClient {
 public:
-    explicit DBusClient(int id, oid_t peer, const std::vector<MetaData> &metaList,
+    explicit DBusClient(int id, oid_t peer, std::string &name, const std::vector<MetaData> &metaList,
             std::shared_ptr<grpc::Channel> channel) {
             
         metaList_ = metaList;
@@ -53,6 +53,7 @@ public:
         stub_ = pb::DBus::NewStub(channel);
         id_ = id;
         peer_ = peer;
+        name_ = name;
         revent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::READ);
         wevent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::WRITE);
         context_ = NULL;
@@ -155,7 +156,7 @@ public:
                 if ((prev_st == GRPC_CHANNEL_IDLE ||
                      prev_st == GRPC_CHANNEL_CONNECTING ||
                      prev_st == GRPC_CHANNEL_TRANSIENT_FAILURE) && curr_st == GRPC_CHANNEL_READY) {
-                    LOG_INFO("rpc", "%s", "grpc reconnected.");
+                    LOG_INFO("rpc", "grpc reconnected: id[%d], peer[%lld], name[%s].", id_, peer_, name_.c_str());
                     Init();
                 }
                 prev_st = curr_st;
@@ -247,6 +248,7 @@ private:
         msg->pb = NULL;
         msg->rpc_ctx = (void*)from;
         msg->ctx = (elf::context_t*)((void*)call);
+        msg->is_raw = false;
 
         //
         s_recv_msgs.push(msg);
@@ -300,6 +302,7 @@ private:
     int running_;
     int ready_;
     oid_t peer_;
+    std::string name_;
     int id_;
 };
 
@@ -338,7 +341,7 @@ struct RpcSession {
             channel = grpc::CreateCustomChannel(raddr, grpc::InsecureChannelCredentials(), args);
         }
 
-        client = E_NEW DBusClient(id, peer, metaList, channel);
+        client = E_NEW DBusClient(id, peer, name, metaList, channel);
         worker = E_NEW std::thread(&DBusClient::WorkerRoutine, client);
     }
 
