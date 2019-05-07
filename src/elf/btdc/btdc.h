@@ -28,6 +28,7 @@ static const char *TOPIC_ODS_EVENT_RECORD_NAME;
 struct Item {
     std::string key;
     std::string val;
+    Item(const std::string &_key, const std::string &_val) : key(_key), val(_val) {}
 };
 
 class BaseTopic {
@@ -38,20 +39,18 @@ public:
         name_ = other.Name();
     }
     BaseTopic(int id, const char *name) {
-        this->id_ = id;
+        char id_s[64] = {0};
+        sprintf(id_s, "%d", id);
+        this->id_ = id_s;
         this->name_ = name;
     }
     virtual ~BaseTopic() {}
-
-    int ID() const { return  id_; }
+    std::string ID() const { return id_; }
     std::string Name() const { return name_; }
     std::vector<Item> Args() const { return args_; }
 
     void Add(const std::string key, const std::string val) {
-        Item item;
-        item.key = key;
-        item.val = val;
-        args_.push_back(item);
+        args_.push_back(Item(key, val));
     }
 
     void Add(const std::string key, int64_t val) {
@@ -88,58 +87,53 @@ public:
 protected:
     std::vector<Item> args_;
     std::string name_;
-    int id_;
+    std::string id_;
 };
 
 class RegisterTopic : public BaseTopic {
 public:
-    RegisterTopic() {
-        BaseTopic(TOPIC_ODS_REGISTER, TOPIC_ODS_REGISTER_NAME);
-    }
-    virtual ~RegisterTopic() {}
+    RegisterTopic() : BaseTopic(TOPIC_ODS_REGISTER, TOPIC_ODS_REGISTER_NAME) {}
+    ~RegisterTopic() {}
 };
 
 class LoginTopic : public BaseTopic {
 public:
-    LoginTopic() {
-        BaseTopic(TOPIC_ODS_LOGIN, TOPIC_ODS_LOGIN_NAME);
-    }
-    virtual ~LoginTopic() {}
+    LoginTopic() : BaseTopic(TOPIC_ODS_LOGIN, TOPIC_ODS_LOGIN_NAME) {}
+    ~LoginTopic() {}
 };
 
 class OnlineTimeTopic : public BaseTopic {
 public:
-    OnlineTimeTopic() {
-        BaseTopic(TOPIC_ODS_ONLINE_TIME, TOPIC_ODS_ONLINE_TIME_NAME);
-    }
-    virtual ~OnlineTimeTopic() {}
+    OnlineTimeTopic() : BaseTopic(TOPIC_ODS_ONLINE_TIME, TOPIC_ODS_ONLINE_TIME_NAME) {}
+    ~OnlineTimeTopic() {}
 };
 
 class OnlineCountTopic : public BaseTopic {
 public:
-    OnlineCountTopic() {
-        BaseTopic(TOPIC_ODS_ONLINE_USER_COUNT, TOPIC_ODS_ONLINE_USER_COUNT_NAME);
-    }
-    virtual ~OnlineCountTopic() {}
+    OnlineCountTopic() : BaseTopic(TOPIC_ODS_ONLINE_USER_COUNT, TOPIC_ODS_ONLINE_USER_COUNT_NAME) {}
+    ~OnlineCountTopic() {}
 };
 
 class EventTopic : public BaseTopic {
 public:
-    EventTopic(int event) {
-        BaseTopic(TOPIC_ODS_EVENT_RECORD, TOPIC_ODS_EVENT_RECORD_NAME);
+    EventTopic(int event) : BaseTopic(TOPIC_ODS_EVENT_RECORD, TOPIC_ODS_EVENT_RECORD_NAME) {
         Add("eventId", event);
     }
-    virtual ~EventTopic() {}
+    ~EventTopic() {}
 };
 
 static const int HTTP_POST_TIMEOUT = 5;
 
 struct Event {
-    BaseTopic topic;
     std::vector<Item> items;
+    std::string name;
     Event(const BaseTopic *topic) {
-        this->topic = *topic;
-        this->items = topic->Args();
+        name = topic->Name();
+        items.push_back(Item("topicId", topic->ID()));
+        items.push_back(Item("topicName", topic->Name()));
+        for (size_t i = 0; i < topic->Args().size(); i++) {
+            items.push_back(topic->Args()[i]);
+        }
     }
 };
 
@@ -147,6 +141,7 @@ private:
     BTDC(const char *app_id, const char *push_url);
     void start();
     bool doSend(const std::string &raw);
+    std::string getAppId() { return app_id_; }
     static void *sendLoop(void *data);
 
 public:
@@ -155,6 +150,12 @@ public:
     static bool Init(const char *filename);
     static void Fini();
     static bool Send(const BaseTopic *topic);
+    static std::string GetAppId() {
+        if (inst == NULL) {
+            return "";
+        }
+        return inst->getAppId();
+    }
 
 private:
     static BTDC *inst;

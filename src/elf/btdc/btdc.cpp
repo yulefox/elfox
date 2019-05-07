@@ -106,7 +106,7 @@ bool BTDC::Send(const BaseTopic *topic)
 
 static bool buildJSON(const BTDC::Event &event, std::string &output)
 {
-    json_t *ctx = json_pack("{siss}", "topicId", event.topic.ID(), "topicName", event.topic.Name().c_str());
+    json_t *ctx = json_pack("{ss}", "dataAppId", BTDC::GetAppId().c_str());
     if (ctx == NULL) {
         LOG_ERROR("btdc", "%s", "build json object failed");
         return false;
@@ -151,7 +151,7 @@ void *BTDC::sendLoop(void *data)
             const Event &event = *itr;
             std::string raw;
             if (!buildJSON(event, raw)) {
-                LOG_ERROR("btdc", "build json failed:: %d, %s", event.topic.ID(), event.topic.Name().c_str());
+                LOG_ERROR("btdc", "build json failed:: %d, %s", event.name.c_str());
             }
             pending.push_back(raw);
         }

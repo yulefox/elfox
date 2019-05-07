@@ -54,11 +54,16 @@ public:
         id_ = id;
         peer_ = peer;
         name_ = name;
+        cevent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::CONNECT);
         revent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::READ);
         wevent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::WRITE);
-        context_ = NULL;
         running_ = 1;
         ready_ = 0;
+
+        if (WaitForReady()) {
+            LOG_INFO("rpc", "grpc[%s/%d] channel is connected success...try to init stream...", name_.c_str(), id_);
+            Init();
+        }
     }
 
     virtual ~DBusClient() {
@@ -74,29 +79,38 @@ public:
         }
         lock.unlock();
 
-        E_DELETE context_;
+        E_DELETE cevent_;
         E_DELETE revent_;
         E_DELETE wevent_;
     }
 
+    bool WaitForReady() {
+        grpc_connectivity_state st = channel_->GetState(true);
+        if (st == GRPC_CHANNEL_READY) {
+            LOG_INFO("rpc", "grpc channel is ready, %s/%d", name_.c_str(), id_);
+            return true;
+        }
+        gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_millis(100, GPR_TIMESPAN));
+        channel_->NotifyOnStateChange(st, deadline, &cq_, (void*)cevent_);
+        LOG_INFO("rpc", "wait channel be ready by CQ, %s/%d", name_.c_str(), id_);
+        return false;
+    }
+
     void Init() {
-        LOG_INFO("rpc", "%s", "start initialize stream...");
+        LOG_INFO("rpc", "start initialize stream for channel: %s/%d", name_.c_str(), id_);
         setReady(0);
         revent_->Init(AsyncClientCall::OperType::INIT);
-        if (context_ != NULL) {
-            context_->TryCancel();
-            E_DELETE context_;
-        }
+
         // metadata
-        context_ = E_NEW grpc::ClientContext;
+        grpc::ClientContext *ctx = E_NEW grpc::ClientContext;
         for (size_t i = 0; i < metaList_.size(); i++) {
-            context_->AddMetadata(metaList_[i].key, metaList_[i].val);
-            LOG_INFO("rpc", "init clientcontext, add metadata %s %s", metaList_[i].key.c_str(), metaList_[i].val.c_str());
+            ctx->AddMetadata(metaList_[i].key, metaList_[i].val);
+            LOG_INFO("rpc", "init clientcontext(%s/%d), add metadata %s %s",
+                    name_.c_str(), id_, metaList_[i].key.c_str(), metaList_[i].val.c_str());
         }
 
         //
-        stream_ = stub_->AsyncStream(context_, &cq_, revent_);
-        LOG_INFO("rpc", "%s", "start initialize stream...OK");
+        stream_ = stub_->AsyncStream(ctx, &cq_, revent_);
     }
 
     void PushSend(const pb_t &pb, void *ctx) {
@@ -138,45 +152,39 @@ public:
     }
 
     void Loop() {
-        int prev_st = GRPC_CHANNEL_IDLE;
         for (;;) {
             void* got_tag = NULL;
             bool ok = false;
 
-            gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_millis(100, GPR_TIMESPAN));
-            grpc::CompletionQueue::NextStatus st = cq_.AsyncNext(&got_tag, &ok, deadline);
-            if (st == grpc::CompletionQueue::SHUTDOWN) {
+            if (!cq_.Next(&got_tag, &ok)) {
                 LOG_ERROR("rpc", "%s", "grpc::CompletionQueue has been shutdown...");
                 break;
-            } else if (st == grpc::CompletionQueue::TIMEOUT) {
-                int curr_st = channel_->GetState(true);
-                if (prev_st != curr_st && curr_st == GRPC_CHANNEL_CONNECTING) {
-                    LOG_INFO("rpc", "%s", "try to reconnect to grpc server.");
-                }
-                if ((prev_st == GRPC_CHANNEL_IDLE ||
-                     prev_st == GRPC_CHANNEL_CONNECTING ||
-                     prev_st == GRPC_CHANNEL_TRANSIENT_FAILURE) && curr_st == GRPC_CHANNEL_READY) {
-                    LOG_INFO("rpc", "grpc reconnected: id[%d], peer[%lld], name[%s].", id_, peer_, name_.c_str());
-                    Init();
-                }
-                prev_st = curr_st;
-            } else if (st == grpc::CompletionQueue::GOT_EVENT) {
-                if (ok) {
-                    AsyncClientCall* call = static_cast<AsyncClientCall*>(got_tag);
-                    switch (call->oper) {
-                    case AsyncClientCall::OperType::INIT:
-                        onInit(call);
-                        break;
-                    case AsyncClientCall::OperType::READ:
-                        onRead(call);
-                        break;
-                    case AsyncClientCall::OperType::WRITE:
-                        onWrite(call);
-                        break;
-                    default:
-                        LOG_INFO("rpc", "%s", "get an unknown type operation");
-                        break;
+            }
+            if (ok) {
+                AsyncClientCall* call = static_cast<AsyncClientCall*>(got_tag);
+                switch (call->oper) {
+                case AsyncClientCall::OperType::CONNECT:
+                    if (WaitForReady()) {
+                        Init();
                     }
+                    break;
+                case AsyncClientCall::OperType::INIT:
+                    onInit(call);
+                    break;
+                case AsyncClientCall::OperType::READ:
+                    onRead(call);
+                    break;
+                case AsyncClientCall::OperType::WRITE:
+                    onWrite(call);
+                    break;
+                default:
+                    LOG_INFO("rpc", "get an unknown type operation: %s/%d", name_.c_str(), id_);
+                    break;
+                }
+            } else {
+                LOG_INFO("rpc", "grpc channel(%s/%d) is closed.", name_.c_str(), id_);
+                if (WaitForReady()) {
+                    Init();
                 }
             }
         }
@@ -184,7 +192,7 @@ public:
 
 private:
     struct AsyncClientCall {
-        enum OperType { INIT = 0x1, READ = 0x2, WRITE = 0x4};
+        enum OperType { CONNECT = 0x1, INIT = 0x2, READ = 0x4, WRITE = 0x8};
         OperType oper;
         pb::Packet pkt;
 
@@ -230,11 +238,11 @@ private:
         if (!wque_.empty()) {
             nextWrite();
         }
-        LOG_INFO("rpc", "%s", "grpc on inited...try to launch to read && write.");
+        LOG_INFO("rpc", "grpc[%s/%d] on inited...try to launch to read && write.", name_.c_str(), id_);
     }
 
     void onRead(AsyncClientCall *call) {
-        LOG_INFO("rpc", "%s", "grpc on read...");
+        LOG_INFO("rpc", "grpc[%s/%d] on read...", name_.c_str(), id_);
 
         pb::Packet *pkt = &(call->pkt);
 
@@ -253,14 +261,14 @@ private:
         //
         s_recv_msgs.push(msg);
 
-        LOG_INFO("rpc", "recv msg: %s", msg->name.c_str());
+        LOG_INFO("rpc", "grpc[%s/%d] recv msg: %s", name_.c_str(), id_, msg->name.c_str());
 
         //
         nextRead();
     }
 
     void onWrite(AsyncClientCall *call) {
-        LOG_INFO("rpc", "%s", "grpc on write...");
+        LOG_INFO("rpc", "grpc[%s/%d] on write...", name_.c_str(), id_);
         std::unique_lock<std::mutex> lock(mutex_);
         wque_.pop_front();
 
@@ -296,7 +304,7 @@ private:
     std::mutex mutex_;
     std::vector<MetaData> metaList_;
     grpc::CompletionQueue cq_;
-    grpc::ClientContext *context_;
+    AsyncClientCall *cevent_;
     AsyncClientCall *revent_;
     AsyncClientCall *wevent_;
     int running_;
