@@ -342,6 +342,10 @@ struct RpcSession {
         args.SetInt(GRPC_ARG_MIN_RECONNECT_BACKOFF_MS, 1000); // The minimum time between subsequent connection attempts, in ms.
         args.SetInt(GRPC_ARG_MAX_RECONNECT_BACKOFF_MS, 3000); // The maximum time between subsequent connection attempts, in ms.
         args.SetInt(GRPC_ARG_INITIAL_RECONNECT_BACKOFF_MS, 500); // The time between the first and second connection attempts, in ms.
+        args.SetInt(GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS, 1000);
+        args.SetInt(GRPC_ARG_HTTP2_MIN_SENT_PING_INTERVAL_WITHOUT_DATA_MS, 1000);
+        args.SetInt(GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA, 0);
+
         if (enable_ssl) {
             auto ssl_creds = grpc::SslCredentials(ssl_opts);
             channel = grpc::CreateCustomChannel(raddr, ssl_creds, args);
