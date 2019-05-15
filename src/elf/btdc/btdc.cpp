@@ -129,7 +129,9 @@ static bool buildJSON(const BTDC::Event &event, std::string &output)
         json_decref(ctx);
         return false;
     }
+    output.append("[");
     output.append(raw);
+    output.append("]");
     free(raw);
     json_decref(ctx);
     return true;
