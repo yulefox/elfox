@@ -120,6 +120,7 @@ int platform_auth(const char *token, platform_user_t &puser)
     puser.account = account;
     puser.reg_time = jwt_get_grant_int(jwt, "reg_time");
     puser.status = jwt_get_grant_int(jwt, "status");
+    puser.ext = jwt_get_grant(jwt, "ext");
 
     free(uid_str);
     jwt_free(jwt);
