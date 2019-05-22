@@ -129,9 +129,9 @@ static bool buildJSON(const BTDC::Event &event, std::string &output)
         json_decref(ctx);
         return false;
     }
-    output.append("[");
+    //output.append("[");
     output.append(raw);
-    output.append("]");
+    //output.append("]");
     free(raw);
     json_decref(ctx);
     return true;
@@ -159,17 +159,25 @@ void *BTDC::sendLoop(void *data)
         }
 
         std::deque<std::string> failed;
+        std::string data;
+        bool flag = false;
+        data.append("[");
         while (!pending.empty()) {
             const std::string raw = pending.front();
-            pending.pop_front();
-            if (!inst->doSend(raw)) {
-                failed.push_back(raw);
+            if (flag) {
+                data.append(",");
             }
+            data.append(raw);
+            flag = true;
+            pending.pop_front();
+            failed.push_back(raw);
         }
-        if (!failed.empty()) {
+        data.append("]");
+        if (!failed.empty() && !inst->doSend(data)) {
+            // rollback
             pending.swap(failed);
         }
-        usleep(500000);
+        usleep(2000000); // 2 seconds
     }
     return NULL;
 }
