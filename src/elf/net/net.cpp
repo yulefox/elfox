@@ -978,10 +978,10 @@ int net_fini(void)
     spin_fini(&s_pre_context_lock);
     spin_fini(&s_context_lock);
     close(s_epoll);
-    E_DELETE s_writer_tid;
-    E_DELETE s_reader_tid;
-    E_DELETE s_pending_read;
-    E_DELETE s_pending_write;
+    S_DELETE(s_writer_tid);
+    S_DELETE(s_reader_tid);
+    S_DELETE(s_pending_read);
+    S_DELETE(s_pending_write);
     return 0;
 }
 

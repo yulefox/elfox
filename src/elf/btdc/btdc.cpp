@@ -14,10 +14,12 @@ const char *BTDC::TOPIC_ODS_ONLINE_TIME_NAME          = "ods_online_time";
 const char *BTDC::TOPIC_ODS_ONLINE_USER_COUNT_NAME    = "ods_online_user_count";
 const char *BTDC::TOPIC_ODS_EVENT_RECORD_NAME         = "ods_event_record";
 
-BTDC::BTDC(const char *app_id, const char *push_url)
+BTDC::BTDC(const char *app_id, const char *push_url, int max_send_interval, int max_send_count)
 {
     app_id_ = app_id;
     push_url_ = push_url;
+    max_send_interval_ = max_send_interval;
+    max_send_count_ = max_send_count;
 }
 
 BTDC::~BTDC()
@@ -76,7 +78,20 @@ bool BTDC::Init(const char *filename)
         json_decref(cfg);
         return false;
     }
-    inst = E_NEW BTDC(json_string_value(app_id_cfg), json_string_value(push_url));
+
+    int max_send_interval = DEFAULT_SEND_INTERVAL;
+    int max_send_count = DEFAULT_SEND_COUNT;
+
+    json_t *send_interval = json_object_get(cfg, "max_send_interval");
+    json_t *send_count = json_object_get(cfg, "max_send_count");
+    if (send_interval != NULL && json_integer_value(send_interval) > 0) {
+        max_send_interval = json_integer_value(send_interval);
+    }
+    if (send_count != NULL && json_integer_value(send_count) > 0) {
+        max_send_count = json_integer_value(send_count);
+    }
+
+    inst = E_NEW BTDC(json_string_value(app_id_cfg), json_string_value(push_url), max_send_interval, max_send_count);
     inst->start();
     json_decref(cfg);
     return true;
@@ -145,6 +160,7 @@ void *BTDC::sendLoop(void *data)
         return NULL;
     }
     std::deque<std::string> pending;
+    std::deque<std::string> failed;
     while (true) {
         std::deque<Event> tmp;
         std::deque<Event>::iterator itr;
@@ -158,26 +174,33 @@ void *BTDC::sendLoop(void *data)
             pending.push_back(raw);
         }
 
-        std::deque<std::string> failed;
         std::string data;
-        bool flag = false;
         data.append("[");
-        while (!pending.empty()) {
+        int count = 0;
+        while (!pending.empty() && count < inst->getSendCount()) {
             const std::string raw = pending.front();
-            if (flag) {
+            if (count > 0) {
                 data.append(",");
             }
             data.append(raw);
-            flag = true;
             pending.pop_front();
-            failed.push_back(raw);
+            count++;
         }
         data.append("]");
-        if (!failed.empty() && !inst->doSend(data)) {
-            // rollback
-            pending.swap(failed);
+        if (count > 0 && !inst->doSend(data)) {
+            failed.push_back(data);
         }
-        usleep(2000000); // 2 seconds
+
+        count = 0;
+        while (!failed.empty() && count < inst->getSendCount()) {
+            const std::string raw = failed.front();
+            if (inst->doSend(raw)) {
+                failed.pop_front();
+            } else {
+                break;
+            }
+        }
+        usleep(inst->getSendInterval() * 1000);
     }
     return NULL;
 }
