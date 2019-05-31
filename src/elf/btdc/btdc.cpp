@@ -97,6 +97,13 @@ bool BTDC::Init(const char *filename)
     return true;
 }
 
+void BTDC::Reset(int interval, int count)
+{
+    if (inst != NULL) {
+        inst->reset(interval, count);
+    }
+}
+
 void BTDC::Fini()
 {
     if (inst != NULL) {
@@ -139,7 +146,7 @@ static bool buildJSON(const BTDC::Event &event, std::string &output)
         }
         json_decref(val);
     }
-    char *raw = json_dumps(ctx, 0);
+    char *raw = json_dumps(ctx, JSON_COMPACT);
     if (raw == NULL) {
         json_decref(ctx);
         return false;
@@ -199,6 +206,7 @@ void *BTDC::sendLoop(void *data)
             } else {
                 break;
             }
+            count++;
         }
         usleep(inst->getSendInterval() * 1000);
     }
@@ -210,10 +218,10 @@ bool BTDC::doSend(const std::string &raw)
     std::string res;
     int ret = http_json(push_url_.c_str(), raw.c_str(), res, HTTP_POST_TIMEOUT);
     if (ret < 0) {
-        LOG_INFO("btdc", "try to send: %s %s failed", push_url_.c_str(), raw.c_str());
+        LOG_ERROR("btdc", "try to send: %s %d failed", push_url_.c_str(), raw.size());
         return false;
     }
-    LOG_INFO("btdc", "try to send: %s %s, res=%s", push_url_.c_str(), raw.c_str(), res.c_str());
+    LOG_INFO("btdc", "send ok: %s %d", push_url_.c_str(), raw.size());
     return res.compare("success") == 0;
 }
 

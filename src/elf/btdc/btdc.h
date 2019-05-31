@@ -25,8 +25,8 @@ static const char *TOPIC_ODS_ONLINE_TIME_NAME;
 static const char *TOPIC_ODS_ONLINE_USER_COUNT_NAME;
 static const char *TOPIC_ODS_EVENT_RECORD_NAME;
 
-static const int DEFAULT_SEND_INTERVAL = 5000;  // 2 seconds
-static const int DEFAULT_SEND_COUNT    = 10000; // 10000 records per loop
+static const int DEFAULT_SEND_INTERVAL = 10000;  // 10 seconds
+static const int DEFAULT_SEND_COUNT    = 1500; // 1500 records per loop
 
 struct Item {
     std::string key;
@@ -148,11 +148,22 @@ private:
     int getSendInterval() { return max_send_interval_; }
     int getSendCount() { return max_send_count_; }
     static void *sendLoop(void *data);
+    void reset(int interval, int count) {
+        if (interval > 0) {
+            LOG_INFO("btdc", "reset send interval: %d %d", max_send_interval_, interval);
+            max_send_interval_ = interval;
+        }
+        if (count > 0) {
+            LOG_INFO("btdc", "reset send count: %d %d", max_send_count_, count);
+            max_send_count_ = count;
+        }
+    }
 
 public:
     virtual ~BTDC();
 public:
     static bool Init(const char *filename);
+    static void Reset(int interval, int count);
     static void Fini();
     static bool Send(const BaseTopic *topic);
     static std::string GetAppId() {
@@ -169,8 +180,8 @@ private:
     xqueue<Event> wque_;
     std::string app_id_;
     std::string push_url_;
-    int max_send_interval_;
-    int max_send_count_;
+    volatile int max_send_interval_;
+    volatile int max_send_count_;
     thread_t worker_;
 };
 
