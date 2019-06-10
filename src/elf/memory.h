@@ -21,6 +21,7 @@
 
 #define S_FREE(x)  do { if (x) { free(x); (x)=NULL; } } while (0)
 #define S_DELETE(x)  do { if (x) { delete(x); (x)=NULL; } } while (0)
+#define S_DELETE_ARRAY(x)  do { if (x) { delete []x; x=NULL; } } while (0)
 
 #define E_ALLOC malloc
 #define E_REALLOC realloc

@@ -201,7 +201,7 @@ int mongodb_fini(void)
             mongo_thread_t *th = th_list->threads + i;
             thread_fini(th->tid);
         }
-        E_DELETE th_list->threads;
+        E_DELETE []th_list->threads;
         E_DELETE th_list;
     }
     s_threads.clear();

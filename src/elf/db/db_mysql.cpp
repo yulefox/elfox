@@ -222,7 +222,7 @@ int db_fini(void)
                 mysql_close(th->mysql);
             }
         }
-        E_DELETE th_list->threads;
+        E_DELETE []th_list->threads;
         E_DELETE th_list;
     }
     s_threads.clear();

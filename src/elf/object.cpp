@@ -54,13 +54,13 @@ void Object::OnInit(void)
 
 void Object::Release(void)
 {
-    obj_map_id::iterator itr = s_objs.begin();
-    for (; itr != s_objs.end(); ++itr) {
+    obj_map_id pending_objs = s_objs;
+    obj_map_id::iterator itr = pending_objs.begin();
+    for (; itr != pending_objs.end(); ++itr) {
         Object *obj = itr->second;
-
-        s_pbs.erase(obj->m_id);
         S_DELETE(obj);
     }
+    pending_objs.clear();
 
     proto_map::iterator itr_p = s_pbs.begin();
     for (; itr_p != s_pbs.end(); ++itr_p) {

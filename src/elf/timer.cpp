@@ -138,6 +138,9 @@ int timer_fini(void)
     s_mgr.end_time = time_ms();
     for (int i = 0; i < MAX_WHEEL_SET_SIZE; ++i) {
         timer_t *head = s_mgr.timers[i];
+        if (head == NULL) {
+            continue;
+        }
         timer_t *t = head;
 
         while (t) {

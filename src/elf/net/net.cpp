@@ -203,6 +203,7 @@ static context_set s_pre_contexts;
 static free_context_queue s_free_contexts;
 static std::set<std::string> s_raw_msgs;
 static std::list<context_t*> s_pending_gc;
+static volatile int s_running = 0;
 
 ///
 /// Running.
@@ -238,7 +239,7 @@ static bool is_raw_msg(const std::string &name)
 
 static void *net_thread(void *args)
 {
-    while (true) {
+    while (s_running) {
         net_update();
     }
     return NULL;
@@ -264,7 +265,7 @@ static void context_stop(context_t *ctx)
 
 static void *context_thread(void *args)
 {
-    while (true) {
+    while (s_running) {
         context_set pre_peers;
         context_set::iterator itr;
 
@@ -307,7 +308,7 @@ static void *context_thread(void *args)
 static void *net_reader(void *args)
 {
     context_xqueue *que = (context_xqueue *)(args);
-    while (true) {
+    while (s_running) {
         std::deque<context_t*> ctxs;
         std::deque<context_t*>::iterator itr;
         que->swap(ctxs);
@@ -323,7 +324,7 @@ static void *net_writer(void *args)
 {
     write_context_xqueue *que = (write_context_xqueue *)(args);
 
-    while (true) {
+    while (s_running) {
         blob_t *msg = NULL;
         que->pop(msg);
 
@@ -362,8 +363,6 @@ static int net_update(void)
     int num = epoll_wait(s_epoll, evts, EPOLL_EVENT_DEFAULT_SIZE, 5);
 
     if (num < 0 && errno != EINTR) {
-        LOG_ERROR("net", "epoll_wait FAILED: %s.",
-                strerror(errno));
         return num;
     }
     for (int i = 0; i < num; ++i) {
@@ -946,6 +945,7 @@ int net_init(int worker_num)
         LOG_ERROR("net", "epoll_create FAILED: %s.", strerror(errno));
         return -1;
     }
+    s_running = 1;
     spin_init(&s_context_lock);
     spin_init(&s_pre_context_lock);
     s_tid = thread_init(net_thread, NULL);
@@ -975,13 +975,15 @@ int net_init(int worker_num)
 int net_fini(void)
 {
     MODULE_IMPORT_SWITCH;
+    s_running = 0;
+    close(s_epoll);
+    S_DELETE_ARRAY(s_writer_tid);
+    S_DELETE_ARRAY(s_reader_tid);
+    S_DELETE_ARRAY(s_pending_read);
+    S_DELETE_ARRAY(s_pending_write);
     spin_fini(&s_pre_context_lock);
     spin_fini(&s_context_lock);
-    close(s_epoll);
-    S_DELETE(s_writer_tid);
-    S_DELETE(s_reader_tid);
-    S_DELETE(s_pending_read);
-    S_DELETE(s_pending_write);
+
     return 0;
 }
 
