@@ -182,6 +182,7 @@ public:
                     break;
                 }
             } else {
+                setReady(0);
                 LOG_INFO("rpc", "grpc channel(%s/%d) is closed.", name_.c_str(), id_);
                 if (WaitForReady()) {
                     Init();
