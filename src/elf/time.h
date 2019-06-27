@@ -65,6 +65,12 @@ time64_t time_diff(time64_t end, time64_t start);
 /// @return Month days.
 ///
 int time_month_days(time_t t);
+
+
+///
+/// convert timestamp to zoned time, -11 <= zone <= 11
+int get_zoned_time(time_t stamp, int zone, char *cts, size_t size);
+
 } // namespace elf
 
 #endif /* !ELF_TIME_H */
