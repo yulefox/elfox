@@ -77,5 +77,29 @@ int time_month_days(time_t t)
     }
     return d;
 }
+
+
+int get_zoned_time(time_t stamp, int zone, char *cts, size_t size)
+{
+    if (zone < -11 || zone > 11) {
+        return -1;
+    }
+
+    time_t curr = stamp;
+    if (curr <= 0) {
+        curr = time(NULL);
+    }
+    curr += 3600 * zone;
+    struct tm *tm = gmtime(&curr);
+    if (tm == NULL) {
+        return -1;
+    }
+
+    memset(cts, 0, size);
+    strftime(cts, size, "%Y-%m-%d %H:%M:%S", tm);
+    return 0;
+}
+
+
 } // namespace elf
 

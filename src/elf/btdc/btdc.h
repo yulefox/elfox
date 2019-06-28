@@ -76,11 +76,8 @@ public:
 
     bool Send() {
         time_t ct = time_s();
-        struct tm ctm;
         char cts[20];
-    
-        localtime_r(&ct, &ctm);
-        strftime(cts, 20, "%F %T", &ctm);
+        elf::get_zoned_time(ct, 8, cts, sizeof(cts));
 
         Add("enterTime", cts);
         Add("logTime", cts);
@@ -133,7 +130,7 @@ struct Event {
     Event(const BaseTopic *topic) {
         name = topic->Name();
         items.push_back(Item("topicId", topic->ID()));
-        items.push_back(Item("topicName", topic->Name()));
+        //items.push_back(Item("topicName", topic->Name()));
         for (size_t i = 0; i < topic->Args().size(); i++) {
             items.push_back(topic->Args()[i]);
         }

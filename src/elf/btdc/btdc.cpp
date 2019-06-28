@@ -221,7 +221,8 @@ bool BTDC::doSend(const std::string &raw)
         LOG_ERROR("btdc", "try to send: %s %d failed", push_url_.c_str(), raw.size());
         return false;
     }
-    LOG_INFO("btdc", "send ok: %s %d", push_url_.c_str(), raw.size());
+    LOG_INFO("btdc", "send ok: %s %d, %s", push_url_.c_str(), raw.size(), raw.c_str());
+    LOG_DEBUG("btdc", "%s", raw.c_str());
     return res.compare("success") == 0;
 }
 
