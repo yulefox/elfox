@@ -145,6 +145,7 @@ void net_stat_recv(const recv_message_t &msg);
 /// @return Peer info.
 ///
 const char *net_peer_ip(const context_t *ctx);
+std::string net_peer_ip(oid_t peer);
 
 ///
 /// Get peer address info.

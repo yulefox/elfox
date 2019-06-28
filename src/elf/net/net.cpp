@@ -1849,4 +1849,14 @@ bool net_internal(const context_t &ctx)
 {
     return ctx.internal;
 }
+
+std::string net_peer_ip(oid_t peer)
+{
+    context_t *ctx = context_find(peer);
+    if (ctx == NULL) {
+        return std::string("0.0.0.0");
+    }
+    return ctx->peer.ip;
+}
+
 } // namespace elf
