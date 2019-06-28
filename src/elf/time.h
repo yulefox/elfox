@@ -40,12 +40,6 @@ struct timeval
 #endif /* ELF_PLATFORM_WIN32 */
 
 ///
-/// Get seconds east of UTC.
-/// @return Seconds easy of UTC.
-///
-int time_gmtoff(void);
-
-///
 /// Get time(in second).
 /// @return Current time.
 ///
