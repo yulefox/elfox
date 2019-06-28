@@ -33,16 +33,6 @@ static int gettimeofday(struct timeval *tp, void *tzp)
 }
 #endif /* ELF_PLATFORM_WIN32 */
 
-int time_gmtoff(void)
-{
-    time_t ct;
-    struct tm ctm;
-
-    time(&ct);
-    localtime_r(&ct, &ctm);
-    return ctm.tm_gmtoff;
-}
-
 time_t time_s(void)
 {
     time_t tm;
