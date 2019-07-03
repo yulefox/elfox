@@ -26,7 +26,7 @@ int platform_init(const char *configfile)
     std::fstream fs(configfile, std::ios::in | std::ios::binary);
 
     if (!fs) {
-        LOG_ERROR("json", "Can NOT open file %s.", configfile);
+        LOG_ERROR("net", "Can NOT open file %s.", configfile);
         return -1;
     }
 
@@ -36,7 +36,7 @@ int platform_init(const char *configfile)
 
     s_platform_setting = json_loads(iss.str().c_str(), 0, NULL);
     if (s_platform_setting == NULL) {
-        LOG_ERROR("json", "Can NOT parse json file %s.", configfile);
+        LOG_ERROR("net", "Can NOT parse json file %s.", configfile);
         return -1;
     }
 
@@ -58,12 +58,12 @@ int platform_auth(const char *token, platform_user_t &puser)
 
     json_t *key = json_object_get(s_platform_setting, "public_key");
     if (key == NULL) {
-        LOG_ERROR("json", "load public key failed: %s", token);
+        LOG_ERROR("net", "load public key failed: %s", token);
         return PLATFORM_SETTING_ERROR;
     }
     json_t *app_id_node = json_object_get(s_platform_setting, "app_id");
     if (app_id_node == NULL) {
-        LOG_ERROR("json", "get app id failed: %s", token);
+        LOG_ERROR("net", "get app id failed: %s", token);
         return PLATFORM_SETTING_ERROR;
     }
 
@@ -75,18 +75,18 @@ int platform_auth(const char *token, platform_user_t &puser)
 
     ret = jwt_decode(&jwt, token, (const unsigned char*)key_str, (int)key_len);
     if (ret != 0) {
-        LOG_ERROR("json", "jwt decode failed: %d %d %s", ret, errno, token);
+        LOG_ERROR("net", "jwt decode failed: %d %d %s", ret, errno, token);
         return PLATFORM_TOKEN_INVALID;
     }
 
     if (json_integer_value(app_id_node) != jwt_get_grant_int(jwt, "app_id")) {
-        LOG_ERROR("json", "invalid app id: %s", token);
+        LOG_ERROR("net", "invalid app id: %s", token);
         jwt_free(jwt);
         return PLATFORM_TOKEN_INVALID;
     }
 
     if (time_s() > jwt_get_grant_int(jwt, "exp")) {
-        LOG_ERROR("json", "token has expired: %s", token);
+        LOG_ERROR("net", "token has expired: %s", token);
         jwt_free(jwt);
         return PLATFORM_TOKEN_EXPIRED;
     }
@@ -100,7 +100,7 @@ int platform_auth(const char *token, platform_user_t &puser)
 
     if (!uid_str || !account || !sid || !platform || !channel || !sdk) {
         jwt_free(jwt);
-        LOG_ERROR("json", "invalid token: %s", token);
+        LOG_ERROR("net", "invalid token: %s", token);
         return PLATFORM_TOKEN_INVALID;
     }
 
@@ -108,7 +108,7 @@ int platform_auth(const char *token, platform_user_t &puser)
     if (errno == EINVAL || errno == ERANGE) {
         free(uid_str);
         jwt_free(jwt);
-        LOG_ERROR("json", "parse uid failed: %s", token);
+        LOG_ERROR("net", "parse uid failed: %s", token);
         return PLATFORM_TOKEN_INVALID;
     }
 

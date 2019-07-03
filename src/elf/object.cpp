@@ -39,7 +39,7 @@ void Object::OnInit(void)
     if (itr != s_objs.end()) {
         Object *obj = itr->second;
 
-        LOG_ERROR("sys", "(%d)<%lld:%lld> DUPLICATED initialization (%s) - (%s)",
+        LOG_ERROR("object", "(%d)<%lld:%lld> DUPLICATED initialization (%s) - (%s)",
                 m_type,
                 m_pid,
                 m_id,
@@ -161,7 +161,7 @@ void Object::IndexProto(pb_t *pb, oid_t xid, oid_t pid, int type, oid_t id, int 
     } else {
         proto->ref++;
     }
-    LOG_TRACE("test.object", "+   OBJ: %19lld %19lld %19lld %4d %6d", xid, pid, id, type, idx);
+    LOG_TRACE("object", "+   OBJ: %19lld %19lld %19lld %4d %6d", xid, pid, id, type, idx);
 }
 
 void Object::UnindexProto(oid_t id)
@@ -192,7 +192,7 @@ void Object::UnindexProto(oid_t id)
     }
     E_DELETE(proto->pb);
     E_DELETE(proto);
-    LOG_TRACE("test.object", "-   OBJ: %19lld %19lld %19lld %4d %6d", xid, pid, id, type, idx);
+    LOG_TRACE("object", "-   OBJ: %19lld %19lld %19lld %4d %6d", xid, pid, id, type, idx);
     DelChildren(id, -1);
 }
 
@@ -334,7 +334,7 @@ oid_t Object::GetContainer(oid_t pid, int type, bool add)
 
     if (cid < 0 && add) {
         cid = oid_gen();
-        LOG_TRACE("test.object", "o CTNER: %19lld(%d)", cid, type);
+        LOG_TRACE("object", "o CTNER: %19lld(%d)", cid, type);
         SetChild(pid, type, cid);
     }
     return cid;
@@ -356,7 +356,7 @@ void Object::DelContainer(oid_t id)
 
     E_DELETE(ism);
     s_containers.erase(itr);
-    LOG_TRACE("test.object", "- CTNER: %19lld(%3d)", id, s_containers.size());
+    LOG_TRACE("object", "- CTNER: %19lld(%3d)", id, s_containers.size());
 }
 
 id_ismap *Object::GetContainerItems(oid_t pid, int type)
@@ -454,7 +454,7 @@ void Object::DelChildren(oid_t pid, int type)
         }
         E_DELETE(ism);
         s_containers.erase(itr);
-        LOG_TRACE("test.object", "- CTNER: %19lld(%3d)", pid, s_containers.size());
+        LOG_TRACE("object", "- CTNER: %19lld(%3d)", pid, s_containers.size());
     }
 }
 

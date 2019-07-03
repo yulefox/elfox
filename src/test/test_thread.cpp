@@ -9,8 +9,8 @@
 
 void *func(void *args)
 {
-    LOG_INFO("test", "Thread %p starts.", 0);
-    LOG_INFO("test", "Thread %p exits.", 0);
+    LOG_INFO("event", "Thread %p starts.", 0);
+    LOG_INFO("event", "Thread %p exits.", 0);
     return NULL;
 }
 

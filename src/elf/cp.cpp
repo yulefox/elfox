@@ -68,7 +68,7 @@ static bool load_csv(const std::string &path, pb_t *cfg)
     std::fstream fs(path.c_str(), std::ios::in | std::ios::binary);
 
     if (!fs) {
-        LOG_ERROR("cp",
+        LOG_ERROR("cfg",
                 "Can NOT open file %s.", path.c_str());
         return false;
     }
@@ -102,7 +102,7 @@ static bool load_csv(const std::string &path, pb_t *cfg)
         }
         ++item_num;
     }
-    LOG_TRACE("cp",
+    LOG_TRACE("cfg",
             "Load config file %s DONE, %d items loaded.",
             path.c_str(),
             item_num);
@@ -114,7 +114,7 @@ bool load_cfg(const std::string &path, pb_t *cfg)
     std::fstream fs(path.c_str(), std::ios::in | std::ios::binary);
 
     if (!fs) {
-        LOG_ERROR("cp",
+        LOG_ERROR("cfg",
                 "Can NOT open file %s.", path.c_str());
         return false;
     }
@@ -150,7 +150,7 @@ bool load_cfg(const std::string &path, pb_t *cfg)
             FieldDescriptor::CppType type = fd->cpp_type();
 
             if (type != FieldDescriptor::CPPTYPE_MESSAGE) {
-                LOG_ERROR("cp",
+                LOG_ERROR("cfg",
                         "Invalid config file: %s.",
                         path.c_str());
                 assert(0);
@@ -173,7 +173,7 @@ bool load_cfg(const std::string &path, pb_t *cfg)
             pb_set_field(sec, fd, val.c_str());
         }
     }
-    LOG_TRACE("cp",
+    LOG_TRACE("cfg",
             "Load config file %s DONE.",
             path.c_str());
     return true;
@@ -240,20 +240,20 @@ static bool load_xml(const std::string &path, pb_t *cfg)
 {
     xmlDocPtr doc = xmlReadFile(path.c_str(), "utf8", XML_PARSE_RECOVER);
     if (!doc) {
-        LOG_ERROR("cp",
+        LOG_ERROR("cfg",
                 "Can NOT open file %s.", path.c_str());
         return false;
     }
 
     xmlNodePtr node = xmlDocGetRootElement(doc);
     if (!node) {
-        LOG_ERROR("cp",
+        LOG_ERROR("cfg",
                 "Can NOT parse file %s.", path.c_str());
         xmlFreeDoc(doc);
         return false;
     }
     xmlnode_parse(cfg, node);
-    LOG_TRACE("cp",
+    LOG_TRACE("cfg",
             "Load config file %s DONE.",
             path.c_str());
     xmlFreeDoc(doc);
@@ -295,7 +295,7 @@ pb_t *config_load(const std::string &name, const std::string &path,
     }
 
     if (!res) {
-        LOG_ERROR("cp",
+        LOG_ERROR("cfg",
                 "Invalid config file format: %s.",
                 path.c_str());
         pb_destroy(cfg);

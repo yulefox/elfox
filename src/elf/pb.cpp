@@ -101,9 +101,7 @@ void pb_set_field(pb_t *pb, const FieldDescriptor *fd,
             ref->SetString(pb, fd, val);
             break;
         default:
-            LOG_ERROR("pb",
-                    "Invalid field type %d.",
-                    type);
+            LOG_ERROR("object", "Invalid field type %d.", type);
             assert(0);
     }
 }
@@ -142,9 +140,7 @@ void pb_set_field(pb_t *pb, const FieldDescriptor *fd,
             ref->SetString(pb, fd, std::string(val, len));
             break;
         default:
-            LOG_ERROR("pb",
-                    "Invalid field type %d.",
-                    type);
+            LOG_ERROR("object", "Invalid field type %d.", type);
             assert(0);
     }
 }

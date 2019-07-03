@@ -92,12 +92,12 @@ template<>
 void object::test<1>() {
     set_test_name("log");
     putchar('\n');
-    LOG_FATAL("test", "%s", "F-hello");
-    LOG_ERROR("test", "%s", "E-hello");
-    LOG_WARN("test", "W-hello %s", "hello");
-    LOG_INFO("test", "%s", "I-hello");
-    LOG_TRACE("test", "%s", "T-hello");
-    LOG_DEBUG("test", "%s", "D-hello");
+    LOG_FATAL("event", "%s", "F-hello");
+    LOG_ERROR("event", "%s", "E-hello");
+    LOG_WARN("event", "W-hello %s", "hello");
+    LOG_INFO("event", "%s", "I-hello");
+    LOG_TRACE("event", "%s", "T-hello");
+    LOG_DEBUG("event", "%s", "D-hello");
     LOG_TEST("%s", "hello");
 }
 }
