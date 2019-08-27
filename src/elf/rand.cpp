@@ -150,7 +150,6 @@ void roll_pb(const roll_req &req, roll_res &res, int times, bool weight)
 void roll_rm(roll_req &req, roll_res &res, int times, bool weight)
 {
     roll_req::const_iterator itr_c = req.begin();
-    roll_res::iterator itr_d;
     int weight_sum = 0;
 
     assert(req.size() >= (size_t)times);
@@ -177,6 +176,39 @@ void roll_rm(roll_req &req, roll_res &res, int times, bool weight)
             rnd -= itr_c->second;
         }
     }
+}
+
+int roll_rm(roll_req &req, int times, bool weight)
+{
+    roll_req::const_iterator itr_c = req.begin();
+    int weight_sum = 0;
+
+    assert(req.size() >= (size_t)times);
+
+    if (weight) {
+        for (; itr_c != req.end(); ++itr_c) {
+            weight_sum += itr_c->second;
+        }
+    } else {
+        weight_sum = 10000;
+    }
+
+    int res = -1;
+    while (times) {
+        int rnd = rand(1, weight_sum);
+
+        for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
+            if (rnd <= itr_c->second) { // hit
+                res = itr_c->first;
+                --times;
+                weight_sum -= itr_c->second;
+                req.erase(itr_c->first);
+                break;
+            }
+            rnd -= itr_c->second;
+        }
+    }
+    return res;
 }
 
 void rand_str(char *rnds, int len)

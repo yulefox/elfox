@@ -108,6 +108,15 @@ void roll_rm(roll_req &req, roll_res &res, int times,
         bool weight = false);
 
 ///
+/// Generate key after given times in request group(remove if hit).
+/// @param req Roll request group.
+/// @param times Roll times.
+/// @param weight With weight if true.
+/// @return Rand key after given times.
+///
+int roll_rm(roll_req &req, int times, bool weight = false);
+
+///
 /// Generate random string.
 /// @param rnds Generated random string.
 /// @param len String length.
