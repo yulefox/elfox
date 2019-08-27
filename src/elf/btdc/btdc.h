@@ -130,7 +130,7 @@ struct Event {
     Event(const BaseTopic *topic) {
         name = topic->Name();
         items.push_back(Item("topicId", topic->ID()));
-        //items.push_back(Item("topicName", topic->Name()));
+        items.push_back(Item("topicName", topic->Name()));
         for (size_t i = 0; i < topic->Args().size(); i++) {
             items.push_back(topic->Args()[i]);
         }
