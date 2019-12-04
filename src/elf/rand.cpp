@@ -128,6 +128,9 @@ void roll_pb(const roll_req &req, roll_res &res, int times, bool weight)
     } else {
         weight_sum = 10000;
     }
+    if (weight_sum < 1) {
+        return;
+    }
 
     while (times--) {
         int rnd = rand(1, weight_sum);
@@ -161,6 +164,9 @@ void roll_rm(roll_req &req, roll_res &res, int times, bool weight)
     } else {
         weight_sum = 10000;
     }
+    if (weight_sum < 1) {
+        return;
+    }
 
     while (times) {
         int rnd = rand(1, weight_sum);
@@ -191,6 +197,9 @@ int roll_rm(roll_req &req, int times, bool weight)
         }
     } else {
         weight_sum = 10000;
+    }
+    if (weight_sum < 1) {
+        return -1;
     }
 
     int res = -1;
