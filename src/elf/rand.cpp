@@ -168,13 +168,12 @@ void roll_rm(roll_req &req, roll_res &res, int times, bool weight)
         return;
     }
 
-    while (times) {
+    while (times--) {
         int rnd = rand(1, weight_sum);
 
         for (itr_c = req.begin(); itr_c != req.end(); ++itr_c) {
             if (rnd <= itr_c->second) { // hit
                 res[itr_c->first] = 1;
-                --times;
                 weight_sum -= itr_c->second;
                 req.erase(itr_c->first);
                 break;
