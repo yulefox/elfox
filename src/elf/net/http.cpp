@@ -184,6 +184,9 @@ int http_json(const char *url, const char *json, std::string &output, int timeou
     res = curl_easy_perform(curl);
     if(res != CURLE_OK) {
         LOG_ERROR("http", "curl_easy_perform() failed(%d): %s %s.", res, curl_easy_strerror(res), url);
+
+        curl_slist_free_all(slist);
+        curl_easy_cleanup(curl);
         return -1;
     }
     curl_slist_free_all(slist);

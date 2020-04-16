@@ -148,15 +148,15 @@ int open(int id, const std::string &name,
     json_t *json = json_object();
     json_t *params = json_object();
     json_t *mds = json_object();
-    json_object_set(params, "ssl_ca_file", json_string(caFile.c_str()));
-    json_object_set(params, "ssl_clt_cert_file", json_string(certFile.c_str()));
-    json_object_set(params, "ssl_clt_key_file", json_string(privKeyFile.c_str()));
-    json_object_set(json, "addr", json_string(addr));
-    json_object_set(json, "params", params);
+    json_object_set_new(params, "ssl_ca_file", json_string(caFile.c_str()));
+    json_object_set_new(params, "ssl_clt_cert_file", json_string(certFile.c_str()));
+    json_object_set_new(params, "ssl_clt_key_file", json_string(privKeyFile.c_str()));
+    json_object_set_new(json, "addr", json_string(addr));
+    json_object_set_new(json, "params", params);
 
     for (size_t i = 0; i < metaList.size(); i++) {
         MetaData md = metaList[i];
-        json_object_set(mds, md.key.c_str(), json_string(md.val.c_str()));
+        json_object_set_new(mds, md.key.c_str(), json_string(md.val.c_str()));
     }
 
 
