@@ -23,13 +23,10 @@
 #include <iostream>
 #include <mutex>
 #include <future>
+#include <jansson.h>
 
-#include <grpc/grpc.h>
-#include <grpc/grpc_posix.h>
-#include <grpc++/channel.h>
-#include <grpc++/client_context.h>
-#include <grpc++/create_channel.h>
-#include <grpc++/security/credentials.h>
+#include <libgohive/bridge.h>
+#include <libgohive/libgohive.h>
 
 #include <elf/net/proto/dbus.pb.h>
 #include <elf/net/proto/dbus.grpc.pb.h>
@@ -37,406 +34,49 @@
 namespace elf {
 namespace rpc {
 
-static std::map< std::string, oid_t> s_name_ids;
-static xqueue<recv_message_t*> s_recv_msgs;
-static std::mutex s_lock_id;
-static std::mutex s_lock_name;
-
-
-class DBusClient {
-public:
-    explicit DBusClient(int id, oid_t peer, std::string &name, const std::vector<MetaData> &metaList,
-            std::shared_ptr<grpc::Channel> channel) {
-            
-        metaList_ = metaList;
-        channel_ = channel;
-        stub_ = pb::DBus::NewStub(channel);
-        id_ = id;
-        peer_ = peer;
-        name_ = name;
-        cevent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::CONNECT);
-        revent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::READ);
-        wevent_ = E_NEW AsyncClientCall(AsyncClientCall::OperType::WRITE);
-        running_ = 1;
-        ready_ = 0;
-
-        if (WaitForReady()) {
-            LOG_INFO("rpc", "grpc[%s/%d] channel is connected success...try to init stream...", name_.c_str(), id_);
-            Init();
-        }
-    }
-
-    virtual ~DBusClient() {
-        setRunning(0);
-        cq_.Shutdown();
-        std::unique_lock<std::mutex> lock(mutex_);
-        while (!wque_.empty()) {
-            pb::Packet *pkt = wque_.front();
-            if (pkt != NULL) {
-                E_DELETE pkt;
-            }
-            wque_.pop_front();
-        }
-        lock.unlock();
-
-        E_DELETE cevent_;
-        E_DELETE revent_;
-        E_DELETE wevent_;
-    }
-
-    bool WaitForReady() {
-        grpc_connectivity_state st = channel_->GetState(true);
-        if (st == GRPC_CHANNEL_READY) {
-            LOG_INFO("rpc", "grpc channel is ready, %s/%d", name_.c_str(), id_);
-            return true;
-        }
-        gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_millis(100, GPR_TIMESPAN));
-        channel_->NotifyOnStateChange(st, deadline, &cq_, (void*)cevent_);
-        LOG_INFO("rpc", "wait channel be ready by CQ, %s/%d", name_.c_str(), id_);
-        return false;
-    }
-
-    void Init() {
-        LOG_INFO("rpc", "start initialize stream for channel: %s/%d", name_.c_str(), id_);
-        setReady(0);
-        revent_->Init(AsyncClientCall::OperType::INIT);
-
-        // metadata
-        grpc::ClientContext *ctx = E_NEW grpc::ClientContext;
-        for (size_t i = 0; i < metaList_.size(); i++) {
-            ctx->AddMetadata(metaList_[i].key, metaList_[i].val);
-            LOG_INFO("rpc", "init clientcontext(%s/%d), add metadata %s %s",
-                    name_.c_str(), id_, metaList_[i].key.c_str(), metaList_[i].val.c_str());
-        }
-
-        //
-        stream_ = stub_->AsyncStream(ctx, &cq_, revent_);
-    }
-
-    void PushSend(const pb_t &pb, void *ctx) {
-        if (!isRunning()) {
-            LOG_INFO("rpc", "%s", "asynclient has been shutdown.");
-            return;
-        }
-        std::string name = pb.GetTypeName();
-        std::string payload;
-        pb.SerializeToString(&payload);
-
-
-        pb::Packet *pkt = E_NEW pb::Packet;
-        pb::Peer *peer = pkt->mutable_peer();
-        pb::Peer *to = static_cast<pb::Peer*>(ctx);
-        if (to == NULL) {
-            peer->set_name("gs");
-            peer->add_peers(id_);
-        } else {
-            peer->CopyFrom(*to);
-        }
-        pkt->set_type(name);
-        pkt->set_payload(payload);
-
-        std::unique_lock<std::mutex> lock(mutex_);
-        wque_.push_back(pkt);
-
-        LOG_INFO("rpc", "push send: %s", name.c_str());
-
-        // start request write
-        if (isReady() && wque_.size() == 1) {
-            LOG_INFO("rpc", "%s", "launch to send...");
-            nextWrite();
-        }
-    }
-
-    static void WorkerRoutine(DBusClient *clt) {
-        clt->Loop();
-    }
-
-    void Loop() {
-        for (;;) {
-            void* got_tag = NULL;
-            bool ok = false;
-
-            if (!cq_.Next(&got_tag, &ok)) {
-                LOG_ERROR("rpc", "%s", "grpc::CompletionQueue has been shutdown...");
-                break;
-            }
-            if (ok) {
-                AsyncClientCall* call = static_cast<AsyncClientCall*>(got_tag);
-                switch (call->oper) {
-                case AsyncClientCall::OperType::CONNECT:
-                    if (WaitForReady()) {
-                        Init();
-                    }
-                    break;
-                case AsyncClientCall::OperType::INIT:
-                    onInit(call);
-                    break;
-                case AsyncClientCall::OperType::READ:
-                    onRead(call);
-                    break;
-                case AsyncClientCall::OperType::WRITE:
-                    onWrite(call);
-                    break;
-                default:
-                    LOG_INFO("rpc", "get an unknown type operation: %s/%d", name_.c_str(), id_);
-                    break;
-                }
-            } else {
-                setReady(0);
-                LOG_INFO("rpc", "grpc channel(%s/%d) is closed.", name_.c_str(), id_);
-                if (WaitForReady()) {
-                    Init();
-                }
-            }
-        }
-    }
-
-private:
-    struct AsyncClientCall {
-        enum OperType { CONNECT = 0x1, INIT = 0x2, READ = 0x4, WRITE = 0x8};
-        OperType oper;
-        pb::Packet pkt;
-
-        AsyncClientCall() {
-            pkt.Clear();
-        }
-
-        AsyncClientCall(OperType op) {
-            oper = op;
-            pkt.Clear();
-        }
-
-        ~AsyncClientCall() {}
-
-        void Init(OperType op) {
-            oper = op;
-            pkt.Clear();
-        }
-    };
-
-    void nextRead() {
-        revent_->Init(AsyncClientCall::OperType::READ);
-        stream_->Read(&revent_->pkt, revent_);
-    }
-
-    void nextWrite() {
-        pb::Packet *pkt = wque_.front();
-        if (pkt != NULL) {
-            wevent_->Init(AsyncClientCall::OperType::WRITE);
-            stream_->Write(*pkt, wevent_);
-        } else {
-            wque_.pop_front();
-            LOG_ERROR("rpc", "%s", "got an nullptr from wque, do drop it.");
-        }
-    }
-
-    void onInit(AsyncClientCall *call) {
-        nextRead();
-   
-        // launch to send
-        std::unique_lock<std::mutex> lock(mutex_);
-        setReady(1);
-        if (!wque_.empty()) {
-            nextWrite();
-        }
-        LOG_INFO("rpc", "grpc[%s/%d] on inited...try to launch to read && write.", name_.c_str(), id_);
-    }
-
-    void onRead(AsyncClientCall *call) {
-        LOG_INFO("rpc", "grpc[%s/%d] on read...", name_.c_str(), id_);
-
-        pb::Packet *pkt = &(call->pkt);
-
-        pb::Peer *from = E_NEW pb::Peer;
-        from->CopyFrom(pkt->peer());
-
-        recv_message_t *msg = E_NEW recv_message_t;
-        msg->name = pkt->type();
-        msg->body = pkt->payload();
-        msg->peer = peer_;
-        msg->pb = NULL;
-        msg->rpc_ctx = (void*)from;
-        msg->ctx = (elf::context_t*)((void*)call);
-        msg->is_raw = false;
-
-        //
-        s_recv_msgs.push(msg);
-
-        LOG_INFO("rpc", "grpc[%s/%d] recv msg: %s", name_.c_str(), id_, msg->name.c_str());
-
-        //
-        nextRead();
-    }
-
-    void onWrite(AsyncClientCall *call) {
-        LOG_INFO("rpc", "grpc[%s/%d] on write...", name_.c_str(), id_);
-        std::unique_lock<std::mutex> lock(mutex_);
-        wque_.pop_front();
-
-        // try to send
-        if (!wque_.empty()) {
-            nextWrite();
-        }
-    }
-
-private:
-
-    void setRunning(int flag) {
-        __sync_val_compare_and_swap(&running_, (flag ^ 1), flag);
-    }
-
-    bool isRunning() {
-        return __sync_val_compare_and_swap(&running_, 1, 1) == 1;
-    }
-
-    void setReady(int flag) {
-        __sync_val_compare_and_swap(&ready_, (flag ^ 1), flag);
-    }
-
-    bool isReady() {
-        return __sync_val_compare_and_swap(&ready_, 1, 1) == 1;
-    }
-
-private:
-    std::unique_ptr<grpc::ClientAsyncReaderWriter<pb::Packet, pb::Packet> > stream_;
-    std::shared_ptr<grpc::Channel> channel_;
-    std::unique_ptr<pb::DBus::Stub> stub_;
-    std::deque<pb::Packet*> wque_;
-    std::mutex mutex_;
-    std::vector<MetaData> metaList_;
-    grpc::CompletionQueue cq_;
-    AsyncClientCall *cevent_;
-    AsyncClientCall *revent_;
-    AsyncClientCall *wevent_;
-    int running_;
-    int ready_;
-    oid_t peer_;
-    std::string name_;
-    int id_;
-};
-
 struct RpcSession {
-    std::shared_ptr<grpc::Channel>  channel;
     std::string name;
-    std::string ip;
-    grpc::SslCredentialsOptions ssl_opts;
-    bool enable_ssl;
-    int port;
     int id;
-    std::vector<MetaData> metaList;
     oid_t peer;
-    std::thread *worker;
-
-    DBusClient *client;
-
-    void open()
-    {
-        char raddr[128];
-        sprintf(raddr, "%s:%d", ip.c_str(), port);
-
-        grpc::ChannelArguments args;
-        args.SetInt(GRPC_ARG_MAX_RECEIVE_MESSAGE_LENGTH, 32 * 1024 * 1024); // 32M
-        args.SetInt(GRPC_ARG_MAX_SEND_MESSAGE_LENGTH, 32 * 1024 * 1024); // 32M
-        args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 3000);
-        args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 5000); 
-        args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
-        args.SetInt(GRPC_ARG_MIN_RECONNECT_BACKOFF_MS, 1000); // The minimum time between subsequent connection attempts, in ms.
-        args.SetInt(GRPC_ARG_MAX_RECONNECT_BACKOFF_MS, 3000); // The maximum time between subsequent connection attempts, in ms.
-        args.SetInt(GRPC_ARG_INITIAL_RECONNECT_BACKOFF_MS, 500); // The time between the first and second connection attempts, in ms.
-        args.SetInt(GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS, 1000);
-        args.SetInt(GRPC_ARG_HTTP2_MIN_SENT_PING_INTERVAL_WITHOUT_DATA_MS, 1000);
-        args.SetInt(GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA, 0);
-
-        if (enable_ssl) {
-            auto ssl_creds = grpc::SslCredentials(ssl_opts);
-            channel = grpc::CreateCustomChannel(raddr, ssl_creds, args);
-        } else {
-            channel = grpc::CreateCustomChannel(raddr, grpc::InsecureChannelCredentials(), args);
-        }
-
-        client = E_NEW DBusClient(id, peer, name, metaList, channel);
-        worker = E_NEW std::thread(&DBusClient::WorkerRoutine, client);
-    }
-
-    void close() {
-        delete client;
-        worker->join();
-        delete worker;
-    }
 };
 
-//
-static std::map<oid_t, std::shared_ptr<struct RpcSession> > s_sessions;
+static std::map< std::string, oid_t> s_name_ids;
+static std::map<oid_t, RpcSession* > s_sessions;
+static xqueue<recv_message_t*> s_recv_msgs;
 
-std::shared_ptr<struct RpcSession> RpcSessionInit(int id, const std::string &name,
-        oid_t peer,
-        const std::string &ip, int port,
-        const std::string &ca,
-        const std::string &key,
-        const std::string &cert,
-        const std::vector<MetaData> &metaList)
+
+static void AddSession(oid_t peer, const std::string &name, int id)
 {
-
-    std::shared_ptr<struct RpcSession> s = std::make_shared<struct RpcSession>();
-
-        if (ca != "" && key != "" && cert != "") {
-        s->enable_ssl = true;
-        s->ssl_opts = {ca, key, cert};
-    }
-
-    s->id = id;
-    s->name = name;
-    s->ip = ip;
-    s->port = port;
-    s->peer = peer;
-    s->metaList = metaList;
-    s->client = NULL;
-    s->worker = NULL;
-
-    std::unique_lock<std::mutex> lock1(s_lock_id);
-    std::unique_lock<std::mutex> lock2(s_lock_name);
-    s_sessions.insert(make_pair(peer, s));
-    s_name_ids.insert(make_pair(name, peer));
-
-    s->open();
-
-    return s;
+    RpcSession *sess = E_NEW RpcSession;
+    sess->name = name;
+    sess->id = id;
+    sess->peer = peer;
+    s_sessions[peer] = sess;
+    s_name_ids[name] = peer;
 }
 
-
-std::shared_ptr<struct RpcSession> RpcSessionFind(oid_t peer)
+static const RpcSession *GetSession(oid_t id)
 {
-    std::unique_lock<std::mutex> lock(s_lock_id);
-
-    std::map<oid_t, std::shared_ptr<struct RpcSession> >::iterator itr = s_sessions.find(peer);
+    std::map<oid_t, RpcSession*>::iterator itr = s_sessions.find(id);
     if (itr == s_sessions.end()) {
         return NULL;
     }
     return itr->second;
 }
 
-std::shared_ptr<struct RpcSession> RpcSessionFind(const std::string &name)
+static const RpcSession *GetSession(const std::string &name)
 {
-    std::unique_lock<std::mutex> lock(s_lock_name);
-
     std::map< std::string, oid_t >::iterator itr = s_name_ids.find(name);
     if (itr == s_name_ids.end()) {
         return NULL;
     }
-    return RpcSessionFind(itr->second);
+
+    oid_t id = itr->second;;
+    return GetSession(id);
 }
 
-static void readCfg(const std::string& filename, std::string& data)
-{
-    std::ifstream file (filename.c_str(), std::ios::in);
-	if (file.is_open()) {
-        std::stringstream ss;
-		ss << file.rdbuf();
 
-        file.close ();
-		data = ss.str();
-	}
-}
+//
 
 static int Proc()
 {
@@ -456,6 +96,38 @@ static int Proc()
 }
 
 
+static void on_recv(int size, const void *payload) {
+    pb::Packet pkt;
+    
+    if (!pkt.ParseFromArray(payload, size)) {
+        LOG_INFO("rpc", "%s", "unserialize pb::Packet failed.");
+        return;
+    }
+
+    pb::Peer *from = E_NEW pb::Peer;
+    from->CopyFrom(pkt.peer());
+
+    recv_message_t *msg = E_NEW recv_message_t;
+    msg->name = pkt.type();
+    msg->body = pkt.payload();
+    //msg->peer = peer;
+    msg->pb = NULL;
+    msg->rpc_ctx = (void*)from;
+    msg->ctx = (elf::context_t*)((void*)msg);
+    msg->is_raw = false;
+
+    //
+    s_recv_msgs.push(msg);
+
+    LOG_INFO("rpc", "recv msg: %s", pkt.type().c_str());
+}
+
+int init()
+{
+    HiveInit(on_recv);
+    return 0;
+}
+
 ///
 int open(int id, const std::string &name,
         oid_t peer,
@@ -470,37 +142,113 @@ int open(int id, const std::string &name,
     std::string key;
     std::string cert;
 
-    if (caFile != "" && privKeyFile != "" && certFile != "") {
-        readCfg(caFile, ca_cert);
-        readCfg(privKeyFile, key);
-        readCfg(certFile, cert);
+    char addr[256];
+    sprintf(addr, "%s:%d", ip.c_str(), port);
+
+    json_t *json = json_object();
+    json_t *params = json_object();
+    json_t *mds = json_object();
+    json_object_set(params, "ssl_ca_file", json_string(caFile.c_str()));
+    json_object_set(params, "ssl_clt_cert_file", json_string(certFile.c_str()));
+    json_object_set(params, "ssl_clt_key_file", json_string(privKeyFile.c_str()));
+    json_object_set(json, "addr", json_string(addr));
+    json_object_set(json, "params", params);
+
+    for (size_t i = 0; i < metaList.size(); i++) {
+        MetaData md = metaList[i];
+        json_object_set(mds, md.key.c_str(), json_string(md.val.c_str()));
     }
 
-    std::shared_ptr<struct RpcSession> s = RpcSessionInit(id, name, peer, ip, port, ca_cert, key, cert, metaList);
-    //RpcSessionStart(s);
-    return 0;
-}
 
-int send(const std::string &name, const pb_t &pb, void *ctx)
-{
-    std::shared_ptr<struct RpcSession> s = RpcSessionFind(name);
-    if (s == NULL || s->client == NULL) {
+    char *ctx = json_dumps(json, 0);
+    if (ctx == NULL) {
+        LOG_INFO("rpc", "%s", "json_dumps failed");
+        return -1;
+    }
+    LOG_INFO("rpc", "rpc ctx: %s", ctx);
+
+    char *ctx_mds = json_dumps(mds, 0);
+    if (ctx_mds == NULL) {
+        LOG_INFO("rpc", "%s", "json_dumps failed");
+        return -1;
+    }
+    LOG_INFO("rpc", "rpc mds: %s", ctx_mds);
+
+    char c_name[1024] = {0};
+    strcpy(c_name, name.c_str());
+
+    HiveConnect_return res = HiveConnect(peer, c_name, ctx, ctx_mds);
+    if (res.r0 != 0) {
+        LOG_INFO("rpc", "gohive client init failed: %s", res.r1);
         return -1;
     }
 
-    s->client->PushSend(pb, ctx);
+    LOG_INFO("rpc", "%s", "gohive client init success...");
+    
+    free(ctx);
+    free(ctx_mds);
+    json_decref(mds);
+    json_decref(json);
+
+    AddSession(peer, name, id);
     return 0;
+}
+
+static int send(const RpcSession *sess, const pb_t &pb, void *ctx)
+{
+    if (sess == NULL) {
+        LOG_ERROR("rpc", "%s", "invalid rpc session.");
+        return -1;
+    }
+    LOG_INFO("rpc", "try to send...%s %d %lld", sess->name.c_str(), sess->id, sess->peer);
+
+    std::string name = pb.GetTypeName();
+    std::string payload;
+    pb.SerializeToString(&payload);
+
+    pb::Packet pkt;
+    pb::Peer *peer = pkt.mutable_peer();
+    pb::Peer *to = static_cast<pb::Peer*>(ctx);
+    if (to == NULL) {
+        peer->set_name("gs");
+        peer->add_peers(sess->id);
+    } else {
+        peer->CopyFrom(*to);
+    }
+    pkt.set_type(name);
+    pkt.set_payload(payload);
+
+    size_t size = pkt.ByteSizeLong();
+    void *buf = malloc(size);
+    pkt.SerializeToArray(buf, size);
+
+    HiveSend_return res = HiveSend(sess->peer, size, buf);
+    free(buf);
+    if (res.r0 != 0) {
+        LOG_ERROR("rpc", "gohive send  failed: ", res.r1);
+        return -1;
+    }
+    return 0;
+}
+
+
+int send(const std::string &name, const pb_t &pb, void *ctx)
+{
+    const RpcSession *sess = GetSession(name);
+    if (sess == NULL) {
+        LOG_ERROR("rpc", "no found rpc session: %s", name.c_str());
+        return -1;
+    }
+    return send(sess, pb, ctx);
 }
 
 int send(oid_t peer, const pb_t &pb, void *ctx)
 {
-    std::shared_ptr<struct RpcSession> s = RpcSessionFind(peer);
-    if (s == NULL || s->client == NULL) {
-        return -1;
+    const RpcSession *sess = GetSession(peer);
+    if (sess == NULL) {
+        LOG_ERROR("rpc", "no found rpc session: %lld", peer);
     }
-
-    s->client->PushSend(pb, ctx);
-    return 0;
+    return send(sess, pb, ctx);
 }
 
 int proc(void)
