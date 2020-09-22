@@ -35,7 +35,7 @@ void srand(int seed);
 /// Generate a pseudo-random intege in rthe mathematical range [0, RAND_MAX].
 /// @return A pseudo-random integer.
 ///
-int rand();
+int rand(int seed = 0);
 
 ///
 /// Generate float random number in [min, max].
@@ -43,7 +43,7 @@ int rand();
 /// @param max Maximum number.
 /// @return Generated random number.
 ///
-float frand(float min, float max);
+float frand(float min, float max, int seed = 0);
 
 ///
 /// Generate integer random number in [min, max].
@@ -51,7 +51,7 @@ float frand(float min, float max);
 /// @param max Maximum number.
 /// @return Generated integer random number.
 ///
-int rand(int min, int max);
+int rand(int min, int max, int seed = 0);
 
 ///
 /// Hit times within range.
@@ -59,7 +59,7 @@ int rand(int min, int max);
 /// @param times Run times.
 /// @return Hit times.
 ///
-int rand_hit(int range, int times);
+int rand_hit(int range, int times, int seed = 0);
 
 ///
 /// Generate several random numbers in [min, max](put back if hit).
@@ -68,7 +68,7 @@ int rand_hit(int range, int times);
 /// @param res Roll result.
 /// @param times Roll times.
 ///
-void roll_pb(int min, int max, roll_res &res, int times);
+void roll_pb(int min, int max, roll_res &res, int times, int seed = 0);
 
 ///
 /// Generate several random numbers in [min, max](remove if hit).
@@ -77,7 +77,7 @@ void roll_pb(int min, int max, roll_res &res, int times);
 /// @param res Roll result.
 /// @param times Roll times.
 ///
-void roll_rm(int min, int max, roll_res &res, int times);
+void roll_rm(int min, int max, roll_res &res, int times, int seed = 0);
 
 ///
 /// Generate several random requests in request group(independent).
@@ -85,7 +85,7 @@ void roll_rm(int min, int max, roll_res &res, int times);
 /// @param res Random response group.
 /// @param times Random times.
 ///
-void rand(const roll_req &req, roll_res &res, int times);
+void rand(const roll_req &req, roll_res &res, int times, int seed = 0);
 
 ///
 /// Generate several random requests in request group(put back if hit).
@@ -95,7 +95,7 @@ void rand(const roll_req &req, roll_res &res, int times);
 /// @param weight With weight if true.
 ///
 void roll_pb(const roll_req &req, roll_res &res, int times,
-        bool weight = false);
+        bool weight = false, int seed = 0);
 
 ///
 /// Generate several random requests in request group(remove if hit).
@@ -105,7 +105,7 @@ void roll_pb(const roll_req &req, roll_res &res, int times,
 /// @param weight With weight if true.
 ///
 void roll_rm(roll_req &req, roll_res &res, int times,
-        bool weight = false);
+        bool weight = false, int seed = 0);
 
 ///
 /// Generate key after given times in request group(remove if hit).
@@ -114,14 +114,14 @@ void roll_rm(roll_req &req, roll_res &res, int times,
 /// @param weight With weight if true.
 /// @return Rand key after given times.
 ///
-int roll_rm(roll_req &req, int times, bool weight = false);
+int roll_rm(roll_req &req, int times, bool weight = false, int seed = 0);
 
 ///
 /// Generate random string.
 /// @param rnds Generated random string.
 /// @param len String length.
 ///
-void rand_str(char *rnds, int len);
+void rand_str(char *rnds, int len, int seed = 0);
 
 ///
 /// Shuffle cards.
