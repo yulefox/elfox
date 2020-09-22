@@ -113,7 +113,7 @@ static void on_recv(int size, const void *payload) {
     //msg->peer = peer;
     msg->pb = NULL;
     msg->rpc_ctx = (void*)from;
-    msg->ctx = (elf::context_t*)((void*)msg);
+    msg->ctx = NULL;
     msg->is_raw = false;
 
     //

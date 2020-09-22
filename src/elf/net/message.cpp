@@ -75,9 +75,7 @@ void rpc_message_handle(recv_message_t *msg)
             net_stat_recv(*msg);
             hdl->proc(*msg);
         }
-    } else if ((msg->ctx != NULL) && !net_internal(*(msg->ctx))) {
-        //net_error(msg->ctx);
-        //net_close(msg->peer);
+    } else {
         LOG_WARN("net", "%lld INVALID message: %s.",
                 msg->peer,
                 msg->name.c_str());
